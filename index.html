@@ -628,7 +628,7 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 4000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 8000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
         const PROMPT_AUDIO_FILES = ['audio/prompt_1.wav', 'audio/prompt_2.wav', 'audio/prompt_3.wav', 'audio/prompt_4.wav', 'audio/prompt_5.wav', 'audio/prompt_6.wav'];
         const FINAL_PROMPT = 'audio/prompt_7.wav';
         
@@ -688,14 +688,15 @@
                     controlsBar.style.display = 'flex';
                     updateProgress();
                     
-                    // 同时启动音频录制和交互追踪，确保时间戳对齐
-                    const startTime = Date.now();
-                    
                     if (state.mediaRecorder && state.mediaRecorder.state === 'inactive') {
                         state.mediaRecorder.start();
                     }
                     
-                    // 确保 InteractionTracker 在音频录制启动后立即启动，时间戳对齐
+                    // 语音播放完成后，启动 InteractionTracker
+                    if (window.InteractionTracker) {
+                        window.InteractionTracker.start();
+                    }
+                    
                     initTest();
                 });
             } catch (err) {
@@ -706,6 +707,7 @@
 
         function initTest() {
             // 初始化交互追踪器
+            // 注意：InteractionTracker.start() 已在语音播放完成后调用，这里不再重复调用
             if (window.InteractionTracker) {
                 window.InteractionTracker.init({
                     autoTrack: true,
@@ -715,13 +717,20 @@
                     trackNavigation: true,
                     includeTimestamp: false
                 });
-                window.InteractionTracker.start();
+                // InteractionTracker.start() 已在语音播放完成的回调中调用
                 window.InteractionTracker._updateCurrentPlate(state.currentIndex);
             }
             
             loadImage(state.currentIndex);
             setupEventListeners();
             updateNavButtons();
+            
+            // 第一张图片显示后，立即启动"下一张"按钮的冷却时间
+            // 这样确保用户从第一张图片开始就有冷却限制
+            // 注意：必须在 updateNavButtons() 之后调用，以确保冷却状态不会被覆盖
+            if (state.currentIndex === 0) {
+                disableNextButton();
+            }
 
             const resizeObserver = new ResizeObserver(() => {
                 if (rorschachImage.complete && rorschachImage.naturalWidth > 0) {
@@ -958,12 +967,6 @@
                 }
             }
 
-            // 如果是点击下一张（包括第一张），立即启动冷却
-            // 这样确保从任何图版点击"下一张"都有冷却时间
-            if (direction === 1 && newIndex < state.totalImages) {
-                disableNextButton();
-            }
-
             if (direction === 1 && newIndex === state.totalImages) {
                 // 记录最后一张图的导航操作（进入选择阶段）
                 if (window.InteractionTracker && window.InteractionTracker._trackNavigation) {
@@ -997,8 +1000,9 @@
                 loadImage(state.currentIndex);
                 updateProgress();
                 
-                // 如果是点击下一张，打印数据结构（冷却已在上面启动）
+                // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
                 if (direction === 1) {
+                    disableNextButton();
                     // 调用 InteractionTracker 的日志打印方法
                     if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
                         window.InteractionTracker.printDataStructures(state.currentIndex);
@@ -1009,7 +1013,7 @@
         }
 
         function loadImage(index) {
-            // 注意：时间戳已在 navigate() 或 initTest() 中记录
+            // 注意：时间戳已在 navigate() 或 startTest() 中记录
             // 这里不需要再次记录，只需要确保图版索引同步
             if (window.InteractionTracker && window.InteractionTracker._updateCurrentPlate) {
                 // 只更新索引，不记录时间戳（因为已经记录过了）
@@ -1131,6 +1135,10 @@
             if (window.InteractionTracker) {
                 try {
                     window.InteractionTracker.stop();
+                    
+                    // 输出所有版图的统计信息（完整数据）
+                    window.InteractionTracker.printAllPlatesStatistics();
+                    
                     const interactionData = window.InteractionTracker.exportJSON({
                         pretty: true,
                         includeStats: true,

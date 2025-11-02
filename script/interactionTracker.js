@@ -612,6 +612,76 @@
         }
 
         /**
+         * 输出所有版图的统计信息（用于测试完成后查看汇总）
+         * 输出 this.data 中所有版图的完整统计信息（整体格式）
+         */
+        printAllPlatesStatistics() {
+            // 构建整体统计对象
+            const allPlatesStats = {
+                // 完整原始数据
+                data: this.data,
+                
+                // 各版图统计信息
+                plates: {},
+                
+                // 全局统计
+                global: {},
+                
+                // 时间戳信息
+                timestamps: {
+                    relative: {},
+                    absolute: {}
+                }
+            };
+            
+            // 遍历所有版图（1-10），构建统计信息
+            for (let i = 1; i <= 10; i++) {
+                const plateKey = String(i);
+                
+                // 获取各版图的统计数据
+                const plateStats = this.getStatistics(i);
+                
+                // 构建版图统计对象
+                allPlatesStats.plates[plateKey] = {
+                    zoom: {
+                        count: this.data.zoom[plateKey] ? this.data.zoom[plateKey].length : 0,
+                        data: this.data.zoom[plateKey] || []
+                    },
+                    rotate: {
+                        count: this.data.rotate[plateKey] ? this.data.rotate[plateKey].length : 0,
+                        data: this.data.rotate[plateKey] || []
+                    },
+                    navigation: {
+                        count: this.data.navigation[plateKey] ? this.data.navigation[plateKey].length : 0,
+                        data: this.data.navigation[plateKey] || []
+                    },
+                    drawingTracks: this.data.drawingTracks[plateKey] === 0 || !this.data.drawingTracks[plateKey] ? 
+                        0 : this.data.drawingTracks[plateKey],
+                    statistics: plateStats
+                };
+            }
+            
+            // 全局统计
+            const globalStats = this.getStatistics();
+            allPlatesStats.global = {
+                totalZoom: globalStats.totalZoom,
+                totalRotate: globalStats.totalRotate,
+                totalNavigation: globalStats.totalNavigation,
+                totalDrawingTracks: globalStats.totalDrawingTracks,
+                testDuration: Math.floor(globalStats.testDuration / 1000) // 秒
+            };
+            
+            // 时间戳信息
+            allPlatesStats.timestamps.relative = this.getAudioTimestamps();
+            allPlatesStats.timestamps.absolute = this.getAbsoluteTimestamps();
+            
+            // 输出整体统计信息
+            console.log('\n==================== 所有版图统计信息 ====================');
+            console.log('[完整版图统计数据]', allPlatesStats);
+            console.log('==================== 所有版图统计信息结束 ====================\n');
+        }
+
+        /**
          * 导出JSON格式数据
          * @param {Object} options - 导出选项
          * @returns {string} JSON字符串
@@ -852,6 +922,7 @@
         getAbsoluteTimestamps: () => trackerInstance.getAbsoluteTimestamps(),
         recordSelectPhase: () => trackerInstance.recordSelectPhase(),
         printDataStructures: (plateIndex) => trackerInstance.printDataStructures(plateIndex),
+        printAllPlatesStatistics: () => trackerInstance.printAllPlatesStatistics(),
 
         // 配置
         updateConfig: (config) => trackerInstance.updateConfig(config),
