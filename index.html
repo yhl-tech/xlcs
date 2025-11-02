@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>罗夏墨迹测试-图版</title>
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --primary-light: #3b82f6;
+            --primary-lighter: #dbeafe;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-gradient);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* 屏幕切换 */
+        .screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        #info-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background: var(--bg-gradient);
+        }
+
+        .info-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 50px 40px;
+            box-shadow: var(--shadow-lg);
+            max-width: 450px;
+            width: 100%;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-card h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .info-form-group {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-form-group label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .info-form-group input {
+            padding: 12px 14px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f9fafb;
+        }
+
+        .info-form-group input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 3px var(--primary-lighter);
+        }
+
+        #start-test-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 30px;
+            background: var(--primary-light);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        #start-test-btn:hover {
+            background: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        #start-test-btn:active {
+            transform: translateY(0);
+        }
+
+        /* 应用窗口 */
+        .app-window {
+            display: flex;
+            flex-direction: column;
+            width: 95vw;
+            max-width: 1200px;
+            height: 95vh;
+            max-height: 900px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .title-bar {
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+            color: white;
+            padding: 16px 24px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .progress-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: #fafafa;
+        }
+
+        #intro-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            box-sizing: border-box;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #intro-image {
+            max-width: 300px;
+            max-height: 300px;
+            object-fit: contain;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+        }
+
+        #intro-text {
+            font-size: 15px;
+            line-height: 1.8;
+            max-width: 700px;
+            text-align: left;
+            color: var(--text-primary);
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+
+        #image-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        #rorschach-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            transition: transform 0.2s ease-out;
+        }
+
+        #drawing-canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: crosshair;
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        /* 后测试视图 */
+        #post-test-view,
+        #summary-view {
+            padding: 30px;
+            overflow-y: auto;
+            height: 100%;
+            background: var(--card-bg);
+            box-sizing: border-box;
+        }
+
+        #post-test-view h2,
+        #summary-view h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: var(--primary-color);
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        #question-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            min-height: 40px;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: var(--primary-lighter);
+            border-radius: 10px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .grid-item {
+            border: 3px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            overflow: hidden;
+        }
+
+        .grid-item:hover {
+            border-color: var(--primary-light);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .grid-item.selected {
+            border-color: var(--success-color);
+            background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.05) 100%);
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+            transform: scale(1.05);
+        }
+
+        .grid-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .grid-item h4 {
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .summary-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
+
+        .summary-item {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            background: white;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .summary-item:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .summary-item h4 {
+            margin-bottom: 12px;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .summary-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        /* 控制栏 */
+        .controls-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            border-top: 2px solid var(--border-color);
+            background: linear-gradient(90deg, #f8fafc 0%, #f0f9ff 100%);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .control-group button {
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-group button:hover {
+            border-color: var(--primary-light);
+            background: var(--primary-lighter);
+            color: var(--primary-color);
+        }
+
+        .control-group button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-group button.selected {
+            background: var(--primary-light);
+            border-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 0 0 3px var(--primary-lighter);
+        }
+
+        .color-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-option {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .color-option:hover {
+            transform: scale(1.15);
+        }
+
+        .color-option.selected {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
+        }
+
+        #finish-btn {
+            padding: 12px 28px;
+            margin-top: 25px;
+            background: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        #finish-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* 提示指示器 */
+        .prompt-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--warning-color);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            animation: slideInUp 0.3s ease-out;
+            box-shadow: var(--shadow-lg);
+            z-index: 200;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .info-card {
+                padding: 30px 20px;
+            }
+
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 10px;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .controls-bar {
+                gap: 8px;
+            }
+
+            .control-group {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .control-group button {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 信息输入屏幕 -->
+    <div id="info-screen" class="screen">
+        <div class="info-card">
+            <h1>🎨 罗夏墨迹测试</h1>
+            <div class="info-form-group">
+                <label for="age">年龄</label>
+                <input type="text" id="age" placeholder="例如：25">
+            </div>
+            <div class="info-form-group">
+                <label for="education">学历</label>
+                <input type="text" id="education" placeholder="例如：本科">
+            </div>
+            <div class="info-form-group">
+                <label for="occupation">职业</label>
+                <input type="text" id="occupation" placeholder="例如：工程师">
+            </div>
+            <div class="info-form-group">
+                <label for="mood">当前心情</label>
+                <input type="text" id="mood" placeholder="例如：平静">
+            </div>
+            <button id="start-test-btn">开始测试</button>
+        </div>
+    </div>
+
+    <!-- 主应用窗口 -->
+    <div id="app-window" class="app-window screen">
+        <div class="title-bar">
+            <span>🎨 罗夏墨迹测试</span>
+            <span class="progress-info" id="progress-text">准备中...</span>
+        </div>
+
+        <div class="main-content" id="main-content">
+            <div id="intro-overlay">
+                <img id="intro-image" src="images/rorschach-blot-example.png" alt="介绍">
+                <p id="intro-text"></p>
+            </div>
+            <div id="image-container">
+                <img id="rorschach-image" src="" alt="罗夏墨迹图">
+                <canvas id="drawing-canvas"></canvas>
+            </div>
+        </div>
+
+        <div id="post-test-view" style="display: none;">
+            <h2>📊 测试总结与反思</h2>
+            <p id="question-text"></p>
+            <div id="post-test-grid" class="image-grid"></div>
+            <button id="finish-btn" style="display: none;">✅ 完成测试并查看汇总</button>
+        </div>
+
+        <div id="summary-view" style="display: none;">
+            <h2>📈 完整测试汇总</h2>
+            <div id="summary-grid" class="image-grid"></div>
+        </div>
+
+        <div class="controls-bar" id="controls-bar" style="display: none;">
+            <div class="control-group">
+                <button id="prev-btn">◀ 上一张</button>
+            </div>
+            <div class="control-group">
+                <button id="zoom-in-btn">🔍+ 放大</button>
+                <button id="zoom-out-btn">🔍- 缩小</button>
+                <button id="rotate-left-btn">↶ 左转</button>
+                <button id="rotate-right-btn">↷ 右转</button>
+            </div>
+            <div class="control-group">
+                <button id="pen-tool" class="selected">✏️ 画笔</button>
+                <div class="color-selector">
+                    <div class="color-option selected" data-color="red" style="background-color: #ef4444;"></div>
+                    <div class="color-option" data-color="green" style="background-color: #10b981;"></div>
+                    <div class="color-option" data-color="blue" style="background-color: #3b82f6;"></div>
+                </div>
+                <button id="eraser-tool">🗑️ 擦除</button>
+            </div>
+            <div class="control-group">
+                <button id="next-btn">下一张 ▶</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-player"></audio>
+
+    <!-- 交互追踪系统 -->
+    <script src="script/interactionTracker.js"></script>
+
+    <script>
+        const state = {
+            currentIndex: 0,
+            totalImages: 10,
+            zoom: 1,
+            rotation: 0,
+            drawing: false,
+            tool: 'pen',
+            color: 'red',
+            canvasStates: new Array(10).fill(null),
+            isSpeaking: false,
+            mediaRecorder: null,
+            audioChunks: [],
+            postTestAnswers: {},
+            inactivityLevel: 0,
+            nextButtonCooldown: 0  // "下一张"按钮冷却时间（秒）
+        };
+
+        let inactivityTimer = null;
+        let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
+        const INACTIVITY_THRESHOLD_1 = 4000;  // 第一次提示
+        const INACTIVITY_THRESHOLD_2 = 8000;  // 第二次提示
+        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        const PROMPT_AUDIO_FILES = ['audio/prompt_1.wav', 'audio/prompt_2.wav', 'audio/prompt_3.wav', 'audio/prompt_4.wav', 'audio/prompt_5.wav', 'audio/prompt_6.wav'];
+        const FINAL_PROMPT = 'audio/prompt_7.wav';
+        
+        const POST_TEST_QUESTIONS = [
+            { key: 'represent', text: '十张图片里，选择一张最能代表你的。', audio: 'audio/q_represent.wav' },
+            { key: 'mother', text: '十张图片里，选择一张最能代表你母亲的。', audio: 'audio/q_mother.wav' },
+            { key: 'father', text: '十张图片里，选择一张最能代表你父亲的。', audio: 'audio/q_father.wav' },
+            { key: 'like', text: '十张图片里，你最喜欢哪一张？', audio: 'audio/q_like.wav' },
+            { key: 'dislike', text: '十张图片里，你最讨厌哪一张？', audio: 'audio/q_dislike.wav' },
+            { key: 'mood', text: '测试到此为止了，你现在心情如何？相比刚开始测试时？', audio: 'audio/q_mood.wav' }
+        ];
+        
+        let currentQuestionIndex = 0;
+
+        // DOM Elements
+        const infoScreen = document.getElementById('info-screen');
+        const appWindow = document.getElementById('app-window');
+        const mainContent = document.getElementById('main-content');
+        const startTestBtn = document.getElementById('start-test-btn');
+        const introOverlay = document.getElementById('intro-overlay');
+        const introText = document.getElementById('intro-text');
+        const audioPlayer = document.getElementById('audio-player');
+        const controlsBar = document.getElementById('controls-bar');
+        const rorschachImage = document.getElementById('rorschach-image');
+        const canvas = document.getElementById('drawing-canvas');
+        const imageContainer = document.getElementById('image-container');
+        const postTestView = document.getElementById('post-test-view');
+        const summaryView = document.getElementById('summary-view');
+        const questionText = document.getElementById('question-text');
+        const finishBtn = document.getElementById('finish-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const progressText = document.getElementById('progress-text');
+        const ctx = canvas.getContext('2d');
+
+        // 启动测试
+        async function startTest() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                initAudio(stream);
+
+                infoScreen.style.display = 'none';
+                appWindow.style.display = 'flex';
+
+                introText.textContent = `罗夏墨迹是瑞士心理学家发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
+
+你要做的就是告诉我，你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
+
+你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。
+
+总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
+
+                rorschachImage.src = `images/rorschach-blot-1.png`;
+
+                playAudio('audio/1.mp3', () => {
+                    introOverlay.style.display = 'none';
+                    controlsBar.style.display = 'flex';
+                    updateProgress();
+                    
+                    // 同时启动音频录制和交互追踪，确保时间戳对齐
+                    const startTime = Date.now();
+                    
+                    if (state.mediaRecorder && state.mediaRecorder.state === 'inactive') {
+                        state.mediaRecorder.start();
+                    }
+                    
+                    // 确保 InteractionTracker 在音频录制启动后立即启动，时间戳对齐
+                    initTest();
+                });
+            } catch (err) {
+                console.error("麦克风授权失败:", err);
+                alert("需要麦克风权限才能开始测试。请刷新页面并允许访问。");
+            }
+        }
+
+        function initTest() {
+            // 初始化交互追踪器
+            if (window.InteractionTracker) {
+                window.InteractionTracker.init({
+                    autoTrack: true,
+                    trackZoom: true,
+                    trackRotate: true,
+                    trackDrawing: true,
+                    trackNavigation: true,
+                    includeTimestamp: false
+                });
+                window.InteractionTracker.start();
+                window.InteractionTracker._updateCurrentPlate(state.currentIndex);
+            }
+            
+            loadImage(state.currentIndex);
+            setupEventListeners();
+            updateNavButtons();
+
+            const resizeObserver = new ResizeObserver(() => {
+                if (rorschachImage.complete && rorschachImage.naturalWidth > 0) {
+                    resizeCanvas();
+                    loadCanvasState(state.currentIndex);
+                }
+            });
+            resizeObserver.observe(rorschachImage);
+
+            // 初始化时，如果图片已加载，立即加载画布状态
+            if (rorschachImage.complete) {
+                resizeCanvas();
+                loadCanvasState(state.currentIndex);
+            } else {
+                // 图片加载完成后加载画布状态
+                rorschachImage.onload = () => {
+                    resizeCanvas();
+                    loadCanvasState(state.currentIndex);
+                    // 移除事件处理器，避免与 loadImage 中的处理器冲突
+                    rorschachImage.onload = null;
+                };
+            }
+
+            resetInactivityTimer();
+        }
+
+        function resizeCanvas() {
+            canvas.width = rorschachImage.clientWidth;
+            canvas.height = rorschachImage.clientHeight;
+            canvas.style.width = rorschachImage.clientWidth + 'px';
+            canvas.style.height = rorschachImage.clientHeight + 'px';
+        }
+
+        // 音频和语音检测
+        function initAudio(stream) {
+            state.mediaRecorder = new MediaRecorder(stream);
+            state.mediaRecorder.ondataavailable = event => state.audioChunks.push(event.data);
+
+            state.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioUrl;
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                a.download = `rorschach_recording_${timestamp}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(audioUrl);
+                state.audioChunks = [];
+            };
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function checkSpeaking() {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = dataArray.reduce((a, b) => a + b, 0);
+                if (sum / dataArray.length > 10) {
+                    state.isSpeaking = true;
+                    resetInactivityTimer();
+                } else {
+                    state.isSpeaking = false;
+                }
+                requestAnimationFrame(checkSpeaking);
+            }
+            checkSpeaking();
+        }
+
+        function playAudio(src, onendedCallback = null) {
+            audioPlayer.src = src;
+            audioPlayer.onended = onendedCallback;
+            audioPlayer.play().catch(e => console.error("音频播放失败:", e));
+        }
+
+        // 优化的不活动逻辑
+        function playRandomPrompt() {
+            if (audioPlayer.paused && !state.isSpeaking) {
+                if (state.inactivityLevel === 0) {
+                    // 第一次提示：播放随机prompt
+                    const randomIndex = Math.floor(Math.random() * PROMPT_AUDIO_FILES.length);
+                    showPromptIndicator('提示：请继续描述...');
+                    playAudio(PROMPT_AUDIO_FILES[randomIndex], () => {
+                        state.inactivityLevel = 1;
+                        resetInactivityTimer();
+                    });
+                } else if (state.inactivityLevel === 1) {
+                    // 第二次提示：播放prompt_7
+                    showPromptIndicator('提示：请点击下一张图片继续...');
+                    playAudio(FINAL_PROMPT, () => {
+                        state.inactivityLevel = 0;
+                        resetInactivityTimer();
+                    });
+                }
+            } else {
+                resetInactivityTimer();
+            }
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            state.inactivityLevel = 0;
+
+            // 第一次提示：4秒
+            inactivityTimer = setTimeout(() => {
+                if (!state.isSpeaking && audioPlayer.paused) {
+                    playRandomPrompt();
+                }
+            }, INACTIVITY_THRESHOLD_1);
+
+            // 第二次提示：8秒（在第一次基础上再4秒）
+            setTimeout(() => {
+                if (state.inactivityLevel === 1 && !state.isSpeaking && audioPlayer.paused) {
+                    playRandomPrompt();
+                }
+            }, INACTIVITY_THRESHOLD_2);
+        }
+
+        function showPromptIndicator(message) {
+            const existing = document.querySelector('.prompt-indicator');
+            if (existing) existing.remove();
+
+            const indicator = document.createElement('div');
+            indicator.className = 'prompt-indicator';
+            indicator.textContent = message;
+            document.body.appendChild(indicator);
+            setTimeout(() => indicator.remove(), 3000);
+        }
+
+        // 事件监听器
+        function setupEventListeners() {
+            startTestBtn.addEventListener('click', startTest);
+            prevBtn.addEventListener('click', () => navigate(-1));
+            nextBtn.addEventListener('click', () => navigate(1));
+            finishBtn.addEventListener('click', finishAndSave);
+
+            document.getElementById('zoom-in-btn').addEventListener('click', () => {
+                updateTransform({ zoom: state.zoom * 1.2 });
+                resetInactivityTimer();
+            });
+            document.getElementById('zoom-out-btn').addEventListener('click', () => {
+                updateTransform({ zoom: Math.max(0.2, state.zoom / 1.2) });
+                resetInactivityTimer();
+            });
+            document.getElementById('rotate-left-btn').addEventListener('click', () => {
+                updateTransform({ rotation: state.rotation - 30 });
+                resetInactivityTimer();
+            });
+            document.getElementById('rotate-right-btn').addEventListener('click', () => {
+                updateTransform({ rotation: state.rotation + 30 });
+                resetInactivityTimer();
+            });
+            document.getElementById('pen-tool').addEventListener('click', () => {
+                selectTool('pen');
+                resetInactivityTimer();
+            });
+            document.getElementById('eraser-tool').addEventListener('click', () => {
+                selectTool('eraser');
+                resetInactivityTimer();
+            });
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.addEventListener('click', (e) => {
+                    selectColor(e.target.dataset.color);
+                    resetInactivityTimer();
+                });
+            });
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+        }
+
+        /**
+         * 禁用"下一张"按钮并开始冷却倒计时
+         */
+        function disableNextButton() {
+            // 如果已经在冷却中，直接返回
+            if (state.nextButtonCooldown > 0) {
+                return;
+            }
+
+            // 禁用按钮
+            nextBtn.disabled = true;
+            state.nextButtonCooldown = NEXT_BUTTON_COOLDOWN;
+
+            // 更新按钮文本显示倒计时
+            function updateCooldownDisplay() {
+                if (state.nextButtonCooldown > 0) {
+                    nextBtn.textContent = `下一张 ▶ (${state.nextButtonCooldown}秒)`;
+                    state.nextButtonCooldown--;
+                } else {
+                    // 冷却结束，恢复按钮
+                    nextBtn.disabled = false;
+                    nextBtn.textContent = '下一张 ▶';
+                    if (nextButtonCooldownTimer) {
+                        clearInterval(nextButtonCooldownTimer);
+                        nextButtonCooldownTimer = null;
+                    }
+                }
+            }
+
+            // 立即更新一次显示
+            updateCooldownDisplay();
+
+            // 每秒更新一次倒计时
+            nextButtonCooldownTimer = setInterval(updateCooldownDisplay, 1000);
+        }
+
+        // 导航和状态
+        function navigate(direction) {
+            saveCanvasState(state.currentIndex);
+            const newIndex = state.currentIndex + direction;
+            
+            // 如果是点击下一张，检查是否在冷却中
+            // 但如果是最后一张图（即将进入选择阶段），允许操作
+            if (direction === 1 && state.nextButtonCooldown > 0) {
+                // 如果即将进入选择阶段，允许操作并清除冷却
+                if (newIndex === state.totalImages) {
+                    // 清除冷却定时器
+                    if (nextButtonCooldownTimer) {
+                        clearInterval(nextButtonCooldownTimer);
+                        nextButtonCooldownTimer = null;
+                    }
+                    state.nextButtonCooldown = 0;
+                } else {
+                    // 在冷却中且不是最后一张，不允许操作
+                    return;
+                }
+            }
+
+            // 如果是点击下一张（包括第一张），立即启动冷却
+            // 这样确保从任何图版点击"下一张"都有冷却时间
+            if (direction === 1 && newIndex < state.totalImages) {
+                disableNextButton();
+            }
+
+            if (direction === 1 && newIndex === state.totalImages) {
+                // 记录最后一张图的导航操作（进入选择阶段）
+                if (window.InteractionTracker && window.InteractionTracker._trackNavigation) {
+                    window.InteractionTracker._trackNavigation('next');
+                }
+                
+                // 清除冷却定时器（如果存在）
+                if (nextButtonCooldownTimer) {
+                    clearInterval(nextButtonCooldownTimer);
+                    nextButtonCooldownTimer = null;
+                }
+                state.nextButtonCooldown = 0;
+                nextBtn.disabled = false;
+                nextBtn.textContent = '下一张 ▶';
+                showPostTestView();
+                return;
+            }
+
+            if (newIndex >= 0 && newIndex < state.totalImages) {
+                // 记录导航操作（在切换之前，记录的是当前图版的导航操作）
+                if (window.InteractionTracker && window.InteractionTracker._trackNavigation) {
+                    window.InteractionTracker._trackNavigation(direction === 1 ? 'next' : 'prev');
+                }
+                
+                state.currentIndex = newIndex;
+                // 更新追踪器的当前图版索引（记录时间戳）
+                // 注意：这里记录的是切换到新图版的时间，即新图版开始的时间
+                if (window.InteractionTracker && window.InteractionTracker._updateCurrentPlate) {
+                    window.InteractionTracker._updateCurrentPlate(state.currentIndex);
+                }
+                loadImage(state.currentIndex);
+                updateProgress();
+                
+                // 如果是点击下一张，打印数据结构（冷却已在上面启动）
+                if (direction === 1) {
+                    // 调用 InteractionTracker 的日志打印方法
+                    if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
+                        window.InteractionTracker.printDataStructures(state.currentIndex);
+                    }
+                }
+            }
+            resetInactivityTimer();
+        }
+
+        function loadImage(index) {
+            // 注意：时间戳已在 navigate() 或 initTest() 中记录
+            // 这里不需要再次记录，只需要确保图版索引同步
+            if (window.InteractionTracker && window.InteractionTracker._updateCurrentPlate) {
+                // 只更新索引，不记录时间戳（因为已经记录过了）
+                window.InteractionTracker._updateCurrentPlate(index);
+            }
+            updateTransform({ zoom: 1, rotation: 0 }, true);
+            
+            // 切换图版时立即清除画布（避免显示上一张图的轨迹）
+            clearCanvas();
+            
+            // 移除之前的 onload 事件处理器，避免冲突
+            rorschachImage.onload = null;
+            
+            rorschachImage.src = `images/rorschach-blot-${index + 1}.png`;
+            
+            // 确保图片加载后加载该图版的画布状态
+            if (rorschachImage.complete) {
+                // 图片已缓存，立即加载画布状态
+                resizeCanvas();
+                loadCanvasState(index);
+            } else {
+                // 图片需要加载，等待加载完成
+                rorschachImage.onload = () => {
+                    resizeCanvas();
+                    loadCanvasState(index);
+                };
+            }
+            
+            updateNavButtons();
+        }
+
+        function updateNavButtons() {
+            prevBtn.disabled = state.currentIndex === 0;
+            // "下一张"按钮的禁用状态由冷却时间控制
+            // 如果是最后一张图，始终允许点击（进入选择阶段不受冷却限制）
+            if (state.currentIndex === state.totalImages - 1) {
+                nextBtn.disabled = false;
+                nextBtn.textContent = '下一张 ▶';
+            }
+            // 其他情况下，禁用状态由冷却定时器控制
+        }
+
+        function updateProgress() {
+            progressText.textContent = `第 ${state.currentIndex + 1} / ${state.totalImages} 张图片`;
+        }
+
+        // 后测试视图
+        function showPostTestView() {
+            clearTimeout(inactivityTimer);
+            mainContent.style.display = 'none';
+            controlsBar.style.display = 'none';
+            postTestView.style.display = 'block';
+            progressText.textContent = '测试总结阶段';
+
+            // 记录进入选择阶段的时间
+            if (window.InteractionTracker && window.InteractionTracker.recordSelectPhase) {
+                window.InteractionTracker.recordSelectPhase();
+            }
+
+            const grid = document.getElementById('post-test-grid');
+            grid.innerHTML = '';
+            for (let i = 0; i < state.totalImages; i++) {
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                item.dataset.index = i;
+                item.innerHTML = `<img src="images/rorschach-blot-${i + 1}.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`;
+                item.addEventListener('click', handleImageSelection);
+                grid.appendChild(item);
+            }
+            askNextQuestion();
+        }
+
+        function askNextQuestion() {
+            document.querySelectorAll('.grid-item.selected').forEach(el => el.classList.remove('selected'));
+
+            if (currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
+                questionText.textContent = "所有问题已回答完毕。感谢您的参与！";
+                document.getElementById('post-test-grid').style.display = 'none';
+                finishBtn.style.display = 'inline-block';
+                return;
+            }
+
+            const question = POST_TEST_QUESTIONS[currentQuestionIndex];
+            questionText.textContent = question.text;
+            const gridContainer = document.getElementById('post-test-grid');
+
+            gridContainer.style.pointerEvents = 'none';
+            playAudio(question.audio, () => {
+                if (question.key !== 'mood') {
+                    gridContainer.style.pointerEvents = 'auto';
+                } else {
+                    currentQuestionIndex++;
+                    setTimeout(askNextQuestion, 1500);
+                }
+            });
+        }
+
+        function handleImageSelection(event) {
+            const selectedIndex = event.currentTarget.dataset.index;
+            const questionKey = POST_TEST_QUESTIONS[currentQuestionIndex].key;
+            state.postTestAnswers[questionKey] = parseInt(selectedIndex) + 1;
+
+            document.querySelectorAll('.grid-item.selected').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+
+            currentQuestionIndex++;
+
+            document.getElementById('post-test-grid').style.pointerEvents = 'none';
+            setTimeout(askNextQuestion, 500);
+        }
+
+        // 完成和汇总
+        function finishAndSave() {
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                state.mediaRecorder.stop();
+            }
+            
+            // 导出交互追踪数据
+            if (window.InteractionTracker) {
+                try {
+                    window.InteractionTracker.stop();
+                    const interactionData = window.InteractionTracker.exportJSON({
+                        pretty: true,
+                        includeStats: true,
+                        includeMetadata: true
+                    });
+                    console.log('[交互追踪数据]', JSON.parse(interactionData));
+                    
+                    // 获取旋转次数统计数据（仅记录到控制台，不自动导出）
+                    const rotationCounts = window.InteractionTracker.getRotationCounts();
+                    console.log('[旋转次数统计]', rotationCounts);
+                    
+                    // 获取画笔轨迹数据（仅记录到控制台，不自动导出）
+                    const drawingTracks = window.InteractionTracker.getDrawingTracks();
+                    console.log('[画笔轨迹数据]', drawingTracks);
+                    
+                    // 获取音频时间戳统计数据（仅记录到控制台，不自动导出）
+                    const audioTimestamps = window.InteractionTracker.getAudioTimestamps();
+                    console.log('[音频时间戳统计（相对时间）]', audioTimestamps);
+                    
+                    // 获取绝对时间戳统计数据
+                    const absoluteTimestamps = window.InteractionTracker.getAbsoluteTimestamps();
+                    console.log('[绝对时间戳统计]', absoluteTimestamps);
+                    
+                    // 可选：自动下载完整交互数据
+                    // window.InteractionTracker.download('json');
+                } catch (error) {
+                    console.error('[交互追踪] 导出数据失败:', error);
+                }
+            }
+            
+            showSummary();
+        }
+
+        function showSummary() {
+            postTestView.style.display = 'none';
+            summaryView.style.display = 'block';
+            progressText.textContent = '测试已完成！';
+
+            const grid = document.getElementById('summary-grid');
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！您的录音文件已开始下载。</h3></div>';
+
+            for (let i = 0; i < state.totalImages; i++) {
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `<h4>图 ${i + 1}</h4>`;
+                const compositeContainer = document.createElement('div');
+                compositeContainer.style.position = 'relative';
+                const baseImage = document.createElement('img');
+                baseImage.src = `images/rorschach-blot-${i + 1}.png`;
+                compositeContainer.appendChild(baseImage);
+                if (state.canvasStates[i]) {
+                    const drawingImage = document.createElement('img');
+                    drawingImage.src = state.canvasStates[i];
+                    drawingImage.style.position = 'absolute';
+                    drawingImage.style.top = 0;
+                    drawingImage.style.left = 0;
+                    drawingImage.style.width = '100%';
+                    drawingImage.style.height = '100%';
+                    compositeContainer.appendChild(drawingImage);
+                }
+                item.appendChild(compositeContainer);
+                grid.appendChild(item);
+            }
+        }
+
+        // 绘图和变换
+        function updateTransform(newTransforms = {}, force = false) {
+            if (!force) {
+                state.zoom = newTransforms.zoom !== undefined ? Math.max(0.2, newTransforms.zoom) : state.zoom;
+                state.rotation = newTransforms.rotation !== undefined ? newTransforms.rotation : state.rotation;
+            } else {
+                state.zoom = newTransforms.zoom;
+                state.rotation = newTransforms.rotation;
+            }
+            imageContainer.style.transform = `scale(${state.zoom}) rotate(${state.rotation}deg)`;
+        }
+
+        let lastX = 0, lastY = 0;
+
+        function startDrawing(e) {
+            state.drawing = true;
+            const rect = canvas.getBoundingClientRect();
+            lastX = e.clientX - rect.left;
+            lastY = e.clientY - rect.top;
+            
+            // 追踪画笔轨迹开始（仅记录画笔，不记录橡皮擦）
+            if (state.tool === 'pen' && window.InteractionTracker && window.InteractionTracker._trackDrawingStart) {
+                window.InteractionTracker._trackDrawingStart(lastX, lastY);
+            }
+            
+            resetInactivityTimer();
+        }
+
+        function draw(e) {
+            if (!state.drawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            ctx.beginPath();
+            if (state.tool === 'pen') {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = state.color;
+                ctx.lineWidth = 5;
+            } else if (state.tool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 20;
+            }
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            
+            // 追踪画笔轨迹点（仅记录画笔，不记录橡皮擦）
+            if (state.tool === 'pen' && window.InteractionTracker && window.InteractionTracker._trackDrawingPoint) {
+                window.InteractionTracker._trackDrawingPoint(x, y);
+            }
+            
+            lastX = x;
+            lastY = y;
+            resetInactivityTimer();
+        }
+
+        function stopDrawing() {
+            state.drawing = false;
+            
+            // 追踪画笔轨迹结束（仅画笔模式才记录）
+            if (state.tool === 'pen' && window.InteractionTracker && window.InteractionTracker._trackDrawingEnd) {
+                window.InteractionTracker._trackDrawingEnd();
+            }
+        }
+
+        function selectTool(tool) {
+            state.tool = tool;
+            document.getElementById('pen-tool').classList.toggle('selected', tool === 'pen');
+            document.getElementById('eraser-tool').classList.toggle('selected', tool === 'eraser');
+        }
+
+        function selectColor(color) {
+            state.color = color;
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.classList.toggle('selected', opt.dataset.color === color);
+            });
+            selectTool('pen');
+        }
+
+        function saveCanvasState(index) {
+            if (canvas.width > 0 && canvas.height > 0) {
+                state.canvasStates[index] = canvas.toDataURL();
+            }
+        }
+
+        function loadCanvasState(index) {
+            clearCanvas();
+            const dataUrl = state.canvasStates[index];
+            if (dataUrl) {
+                const img = new Image();
+                img.src = dataUrl;
+                img.onload = () => ctx.drawImage(img, 0, 0);
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', setupEventListeners);
+    </script>
+</body>
+</html>
