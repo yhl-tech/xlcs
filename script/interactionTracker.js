@@ -41,6 +41,9 @@
             // 当前图版索引（从state对象获取）
             this.currentPlateIndex = null;
             
+            // 标记事件是否已绑定
+            this._eventsBound = false;
+            
             // 时间戳追踪 - 记录每个图版的起始时间
             this.timestamps = {
                 start: null,      // 测试开始时间
@@ -83,16 +86,16 @@
 
         /**
          * 获取当前图版索引
-         * 通过访问全局state对象获取
+         * 通过访问全局state对象获取（始终使用最新的state值）
          */
         _getCurrentPlateIndex() {
-            // 优先使用缓存的索引（已通过updateCurrentPlate更新）
-            if (this.currentPlateIndex !== null) {
-                return this.currentPlateIndex;
-            }
-            // 尝试从全局state获取
+            // 始终从全局state获取最新的索引，确保准确性
             if (typeof window !== 'undefined' && window.state) {
                 return window.state.currentIndex || 0;
+            }
+            // 如果无法获取state，使用缓存的索引
+            if (this.currentPlateIndex !== null) {
+                return this.currentPlateIndex;
             }
             // 默认返回0
             return 0;
@@ -121,12 +124,26 @@
          * @param {number} direction - 1表示放大，-1表示缩小
          */
         trackZoom(direction) {
-            if (!this.config.trackZoom || this.status !== 'active') {
+            // 调试日志：检查为什么没有记录
+            if (!this.config.trackZoom) {
+                console.warn('[InteractionTracker] trackZoom 被禁用');
+                return;
+            }
+            if (this.status !== 'active') {
+                console.warn('[InteractionTracker] trackZoom 状态不是 active:', this.status);
                 return;
             }
 
             const plateKey = this._getCurrentPlateKey();
             const timestamp = this._getTimestamp();
+            
+            console.log('[InteractionTracker] 记录缩放操作:', {
+                direction,
+                plateKey,
+                currentIndex: this._getCurrentPlateIndex(),
+                stateIndex: typeof window !== 'undefined' && window.state ? window.state.currentIndex : 'N/A',
+                data: this.data.zoom[plateKey]
+            });
 
             const record = direction;
             this.data.zoom[plateKey].push(record);
@@ -137,11 +154,6 @@
                 direction: direction,
                 timestamp: timestamp
             });
-
-            // 调试日志
-            if (this.config.debug) {
-                console.log(`[InteractionTracker] 记录缩放操作: 图版${plateKey}, 方向=${direction > 0 ? '放大' : '缩小'}`);
-            }
         }
 
         /**
@@ -149,12 +161,26 @@
          * @param {number} angle - 旋转角度（每次30度）
          */
         trackRotate(angle) {
-            if (!this.config.trackRotate || this.status !== 'active') {
+            // 调试日志：检查为什么没有记录
+            if (!this.config.trackRotate) {
+                console.warn('[InteractionTracker] trackRotate 被禁用');
+                return;
+            }
+            if (this.status !== 'active') {
+                console.warn('[InteractionTracker] trackRotate 状态不是 active:', this.status);
                 return;
             }
 
             const plateKey = this._getCurrentPlateKey();
             const timestamp = this._getTimestamp();
+            
+            console.log('[InteractionTracker] 记录旋转操作:', {
+                angle,
+                plateKey,
+                currentIndex: this._getCurrentPlateIndex(),
+                stateIndex: typeof window !== 'undefined' && window.state ? window.state.currentIndex : 'N/A',
+                data: this.data.rotate[plateKey]
+            });
 
             // 记录旋转角度
             this.data.rotate[plateKey].push(angle);
@@ -182,7 +208,15 @@
             }
 
             const plateKey = this._getCurrentPlateKey();
+            const currentIndex = this._getCurrentPlateIndex();
             const timestamp = this._getTimestamp();
+            
+            console.log('[调试] trackNavigation 被调用:', {
+                direction,
+                plateKey,
+                currentIndex,
+                stateCurrentIndex: typeof window !== 'undefined' && window.state ? window.state.currentIndex : 'N/A'
+            });
 
             // 记录导航操作
             this.data.navigation[plateKey].push(direction);
@@ -289,6 +323,7 @@
             this.currentPlateIndex = null;
             this.currentTrack = null;
             this.currentTrackStartTime = null;
+            this._eventsBound = false; // 重置事件绑定标记
             this.timestamps = {
                 start: null,
                 plates: {},
@@ -555,60 +590,40 @@
          * @param {number} plateIndex - 图版索引（0-9）或图版编号（1-10）
          */
         printDataStructures(plateIndex) {
-            // 支持传入索引（0-9）或编号（1-10）
-            const plateNumber = plateIndex >= 1 && plateIndex <= 10 ? plateIndex : (plateIndex + 1);
+            // plateIndex 传入的是索引（0-9），需要转换为图版编号（1-10）
+            // 从 navigate() 函数传入的 previousIndex 是 state.currentIndex（0-9的索引）
+            // 所以统一转换为：plateIndex + 1
+            const plateNumber = plateIndex + 1;
             
-            console.log(`\n==================== 图版 ${plateNumber} 数据结构 ====================`);
+            console.log('[调试] printDataStructures 被调用:', {
+                plateIndex,
+                plateNumber,
+                allNavigationData: this.data.navigation
+            });
             
             try {
-                // 1. 当前图版统计信息
-                const plateStats = this.getStatistics(plateNumber);
-                console.log(`[图版 ${plateNumber} 统计信息]`, plateStats);
-                
-                // 2. 旋转次数统计
-                const rotationCounts = this.getRotationCounts();
-                console.log(`[旋转次数统计]`, rotationCounts);
-                console.log(`[图版 ${plateNumber} 旋转次数]:`, rotationCounts[String(plateNumber)] || 0);
-                
-                // 3. 画笔轨迹数据
+                // 获取画笔轨迹数据
                 const drawingTracks = this.getDrawingTracks();
-                const plateTracks = drawingTracks[String(plateNumber)];
-                console.log(`[画笔轨迹数据]`, drawingTracks);
-                if (plateTracks && plateTracks !== 0) {
-                    console.log(`[图版 ${plateNumber} 画笔轨迹]:`, JSON.stringify(plateTracks, null, 2));
-                } else {
-                    console.log(`[图版 ${plateNumber} 画笔轨迹]: 无`);
-                }
                 
-                // 4. 相对时间戳统计
-                const audioTimestamps = this.getAudioTimestamps();
-                console.log(`[音频时间戳统计（相对时间）]`, audioTimestamps);
-                console.log(`[图版 ${plateNumber} 起始时间（相对）]:`, audioTimestamps[String(plateNumber)] || '未记录');
-                
-                // 5. 绝对时间戳统计
-                const absoluteTimestamps = this.getAbsoluteTimestamps();
-                console.log(`[绝对时间戳统计]`, absoluteTimestamps);
-                console.log(`[图版 ${plateNumber} 起始时间（绝对）]:`, absoluteTimestamps[String(plateNumber)] || '未记录');
-                
-                // 6. 完整交互数据（仅当前图版相关）
+                // 获取所有交互数据
                 const allData = this.getAllData({
                     includeStats: false,
                     includeMetadata: false
                 });
                 const plateKey = String(plateNumber);
+                
+                // 只输出完整交互数据
                 const plateData = {
                     zoom: allData.zoom[plateKey] || [],
                     rotate: allData.rotate[plateKey] || [],
                     navigation: allData.navigation[plateKey] || [],
-                    drawingTracks: drawingTracks[plateKey] || 0  // 包含画笔轨迹数据（使用上面定义的drawingTracks）
+                    drawingTracks: drawingTracks[plateKey] || 0
                 };
                 console.log(`[图版 ${plateNumber} 完整交互数据]`, plateData);
                 
             } catch (error) {
                 console.error(`[数据结构打印错误]`, error);
             }
-            
-            console.log(`==================== 图版 ${plateNumber} 数据结束 ====================\n`);
         }
 
         /**
@@ -675,10 +690,7 @@
             allPlatesStats.timestamps.relative = this.getAudioTimestamps();
             allPlatesStats.timestamps.absolute = this.getAbsoluteTimestamps();
             
-            // 输出整体统计信息
-            console.log('\n==================== 所有版图统计信息 ====================');
             console.log('[完整版图统计数据]', allPlatesStats);
-            console.log('==================== 所有版图统计信息结束 ====================\n');
         }
 
         /**
@@ -739,8 +751,9 @@
          * 初始化追踪器并绑定事件
          */
         init() {
-            if (this.status !== 'idle') {
-                console.warn('[InteractionTracker] 追踪器已经初始化');
+            // 如果已经绑定过事件，不再重复绑定
+            if (this._eventsBound) {
+                console.warn('[InteractionTracker] 事件监听器已经绑定');
                 return;
             }
 
@@ -755,15 +768,15 @@
             // 等待一小段时间确保原有代码已加载
             setTimeout(() => {
                 this._interceptZoomEvents();
+                this._eventsBound = true; // 标记事件已绑定
                 
                 // 初始化当前图版索引
                 this.updateCurrentPlate(this._getCurrentPlateIndex());
                 
-                if (this.config.autoTrack) {
+                if (this.config.autoTrack && this.status === 'idle') {
                     this.start();
                 }
                 
-                console.log('[InteractionTracker] 追踪器初始化完成');
             }, 200);
         }
 
@@ -789,8 +802,6 @@
                 zoomOutBtn.addEventListener('click', () => {
                     this.trackZoom(-1);
                 }, true);
-
-                console.log('[InteractionTracker] 放大/缩小事件追踪已启用');
             }
 
             if (!rotateLeftBtn || !rotateRightBtn) {
@@ -805,8 +816,6 @@
                 rotateRightBtn.addEventListener('click', () => {
                     this.trackRotate(30);
                 }, true);
-
-                console.log('[InteractionTracker] 旋转事件追踪已启用');
             }
         }
 
@@ -946,11 +955,5 @@
         // 直接访问实例（高级用法）
         _instance: trackerInstance
     };
-
-    // 便于调试
-    if (typeof console !== 'undefined') {
-        console.log('[InteractionTracker] 交互追踪系统已加载');
-    }
-
 })(window);
 

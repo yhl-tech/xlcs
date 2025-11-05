@@ -603,8 +603,14 @@
 
     <audio id="audio-player"></audio>
 
+    <!-- Axios 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
     <!-- 交互追踪系统 -->
     <script src="script/interactionTracker.js"></script>
+    
+    <!-- API 接口模块 -->
+    <script src="script/api.js"></script>
 
     <script>
         const state = {
@@ -619,10 +625,14 @@
             isSpeaking: false,
             mediaRecorder: null,
             audioChunks: [],
+            audioBlob: null,  // 保存完整的音频Blob，供接口提交使用
             postTestAnswers: {},
             inactivityLevel: 0,
             nextButtonCooldown: 0  // "下一张"按钮冷却时间（秒）
         };
+        
+        // 将 state 挂载到 window 对象，以便 InteractionTracker 可以访问
+        window.state = state;
 
         let inactivityTimer = null;
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
@@ -680,9 +690,6 @@
 你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。
 
 总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
-
-                rorschachImage.src = `images/rorschach-blot-1.png`;
-
                 playAudio('audio/1.mp3', () => {
                     introOverlay.style.display = 'none';
                     controlsBar.style.display = 'flex';
@@ -771,6 +778,10 @@
 
             state.mediaRecorder.onstop = () => {
                 const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+                
+                // 保存音频Blob到state，供finishAndSave使用
+                state.audioBlob = audioBlob;
+                
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -866,7 +877,16 @@
         }
 
         // 事件监听器
+        // 标记事件监听器是否已绑定
+        let eventListenersSetup = false;
+        
         function setupEventListeners() {
+            // 防止重复绑定事件监听器
+            if (eventListenersSetup) {
+                return;
+            }
+            eventListenersSetup = true;
+            
             startTestBtn.addEventListener('click', startTest);
             prevBtn.addEventListener('click', () => navigate(-1));
             nextBtn.addEventListener('click', () => navigate(1));
@@ -947,6 +967,12 @@
 
         // 导航和状态
         function navigate(direction) {
+            console.log('[调试] navigate 被调用:', {
+                direction,
+                currentIndex: state.currentIndex,
+                newIndex: state.currentIndex + direction
+            });
+            
             saveCanvasState(state.currentIndex);
             const newIndex = state.currentIndex + direction;
             
@@ -973,6 +999,11 @@
                     window.InteractionTracker._trackNavigation('next');
                 }
                 
+                // 打印最后一张图的数据（离开前的图版数据）
+                if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
+                    window.InteractionTracker.printDataStructures(state.currentIndex);
+                }
+                
                 // 清除冷却定时器（如果存在）
                 if (nextButtonCooldownTimer) {
                     clearInterval(nextButtonCooldownTimer);
@@ -991,7 +1022,12 @@
                     window.InteractionTracker._trackNavigation(direction === 1 ? 'next' : 'prev');
                 }
                 
+                // 保存离开前的图版索引（用于打印日志）
+                const previousIndex = state.currentIndex;
+                
                 state.currentIndex = newIndex;
+                console.log('[调试] state.currentIndex 更新为:', state.currentIndex);
+                
                 // 更新追踪器的当前图版索引（记录时间戳）
                 // 注意：这里记录的是切换到新图版的时间，即新图版开始的时间
                 if (window.InteractionTracker && window.InteractionTracker._updateCurrentPlate) {
@@ -1000,12 +1036,13 @@
                 loadImage(state.currentIndex);
                 updateProgress();
                 
+                console.log('[调试] updateProgress 后，currentIndex:', state.currentIndex);
+                
                 // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
                 if (direction === 1) {
                     disableNextButton();
-                    // 调用 InteractionTracker 的日志打印方法
                     if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
-                        window.InteractionTracker.printDataStructures(state.currentIndex);
+                        window.InteractionTracker.printDataStructures(previousIndex);
                     }
                 }
             }
@@ -1057,6 +1094,7 @@
         }
 
         function updateProgress() {
+            console.log('[调试] updateProgress 被调用，currentIndex:', state.currentIndex, '显示:', state.currentIndex + 1);
             progressText.textContent = `第 ${state.currentIndex + 1} / ${state.totalImages} 张图片`;
         }
 
@@ -1167,6 +1205,49 @@
                 } catch (error) {
                     console.error('[交互追踪] 导出数据失败:', error);
                 }
+            }
+            
+            // 调用接口提交数据到服务器
+            if (window.submitTestDataToServer && window.InteractionTracker) {
+                // 使用异步方式提交，不阻塞页面显示
+                (async () => {
+                    try {
+                        // 显示提交提示
+                        if (finishBtn) {
+                            finishBtn.disabled = true;
+                            finishBtn.textContent = '正在提交数据...';
+                        }
+                        
+                        // 获取音频数据（从state.audioBlob或重新创建）
+                        let audioBlob = state.audioBlob;
+                        if (!audioBlob && state.audioChunks && state.audioChunks.length > 0) {
+                            audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+                        }
+                        
+                        // 调用接口提交数据
+                        const result = await window.submitTestDataToServer(
+                            window.InteractionTracker,
+                            audioBlob,
+                            state.postTestAnswers
+                        );
+                        
+                        console.log('[API] 数据提交成功:', result);
+                        
+                        // 显示成功提示
+                        if (finishBtn) {
+                            finishBtn.textContent = '✅ 数据已提交成功';
+                            finishBtn.style.backgroundColor = '#10b981';
+                        }
+                    } catch (error) {
+                        console.error('[API] 提交数据失败:', error);
+                        
+                        // 显示错误提示（不影响继续显示汇总页面）
+                        if (finishBtn) {
+                            finishBtn.textContent = '⚠️ 数据提交失败（已保存本地）';
+                            finishBtn.style.backgroundColor = '#f59e0b';
+                        }
+                    }
+                })();
             }
             
             showSummary();
