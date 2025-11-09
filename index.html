@@ -142,6 +142,17 @@
             transform: translateY(0);
         }
 
+        #enter-btn {
+            padding: 8px 28px;
+            margin-top: 10px;
+            background: var(--primary-light);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
         /* 应用窗口 */
         .app-window {
             display: flex;
@@ -558,6 +569,7 @@
             <div id="intro-overlay">
                 <img id="intro-image" src="./images/rorschach-blot-example.png" alt="介绍">
                 <p id="intro-text"></p>
+                <button id="enter-btn" style="display: none;">进入</button>
             </div>
             <div id="image-container">
                 <img id="rorschach-image" src="" alt="罗夏墨迹图">
@@ -672,6 +684,7 @@
         const startTestBtn = document.getElementById('start-test-btn');
         const introOverlay = document.getElementById('intro-overlay');
         const introText = document.getElementById('intro-text');
+        const enterBtn = document.getElementById('enter-btn');
         const audioPlayer = document.getElementById('audio-player');
         const controlsBar = document.getElementById('controls-bar');
         const rorschachImage = document.getElementById('rorschach-image');
@@ -703,23 +716,46 @@
 
 总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
                 introText.textContent = introTextContent;
-                // 使用TTS播放介绍文本
-                playAudio(introTextContent, () => {
-                    introOverlay.style.display = 'none';
-                    controlsBar.style.display = 'flex';
-                    updateProgress();
-                    
-                    if (state.mediaRecorder && state.mediaRecorder.state === 'inactive') {
-                        state.mediaRecorder.start();
+                // 显示"进入"按钮
+                enterBtn.style.display = 'block';
+                
+                // 点击"进入"按钮后连接 WebSocket 并开始录音，直接进入测试流程
+                enterBtn.onclick = async () => {
+                    try {
+                        enterBtn.disabled = true;
+                        enterBtn.textContent = '连接中...';
+                        
+                        // 连接豆包实时语音 WebSocket
+                        if (window.dialogClient) {
+                            if (!window.dialogClient.isConnected) {
+                                await window.dialogClient.connect();
+                            }
+                            // 开始录音
+                            await window.dialogClient.startRecording();
+                        }
+                        
+                        // 隐藏介绍覆盖层，直接进入测试流程
+                        introOverlay.style.display = 'none';
+                        controlsBar.style.display = 'flex';
+                        updateProgress();
+                        
+                        if (state.mediaRecorder && state.mediaRecorder.state === 'inactive') {
+                            state.mediaRecorder.start();
+                        }
+                        
+                        // 启动 InteractionTracker
+                        if (window.InteractionTracker) {
+                            window.InteractionTracker.start();
+                        }
+                        
+                        initTest();
+                    } catch (error) {
+                        console.error('连接 WebSocket 失败:', error);
+                        alert('连接语音服务失败，请检查后端服务器是否已启动。');
+                        enterBtn.disabled = false;
+                        enterBtn.textContent = '进入';
                     }
-                    
-                    // 语音播放完成后，启动 InteractionTracker
-                    if (window.InteractionTracker) {
-                        window.InteractionTracker.start();
-                    }
-                    
-                    initTest();
-                });
+                };
             } catch (err) {
                 console.error("麦克风授权失败:", err);
                 alert("需要麦克风权限才能开始测试。请刷新页面并允许访问。");
@@ -831,10 +867,10 @@
         }
 
         /**
-         * 播放音频（支持文件路径和TTS文本）
+         * 播放音频（支持文件路径和实时对话文本）
          * @param {string} src - 音频文件路径（如 'audio/1.mp3'）或文本内容
          * @param {Function} onendedCallback - 播放完成回调
-         * @param {Object} options - 可选参数（仅用于TTS模式）
+         * @param {Object} options - 可选参数
          */
         async function playAudio(src, onendedCallback = null, options = {}) {
             // 如果 src 是文件路径（以 './audio/' 或 'audio/' 开头），使用原有方式播放
@@ -845,19 +881,42 @@
                 return;
             }
 
-            // 否则使用 TTS 合成播放
-            if (window.playTTSAudio) {
+            // 否则使用实时对话客户端发送文本查询
+            if (window.dialogClient) {
                 try {
-                    await window.playTTSAudio(src, audioPlayer, onendedCallback, options);
+                    // 确保已连接
+                    if (!window.dialogClient.isConnected) {
+                        await window.dialogClient.connect();
+                    }
+
+                    // 发送文本查询（已注释）
+                    // await window.dialogClient.sendTextQuery(src);
+
+                    // 由于实时对话是流式播放，无法准确判断播放完成时间
+                    // 根据文本长度估算播放时间（平均语速约 3-4 字/秒）
+                    if (onendedCallback) {
+                        const estimatedDuration = Math.max(2000, src.length * 300); // 至少 2 秒，每字约 300ms
+                        setTimeout(() => {
+                            if (onendedCallback) {
+                                onendedCallback();
+                            }
+                        }, estimatedDuration);
+                    }
                 } catch (error) {
-                    console.error('[播放音频] TTS合成失败:', error);
-                    // 错误处理：可以显示文本或使用其他降级方案
+                    console.error('[播放音频] 实时对话失败:', error);
+                    // 错误处理：显示文本或使用其他降级方案
                     if (options.onError) {
                         options.onError(error);
+                    } else {
+                        // 降级方案：显示文本内容
+                        console.warn('[播放音频] 无法播放，文本内容:', src);
                     }
                 }
             } else {
-                console.warn('[播放音频] TTS客户端未加载，无法播放文本:', src);
+                console.warn('[播放音频] 实时对话客户端未加载，无法播放文本:', src);
+                if (options.onError) {
+                    options.onError(new Error('实时对话客户端未加载'));
+                }
             }
         }
 

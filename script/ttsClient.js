@@ -1,328 +1,351 @@
 /**
- * 罗夏墨迹测试 - TTS 语音合成客户端
- * 使用流式传输方式从后端获取语音合成音频
+ * 罗夏墨迹测试 - 实时语音对话客户端
+ * 通过 WebSocket 连接到后端服务器，实现实时语音对话
  */
 
 (function(window) {
     'use strict';
 
-    /**
-     * TTS 配置
-     * 复用 api.js 的共享配置（baseURL, timeout），避免重复配置
-     */
-    const TTS_CONFIG = {
-        // API 基础路径（复用 api.js 的配置，如果已加载）
-        baseURL: (typeof window !== 'undefined' && window.API_CONFIG?.baseURL) || '/api',
-        
-        // TTS 接口端点（TTS 专用）
-        endpoint: '/tts',
-        
-        // 请求超时时间（复用 api.js 的配置，如果已加载）
-        timeout: (typeof window !== 'undefined' && window.API_CONFIG?.timeout) || 30000,
-        
-        // 音频格式（TTS 专用）
-        audioFormat: 'audio/wav', // 或 'audio/mpeg' (mp3)
-        
-        // 流式接收配置（保留用于未来扩展）
-        // chunkSize: 8192, // 每次累积的音频块大小（字节）
-        // minChunksBeforePlay: 3, // 累积多少个块后开始播放（可选，设为0则等待完整）
+    const DIALOG_CONFIG = {
+        wsUrl: 'ws://localhost:8765',
+        inputAudio: {
+            sampleRate: 16000,
+            channels: 1,
+            bitsPerSample: 16
+        },
+        outputAudio: {
+            sampleRate: 24000,
+            channels: 1,
+            bitsPerSample: 16
+        },
+        bufferSize: 4096
     };
 
-    /**
-     * TTS 客户端类
-     */
-    class TTSClient {
-        constructor(config = {}) {
-            this.config = { ...TTS_CONFIG, ...config };
-            this.baseURL = this.config.baseURL;
-            this.endpoint = this.config.endpoint;
+    function convertFloat32ToS16le(input) {
+        const buffer = new ArrayBuffer(input.length * 2);
+        const view = new DataView(buffer);
+        for (let i = 0; i < input.length; i++) {
+            const s = Math.max(-1, Math.min(1, input[i]));
+            view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return buffer;
+    }
+
+    async function playPCMWithWebAudio(pcmData, sampleRate, onendedCallback = null) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: sampleRate
+        });
+        
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
         }
 
-        /**
-         * 生成TTS音频（流式传输）
-         * @param {string} text - 要合成的文本
-         * @param {Object} options - 可选参数
-         * @param {string} options.speaker - 音色（可选）
-         * @param {Function} options.onProgress - 进度回调 (loaded, total)
-         * @param {Function} options.onChunk - 接收到音频块的回调
-         * @returns {Promise<Blob>} 返回音频Blob
-         */
-        async synthesizeStream(text, options = {}) {
-            if (!text || typeof text !== 'string') {
-                throw new Error('文本内容不能为空');
-            }
+        const int16View = new Int16Array(pcmData);
+        const float32Array = new Float32Array(int16View.length);
+        for (let i = 0; i < int16View.length; i++) {
+            float32Array[i] = int16View[i] / 32768.0;
+        }
+        
+        const audioBuffer = audioContext.createBuffer(1, float32Array.length, sampleRate);
+        audioBuffer.copyToChannel(float32Array, 0);
 
-            const {
-                speaker = 'zh_female_vv_jupiter_bigtts',
-                onProgress = null,
-                onChunk = null
-            } = options;
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
 
-            // 构建请求URL
-            const url = `${this.baseURL}${this.endpoint}`;
-            
-            // 请求参数
-            const requestBody = {
-                text: text,
-                speaker: speaker,
-                format: 'wav', // 或 'mp3'
-                stream: true // 标识需要流式传输
+        if (onendedCallback) {
+            source.onended = () => {
+                if (typeof onendedCallback === 'function') {
+                    onendedCallback();
+                }
             };
+        }
 
-            // 创建超时控制器
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-            }, this.config.timeout);
+            source.start(0);
+        return source;
+    }
 
-            try {
-                // 使用 Fetch API 进行流式请求（axios 对流式支持有限）
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/octet-stream' // 接收二进制流
-                    },
-                    body: JSON.stringify(requestBody),
-                    signal: controller.signal
-                });
+    class RealtimeDialogClient {
+        constructor(config = {}) {
+            this.config = { ...DIALOG_CONFIG, ...config };
+            this.ws = null;
+            this.audioContext = null;
+            this.mediaStream = null;
+            this.scriptProcessor = null;
+            this.isRecording = false;
+            this.isConnected = false;
+            
+            this.audioQueue = [];
+            this.isPlaying = false;
+            this.nextPlayTime = 0;
+            
+            this.onConnect = null;
+            this.onDisconnect = null;
+            this.onError = null;
+            this.onRecordingStart = null;
+            this.onRecordingStop = null;
+        }
 
-                clearTimeout(timeoutId);
+        async connect() {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                console.log('[Dialog] WebSocket 已连接');
+                return;
+            }
 
-                if (!response.ok) {
-                    let errorText = '';
-                    try {
-                        errorText = await response.text();
-                    } catch (e) {
-                        errorText = '无法读取错误信息';
-                    }
-                    throw new Error(`TTS请求失败: ${response.status} ${response.statusText} - ${errorText}`);
-                }
-
-                // 检查响应类型
-                const contentType = response.headers.get('content-type') || '';
-                if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
-                    // 注意：这里不读取响应体，因为后续需要读取音频流
-                    throw new Error(`意外的响应类型: ${contentType}，期望音频流`);
-                }
-
-                // 获取内容长度（如果可用）
-                const contentLength = response.headers.get('content-length');
-                const total = contentLength ? parseInt(contentLength, 10) : null;
-
-                // 读取流式数据
-                const reader = response.body.getReader();
-                const chunks = [];
-                let loaded = 0;
-                let chunkCount = 0;
-
+            return new Promise((resolve, reject) => {
                 try {
-                    // 流式读取
-                    while (true) {
-                        let result;
-                        try {
-                            result = await reader.read();
-                        } catch (readError) {
-                            // 流读取失败，尝试取消
-                            try {
-                                reader.cancel();
-                            } catch (cancelError) {
-                                // 忽略取消错误
-                            }
-                            throw new Error(`流读取失败: ${readError.message}`);
+                    this.ws = new WebSocket(this.config.wsUrl);
+
+                    this.ws.onopen = () => {
+                        console.log('[Dialog] WebSocket 连接成功');
+                        this.isConnected = true;
+                        if (this.onConnect) {
+                            this.onConnect();
                         }
+                        resolve();
+                    };
 
-                        const { done, value } = result;
-                        
-                        if (done) {
-                            break; // 流读取完成
-                        }
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(event);
+                    };
 
-                        // 累积音频数据块
-                        chunks.push(value);
-                        loaded += value.length;
-                        chunkCount++;
-
-                        // 调用进度回调
-                        if (onProgress && typeof onProgress === 'function') {
-                            onProgress(loaded, total);
-                        }
-
-                        // 调用块接收回调
-                        if (onChunk && typeof onChunk === 'function') {
-                            onChunk(value, chunkCount);
-                        }
-                    }
-                } finally {
-                    // 确保释放reader资源
-                    try {
-                        reader.releaseLock();
-                    } catch (e) {
-                        // 忽略释放错误
-                    }
-                }
-
-                // 将所有块合并为 Blob
-                const audioBlob = new Blob(chunks, { type: this.config.audioFormat });
-                
-                console.log(`[TTS] 音频生成完成: ${audioBlob.size} 字节, ${chunkCount} 个数据块`);
-                
-                return audioBlob;
-
-            } catch (error) {
-                clearTimeout(timeoutId); // 确保清理超时
-                
-                if (error.name === 'AbortError') {
-                    console.error('[TTS] 请求超时:', this.config.timeout, 'ms');
-                    throw new Error(`TTS请求超时（${this.config.timeout}ms）`);
-                } else {
-                    console.error('[TTS] 流式请求失败:', error);
-                    throw error;
-                }
-            }
-        }
-
-        /**
-         * 生成TTS音频（简化版，等待完整音频）
-         * @param {string} text - 要合成的文本
-         * @param {Object} options - 可选参数
-         * @returns {Promise<Blob>} 返回音频Blob
-         */
-        async synthesize(text, options = {}) {
-            return this.synthesizeStream(text, options);
-        }
-
-        /**
-         * 生成TTS音频并返回可播放的URL
-         * @param {string} text - 要合成的文本
-         * @param {Object} options - 可选参数
-         * @returns {Promise<string>} 返回 Blob URL
-         */
-        async synthesizeToURL(text, options = {}) {
-            const blob = await this.synthesize(text, options);
-            return URL.createObjectURL(blob);
-        }
-
-        /**
-         * 生成TTS音频并直接播放
-         * @param {string} text - 要合成的文本
-         * @param {HTMLAudioElement} audioElement - 音频元素
-         * @param {Function} onendedCallback - 播放完成回调
-         * @param {Object} options - 可选参数
-         * @returns {Promise<void>}
-         */
-        async synthesizeAndPlay(text, audioElement, onendedCallback = null, options = {}) {
-            // 验证音频元素
-            if (!audioElement) {
-                throw new Error('音频元素不能为空');
-            }
-            if (!(audioElement instanceof HTMLAudioElement)) {
-                throw new Error('audioElement 必须是 HTMLAudioElement 实例');
-            }
-
-            let audioURL = null; // 用于错误时清理
-
-            try {
-                // 显示加载状态（可选）
-                if (options.onLoading && typeof options.onLoading === 'function') {
-                    options.onLoading(true);
-                }
-
-                // 生成音频
-                const blob = await this.synthesize(text, {
-                    ...options,
-                    onProgress: (loaded, total) => {
-                        if (options.onProgress && typeof options.onProgress === 'function') {
-                            options.onProgress(loaded, total);
-                        }
-                    }
-                });
-
-                // 创建 Blob URL
-                audioURL = URL.createObjectURL(blob);
-
-                // 清理之前的URL（如果存在）
-                if (audioElement.src && audioElement.src.startsWith('blob:')) {
-                    try {
-                        URL.revokeObjectURL(audioElement.src);
-                    } catch (e) {
-                        // 忽略清理错误
-                    }
-                }
-
-                // 设置音频源
-                audioElement.src = audioURL;
-
-                // 设置播放完成回调
-                const cleanup = () => {
-                    if (audioURL) {
-                        URL.revokeObjectURL(audioURL);
-                        audioURL = null;
-                    }
-                };
-
-                if (onendedCallback) {
-                    audioElement.onended = () => {
-                        cleanup();
-                        if (typeof onendedCallback === 'function') {
-                            onendedCallback();
+                    this.ws.onclose = () => {
+                        console.log('[Dialog] WebSocket 连接已关闭');
+                        this.isConnected = false;
+                        this.stopRecording();
+                        this.audioQueue = [];
+                        this.isPlaying = false;
+                        this.nextPlayTime = 0;
+                        if (this.onDisconnect) {
+                            this.onDisconnect();
                         }
                     };
-                } else {
-                    // 如果没有回调，也要清理
-                    audioElement.onended = cleanup;
+
+                    this.ws.onerror = (error) => {
+                        console.error('[Dialog] WebSocket 错误:', error);
+                        this.isConnected = false;
+                        if (this.onError) {
+                            this.onError(error);
+                        }
+                        reject(error);
+                    };
+                } catch (error) {
+                    console.error('[Dialog] 连接失败:', error);
+                    reject(error);
                 }
+            });
+        }
 
-                // 播放音频
-                await audioElement.play();
+        handleMessage(event) {
+            let dataPromise;
+            if (event.data instanceof Blob) {
+                dataPromise = event.data.arrayBuffer();
+            } else if (event.data instanceof ArrayBuffer) {
+                dataPromise = Promise.resolve(event.data);
+            }
 
-                // 隐藏加载状态
-                if (options.onLoading && typeof options.onLoading === 'function') {
-                    options.onLoading(false);
-                }
-
-            } catch (error) {
-                console.error('[TTS] 播放失败:', error);
-                
-                // 清理资源
-                if (audioURL) {
-                    try {
-                        URL.revokeObjectURL(audioURL);
-                    } catch (e) {
-                        // 忽略清理错误
+            if (dataPromise) {
+                dataPromise.then(arrayBuffer => {
+                    this.audioQueue.push(arrayBuffer);
+                    if (!this.isPlaying) {
+                        this.playQueue();
                     }
-                    audioURL = null;
-                }
-                
-                // 隐藏加载状态
-                if (options.onLoading && typeof options.onLoading === 'function') {
-                    options.onLoading(false);
-                }
+                }).catch(err => {
+                    console.error('[Dialog] 处理消息数据失败:', err);
+                });
+            }
+        }
 
-                // 错误处理：可以回退到文本显示或其他处理
-                if (options.onError && typeof options.onError === 'function') {
-                    options.onError(error);
-                } else {
-                    throw error;
+        async playQueue() {
+            if (this.audioQueue.length === 0) {
+                this.isPlaying = false;
+                return;
+            }
+
+            this.isPlaying = true;
+            const arrayBuffer = this.audioQueue.shift();
+
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: this.config.outputAudio.sampleRate
+                });
+                this.nextPlayTime = this.audioContext.currentTime;
+            }
+
+            if (!this.audioContext || arrayBuffer.byteLength === 0) {
+                this.playQueue();
+                return;
+            }
+
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+
+            const int16View = new Int16Array(arrayBuffer);
+            const float32Array = new Float32Array(int16View.length);
+            for (let i = 0; i < int16View.length; i++) {
+                float32Array[i] = int16View[i] / 32768.0;
+            }
+            
+            const audioBuffer = this.audioContext.createBuffer(1, float32Array.length, this.audioContext.sampleRate);
+            audioBuffer.copyToChannel(float32Array, 0);
+
+            const source = this.audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(this.audioContext.destination);
+
+            const currentTime = this.audioContext.currentTime;
+            const startTime = Math.max(currentTime, this.nextPlayTime);
+            source.start(startTime);
+
+            this.nextPlayTime = startTime + audioBuffer.duration;
+            source.onended = () => {
+                this.playQueue();
+            };
+        }
+
+        async initAudio() {
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: this.config.outputAudio.sampleRate
+                });
+                this.nextPlayTime = this.audioContext.currentTime;
+            }
+            
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            
+            if (!this.mediaStream) {
+                try {
+                    this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: this.config.inputAudio.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: true
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Dialog] 获取麦克风失败:', err);
+                    if (this.onError) {
+                        this.onError(new Error('无法访问麦克风，请检查权限设置'));
+                    }
+                    return false;
                 }
             }
+            return true;
+        }
+
+        async startRecording() {
+            if (this.isRecording) {
+                console.warn('[Dialog] 已在录音中');
+                return;
+            }
+
+            if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                throw new Error('WebSocket 未连接，请先调用 connect()');
+            }
+
+            const success = await this.initAudio();
+            if (!success) {
+                throw new Error('无法初始化音频输入');
+            }
+
+            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+            this.scriptProcessor = this.audioContext.createScriptProcessor(
+                this.config.bufferSize,
+                1,
+                1
+            );
+
+            this.scriptProcessor.onaudioprocess = (event) => {
+                if (!this.isRecording) return;
+                
+                const inputData = event.inputBuffer.getChannelData(0);
+                const pcmData = convertFloat32ToS16le(inputData);
+                
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(pcmData);
+                }
+            };
+
+            source.connect(this.scriptProcessor);
+            this.scriptProcessor.connect(this.audioContext.destination);
+
+            this.isRecording = true;
+            console.log('[Dialog] 开始录音');
+            
+            if (this.onRecordingStart) {
+                this.onRecordingStart();
+            }
+        }
+
+        stopRecording() {
+            if (!this.isRecording) {
+                return;
+            }
+
+            this.isRecording = false;
+            
+            if (this.scriptProcessor) {
+                this.scriptProcessor.disconnect();
+                this.scriptProcessor = null;
+            }
+
+            console.log('[Dialog] 停止录音');
+            
+            if (this.onRecordingStop) {
+                this.onRecordingStop();
+            }
+        }
+
+        async sendTextQuery(text) {
+            if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                throw new Error('WebSocket 未连接，请先调用 connect()');
+            }
+
+            const message = JSON.stringify({
+                type: 'text_query',
+                content: text
+            });
+            
+            this.ws.send(message);
+            console.log('[Dialog] 发送文本查询:', text);
+        }
+
+        disconnect() {
+            this.stopRecording();
+            
+            if (this.mediaStream) {
+                this.mediaStream.getTracks().forEach(track => track.stop());
+                this.mediaStream = null;
+            }
+
+            if (this.audioContext) {
+                this.audioContext.close().catch(err => {
+                    console.error('[Dialog] 关闭 AudioContext 失败:', err);
+                });
+                this.audioContext = null;
+            }
+
+            if (this.ws) {
+                this.ws.close();
+                this.ws = null;
+            }
+
+            this.isConnected = false;
+            this.audioQueue = [];
+            this.isPlaying = false;
+            this.nextPlayTime = 0;
         }
     }
 
-    /**
-     * 创建TTS客户端实例
-     */
-    const ttsClient = new TTSClient();
+    const dialogClient = new RealtimeDialogClient();
 
-    /**
-     * 便捷方法：直接播放TTS音频（兼容原有 playAudio 接口）
-     * @param {string} text - 要合成的文本（如果以 'audio/' 开头则视为文件路径，直接播放）
-     * @param {HTMLAudioElement} audioElement - 音频元素
-     * @param {Function} onendedCallback - 播放完成回调
-     * @param {Object} options - 可选参数
-     */
+    window.RealtimeDialogClient = RealtimeDialogClient;
+    window.dialogClient = dialogClient;
+
     window.playTTSAudio = async function(text, audioElement, onendedCallback = null, options = {}) {
-        // 如果 text 是文件路径（以 'audio/' 开头），直接使用原有方式播放
         if (typeof text === 'string' && text.startsWith('audio/')) {
             if (audioElement) {
                 audioElement.src = text;
@@ -332,19 +355,14 @@
             return;
         }
 
-        // 否则使用 TTS 合成
-        await ttsClient.synthesizeAndPlay(text, audioElement, onendedCallback, options);
+        console.warn('[TTS] 文本转语音功能已迁移到实时对话模式，请使用 dialogClient 进行实时对话');
+        if (options.onError) {
+            options.onError(new Error('请使用 dialogClient.connect() 和 dialogClient.startRecording() 进行实时语音对话'));
+        }
     };
 
-    /**
-     * 导出到全局
-     */
-    window.TTSClient = TTSClient;
-    window.ttsClient = ttsClient;
-
     if (typeof console !== 'undefined') {
-        console.log('[TTS] TTS客户端模块已加载');
+        console.log('[Dialog] 实时语音对话客户端模块已加载');
     }
 
 })(window);
-
