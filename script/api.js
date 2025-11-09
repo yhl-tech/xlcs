@@ -367,6 +367,7 @@
     window.APIClient = APIClient;
     window.APIError = APIError;
     window.apiClient = apiClient;
+    window.API_CONFIG = API_CONFIG; // 导出配置供其他模块使用
 
     if (typeof console !== 'undefined') {
         console.log('[API] API模块已加载');

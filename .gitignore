@@ -12,6 +12,18 @@ dist
 dist-ssr
 *.local
 
+# public 目录（如果使用符号链接，不需要忽略）
+# public
+
+# pnpm
+.pnpm-store
+# 注意：pnpm-lock.yaml 应该提交到版本控制
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

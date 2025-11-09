@@ -1,12 +1,19 @@
-const express = require('express');
-const { createProxyMiddleware } = require('http-proxy-middleware');
-const path = require('path');
+import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const BACKEND_URL = 'http://localhost:3000'; // 修改为后端地址
 
 // 静态文件
+// 提供项目根目录的静态文件（index.html, script/ 等）
 app.use(express.static(__dirname));
+// 提供 public 目录的静态文件（images/, audio/ 等）
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API 代理：所有 /api 请求转发到后端
 app.use('/api', createProxyMiddleware({

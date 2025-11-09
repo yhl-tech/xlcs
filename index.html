@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>罗夏墨迹测试-图版</title>
     <style>
         :root {
@@ -555,7 +556,7 @@
 
         <div class="main-content" id="main-content">
             <div id="intro-overlay">
-                <img id="intro-image" src="images/rorschach-blot-example.png" alt="介绍">
+                <img id="intro-image" src="./images/rorschach-blot-example.png" alt="介绍">
                 <p id="intro-text"></p>
             </div>
             <div id="image-container">
@@ -607,10 +608,13 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     
     <!-- 交互追踪系统 -->
-    <script src="script/interactionTracker.js"></script>
+    <script type="module" src="./script/interactionTracker.js"></script>
     
     <!-- API 接口模块 -->
-    <script src="script/api.js"></script>
+    <script type="module" src="./script/api.js"></script>
+    
+    <!-- TTS 语音合成客户端 -->
+    <script type="module" src="./script/ttsClient.js"></script>
 
     <script>
         const state = {
@@ -638,17 +642,25 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 4000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 8000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
-        const PROMPT_AUDIO_FILES = ['audio/prompt_1.wav', 'audio/prompt_2.wav', 'audio/prompt_3.wav', 'audio/prompt_4.wav', 'audio/prompt_5.wav', 'audio/prompt_6.wav'];
-        const FINAL_PROMPT = 'audio/prompt_7.wav';
+        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        // 提示文本数组（用于TTS语音合成）
+        const PROMPT_TEXTS = [
+            '提示：请继续描述...',
+            '您还能看到些什么吗？',
+            '请详细描述一下您看到的内容',
+            '除了这个，您还能看到什么？',
+            '请继续分享您的观察',
+            '您可以更详细地描述一下吗？'
+        ];
+        const FINAL_PROMPT_TEXT = '提示：请点击下一张图片继续...';
         
         const POST_TEST_QUESTIONS = [
-            { key: 'represent', text: '十张图片里，选择一张最能代表你的。', audio: 'audio/q_represent.wav' },
-            { key: 'mother', text: '十张图片里，选择一张最能代表你母亲的。', audio: 'audio/q_mother.wav' },
-            { key: 'father', text: '十张图片里，选择一张最能代表你父亲的。', audio: 'audio/q_father.wav' },
-            { key: 'like', text: '十张图片里，你最喜欢哪一张？', audio: 'audio/q_like.wav' },
-            { key: 'dislike', text: '十张图片里，你最讨厌哪一张？', audio: 'audio/q_dislike.wav' },
-            { key: 'mood', text: '测试到此为止了，你现在心情如何？相比刚开始测试时？', audio: 'audio/q_mood.wav' }
+            { key: 'represent', text: '十张图片里，选择一张最能代表你的。', audio: './audio/q_represent.wav' },
+            { key: 'mother', text: '十张图片里，选择一张最能代表你母亲的。', audio: './audio/q_mother.wav' },
+            { key: 'father', text: '十张图片里，选择一张最能代表你父亲的。', audio: './audio/q_father.wav' },
+            { key: 'like', text: '十张图片里，你最喜欢哪一张？', audio: './audio/q_like.wav' },
+            { key: 'dislike', text: '十张图片里，你最讨厌哪一张？', audio: './audio/q_dislike.wav' },
+            { key: 'mood', text: '测试到此为止了，你现在心情如何？相比刚开始测试时？', audio: './audio/q_mood.wav' }
         ];
         
         let currentQuestionIndex = 0;
@@ -683,14 +695,16 @@
                 infoScreen.style.display = 'none';
                 appWindow.style.display = 'flex';
 
-                introText.textContent = `罗夏墨迹是瑞士心理学家发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
+                const introTextContent = `罗夏墨迹是瑞士心理学家发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
 
 你要做的就是告诉我，你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
 
 你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。
 
 总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
-                playAudio('audio/1.mp3', () => {
+                introText.textContent = introTextContent;
+                // 使用TTS播放介绍文本
+                playAudio(introTextContent, () => {
                     introOverlay.style.display = 'none';
                     controlsBar.style.display = 'flex';
                     updateProgress();
@@ -816,27 +830,53 @@
             checkSpeaking();
         }
 
-        function playAudio(src, onendedCallback = null) {
-            audioPlayer.src = src;
-            audioPlayer.onended = onendedCallback;
-            audioPlayer.play().catch(e => console.error("音频播放失败:", e));
+        /**
+         * 播放音频（支持文件路径和TTS文本）
+         * @param {string} src - 音频文件路径（如 'audio/1.mp3'）或文本内容
+         * @param {Function} onendedCallback - 播放完成回调
+         * @param {Object} options - 可选参数（仅用于TTS模式）
+         */
+        async function playAudio(src, onendedCallback = null, options = {}) {
+            // 如果 src 是文件路径（以 './audio/' 或 'audio/' 开头），使用原有方式播放
+            if (typeof src === 'string' && (src.startsWith('./audio/') || src.startsWith('audio/'))) {
+                audioPlayer.src = src;
+                audioPlayer.onended = onendedCallback;
+                audioPlayer.play().catch(e => console.error("音频播放失败:", e));
+                return;
+            }
+
+            // 否则使用 TTS 合成播放
+            if (window.playTTSAudio) {
+                try {
+                    await window.playTTSAudio(src, audioPlayer, onendedCallback, options);
+                } catch (error) {
+                    console.error('[播放音频] TTS合成失败:', error);
+                    // 错误处理：可以显示文本或使用其他降级方案
+                    if (options.onError) {
+                        options.onError(error);
+                    }
+                }
+            } else {
+                console.warn('[播放音频] TTS客户端未加载，无法播放文本:', src);
+            }
         }
 
         // 优化的不活动逻辑
         function playRandomPrompt() {
             if (audioPlayer.paused && !state.isSpeaking) {
                 if (state.inactivityLevel === 0) {
-                    // 第一次提示：播放随机prompt
-                    const randomIndex = Math.floor(Math.random() * PROMPT_AUDIO_FILES.length);
-                    showPromptIndicator('提示：请继续描述...');
-                    playAudio(PROMPT_AUDIO_FILES[randomIndex], () => {
+                    // 第一次提示：使用TTS播放随机提示文本
+                    const randomIndex = Math.floor(Math.random() * PROMPT_TEXTS.length);
+                    const promptText = PROMPT_TEXTS[randomIndex];
+                    showPromptIndicator(promptText);
+                    playAudio(promptText, () => {
                         state.inactivityLevel = 1;
                         resetInactivityTimer();
                     });
                 } else if (state.inactivityLevel === 1) {
-                    // 第二次提示：播放prompt_7
-                    showPromptIndicator('提示：请点击下一张图片继续...');
-                    playAudio(FINAL_PROMPT, () => {
+                    // 第二次提示：使用TTS播放最终提示文本
+                    showPromptIndicator(FINAL_PROMPT_TEXT);
+                    playAudio(FINAL_PROMPT_TEXT, () => {
                         state.inactivityLevel = 0;
                         resetInactivityTimer();
                     });
@@ -1064,7 +1104,7 @@
             // 移除之前的 onload 事件处理器，避免冲突
             rorschachImage.onload = null;
             
-            rorschachImage.src = `images/rorschach-blot-${index + 1}.png`;
+            rorschachImage.src = `./images/rorschach-blot-${index + 1}.png`;
             
             // 确保图片加载后加载该图版的画布状态
             if (rorschachImage.complete) {
@@ -1117,7 +1157,7 @@
                 const item = document.createElement('div');
                 item.className = 'grid-item';
                 item.dataset.index = i;
-                item.innerHTML = `<img src="images/rorschach-blot-${i + 1}.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`;
+                item.innerHTML = `<img src="./images/rorschach-blot-${i + 1}.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`;
                 item.addEventListener('click', handleImageSelection);
                 grid.appendChild(item);
             }
@@ -1139,7 +1179,8 @@
             const gridContainer = document.getElementById('post-test-grid');
 
             gridContainer.style.pointerEvents = 'none';
-            playAudio(question.audio, () => {
+            // 使用TTS播放问题文本（使用question.text而不是question.audio）
+            playAudio(question.text, () => {
                 if (question.key !== 'mood') {
                     gridContainer.style.pointerEvents = 'auto';
                 } else {
@@ -1268,7 +1309,7 @@
                 const compositeContainer = document.createElement('div');
                 compositeContainer.style.position = 'relative';
                 const baseImage = document.createElement('img');
-                baseImage.src = `images/rorschach-blot-${i + 1}.png`;
+                baseImage.src = `./images/rorschach-blot-${i + 1}.png`;
                 compositeContainer.appendChild(baseImage);
                 if (state.canvasStates[i]) {
                     const drawingImage = document.createElement('img');
