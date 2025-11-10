@@ -677,6 +677,90 @@
         
         let currentQuestionIndex = 0;
 
+        // 会话级 TTS 设置（可按需改为从 UI/配置读取）
+        const TTS = {
+            speaker: 'zh_female_vv_jupiter_bigtts',
+            inited: false,
+            currentMode: null
+        };
+
+        if (window.dialogClient) {
+            window.dialogClient.onDisconnect = () => {
+                TTS.inited = false;
+                TTS.currentMode = null;
+            };
+        }
+
+        // 启动页介绍文案（用于显示与播报保持一致）
+        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
+
+你要做的就是告诉我，你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
+
+你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。
+
+总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
+
+        async function ensureTTSInit(mode = 'audio') {
+            if (!window.dialogClient) {
+                throw new Error('dialogClient 未加载');
+            }
+            if (window.dialogClient.isConnected) {
+                if (TTS.inited && TTS.currentMode === mode) {
+                    return;
+                }
+                // 模式不同：断开重连
+                window.dialogClient.disconnect();
+                TTS.inited = false;
+                TTS.currentMode = null;
+                // 等待短暂时间让连接关闭
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            if (!window.dialogClient.isConnected) {
+                await window.dialogClient.connect();
+            }
+            try {
+                const initMsg = JSON.stringify({ type: 'init', speaker: TTS.speaker, mode });
+                window.dialogClient.ws && window.dialogClient.ws.send(initMsg);
+                TTS.inited = true;
+                TTS.currentMode = mode;
+            } catch (e) {
+                console.warn('发送 TTS 初始化失败：', e);
+            }
+        }
+
+        async function sendTTSText(text, opts = { start: true, end: true, is_user_querying: false }) {
+            if (!window.dialogClient) {
+                throw new Error('dialogClient 未加载');
+            }
+            if (!window.dialogClient.isConnected) {
+                await window.dialogClient.connect();
+            }
+            const msg = JSON.stringify({
+                type: 'tts_text',
+                start: Boolean(opts.start),
+                end: Boolean(opts.end),
+                is_user_querying: Boolean(opts.is_user_querying),
+                content: String(text || '')
+            });
+            window.dialogClient.ws && window.dialogClient.ws.send(msg);
+        }
+
+        async function sendTextQuery(text, { ensure = true } = {}) {
+            if (!window.dialogClient) {
+                throw new Error('dialogClient 未加载');
+            }
+            if (ensure) {
+                await ensureTTSInit('audio');
+            } else if (!window.dialogClient.isConnected) {
+                await window.dialogClient.connect();
+            }
+            const msg = JSON.stringify({
+                type: 'text_query',
+                content: String(text || '')
+            });
+            window.dialogClient.ws && window.dialogClient.ws.send(msg);
+        }
+
         // DOM Elements
         const infoScreen = document.getElementById('info-screen');
         const appWindow = document.getElementById('app-window');
@@ -708,16 +792,29 @@
                 infoScreen.style.display = 'none';
                 appWindow.style.display = 'flex';
 
-                const introTextContent = `罗夏墨迹是瑞士心理学家发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
-
-你要做的就是告诉我，你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
-
-你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。
-
-总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
-                introText.textContent = introTextContent;
+                introText.textContent = INTRO_TEXT;
                 // 显示"进入"按钮
                 enterBtn.style.display = 'block';
+                enterBtn.disabled = true;
+                enterBtn.textContent = '语音播报中...';
+
+                // 在用户点击“开始测试”后，使用实时 TTS 播报启动页介绍
+                try {
+                    await ensureTTSInit('audio');
+                    const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${INTRO_TEXT}`;
+                    await sendTextQuery(introQuery, { ensure: false });
+                } catch (e) {
+                    console.warn('[启动页介绍] 播报失败，已忽略：', e);
+                    enterBtn.disabled = false;
+                    enterBtn.textContent = '进入';
+                }
+
+                // 播报结束后允许进入测试
+                const estimatedIntroDuration = Math.min(15000, Math.max(5000, Math.floor(INTRO_TEXT.length * 120)));
+                setTimeout(() => {
+                    enterBtn.disabled = false;
+                    enterBtn.textContent = '进入';
+                }, estimatedIntroDuration);
                 
                 // 点击"进入"按钮后连接 WebSocket 并开始录音，直接进入测试流程
                 enterBtn.onclick = async () => {
@@ -727,11 +824,22 @@
                         
                         // 连接豆包实时语音 WebSocket
                         if (window.dialogClient) {
-                            if (!window.dialogClient.isConnected) {
-                                await window.dialogClient.connect();
+                            await ensureTTSInit('audio');
+
+                            // 确保以 arraybuffer 接收二进制，减少 Blob 开销
+                            if (window.dialogClient.ws) {
+                                try { window.dialogClient.ws.binaryType = 'arraybuffer'; } catch (e) { console.warn('binaryType 设置失败:', e); }
                             }
-                            // 开始录音
-                            await window.dialogClient.startRecording();
+                            // 用户手势下显式解锁 AudioContext
+                            if (window.dialogClient.audioContext && window.dialogClient.audioContext.state === 'suspended') {
+                                try { await window.dialogClient.audioContext.resume(); } catch (e) { console.warn('AudioContext resume 失败:', e); }
+                            }
+                            // 立即开启录音，保持会话活跃，避免服务端过早结束会话
+                            try {
+                                await window.dialogClient.startRecording();
+                            } catch (err) {
+                                console.warn('开始录音失败:', err);
+                            }
                         }
                         
                         // 隐藏介绍覆盖层，直接进入测试流程
@@ -884,6 +992,9 @@
             // 否则使用实时对话客户端发送文本查询
             if (window.dialogClient) {
                 try {
+                    if (!window.dialogClient.isConnected || TTS.currentMode !== 'audio') {
+                        await ensureTTSInit('audio');
+                    }
                     // 确保已连接
                     if (!window.dialogClient.isConnected) {
                         await window.dialogClient.connect();
@@ -1488,7 +1599,14 @@
         }
 
         // 初始化
-        document.addEventListener('DOMContentLoaded', setupEventListeners);
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            // 页面加载后：设置介绍文案并尝试自动播报一次
+            const introTextEl = document.getElementById('intro-text');
+            if (introTextEl) {
+                introTextEl.textContent = INTRO_TEXT;
+            }
+        });
     </script>
 </body>
 </html>

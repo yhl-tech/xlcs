@@ -97,6 +97,11 @@
                     this.ws = new WebSocket(this.config.wsUrl);
 
                     this.ws.onopen = () => {
+                        try {
+                            this.ws.binaryType = 'arraybuffer';
+                        } catch (e) {
+                            console.warn('[Dialog] 设置 binaryType 失败:', e);
+                        }
                         console.log('[Dialog] WebSocket 连接成功');
                         this.isConnected = true;
                         if (this.onConnect) {
