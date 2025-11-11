@@ -87,9 +87,12 @@
         }
 
         async connect() {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                console.log('[Dialog] WebSocket 已连接');
-                return;
+            // 修复：如果已有连接，先断开以确保干净状态
+            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                console.log('[Dialog] 关闭现有WebSocket连接');
+                this.ws.close();
+                // 等待连接关闭
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             return new Promise((resolve, reject) => {
@@ -305,8 +308,14 @@
         }
 
         async sendTextQuery(text) {
+            // 修复：添加连接状态检查和自动重连机制
             if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-                throw new Error('WebSocket 未连接，请先调用 connect()');
+                console.warn('[Dialog] WebSocket未连接，尝试重新连接...');
+                try {
+                    await this.connect();
+                } catch (err) {
+                    throw new Error('WebSocket重新连接失败: ' + err.message);
+                }
             }
 
             const message = JSON.stringify({
@@ -342,6 +351,8 @@
             this.audioQueue = [];
             this.isPlaying = false;
             this.nextPlayTime = 0;
+            
+            console.log('[Dialog] 已断开所有连接');
         }
     }
 
