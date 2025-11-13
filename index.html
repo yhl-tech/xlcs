@@ -652,9 +652,10 @@
         window.state = state;
 
         let inactivityTimer = null;
+        let inactivityActive = false;
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
-        const INACTIVITY_THRESHOLD_1 = 4000;  // 第一次提示
-        const INACTIVITY_THRESHOLD_2 = 8000;  // 第二次提示
+        const INACTIVITY_THRESHOLD_1 = 10000;  // 第一次提示
+        const INACTIVITY_THRESHOLD_2 = 20000;  // 第二次提示
         const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
         // 提示文本数组（用于TTS语音合成）
         const PROMPT_TEXTS = [
@@ -975,7 +976,7 @@
                 };
             }
 
-            resetInactivityTimer();
+            startInactivityMonitoring();
         }
 
         function resizeCanvas() {
@@ -1113,6 +1114,9 @@
         }
 
         function resetInactivityTimer() {
+            if (!inactivityActive) {
+                return;
+            }
             clearTimeout(inactivityTimer);
             state.inactivityLevel = 0;
 
@@ -1366,6 +1370,7 @@
 
         // 后测试视图
         function showPostTestView() {
+            stopInactivityMonitoring();
             clearTimeout(inactivityTimer);
             mainContent.style.display = 'none';
             controlsBar.style.display = 'none';
@@ -1550,6 +1555,17 @@
                 item.appendChild(compositeContainer);
                 grid.appendChild(item);
             }
+        }
+
+        function startInactivityMonitoring() {
+            inactivityActive = true;
+            resetInactivityTimer();
+        }
+
+        function stopInactivityMonitoring() {
+            inactivityActive = false;
+            clearTimeout(inactivityTimer);
+            state.inactivityLevel = 0;
         }
 
         // 绘图和变换
