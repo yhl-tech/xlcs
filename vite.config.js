@@ -22,12 +22,16 @@ export default defineConfig({
     
     // 压缩配置
     minify: 'esbuild', // 使用 esbuild 进行压缩（快速且高效，Vite 默认）
+    // esbuild 配置（生产环境删除 console 和 debugger）
+    esbuild: {
+      drop: ['console', 'debugger'], // 生产环境删除 console 和 debugger
+    },
     // 如需使用 terser（更好的压缩效果），需要安装: npm install -D terser
     // minify: 'terser',
     // terserOptions: {
     //   compress: {
-    //     drop_console: false, // 保留 console（开发调试用）
-    //     drop_debugger: true,  // 移除 debugger
+    //     drop_console: true,  // 删除 console
+    //     drop_debugger: true, // 移除 debugger
     //   },
     // },
     

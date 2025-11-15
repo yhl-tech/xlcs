@@ -674,7 +674,7 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 10000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 20000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
+        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
         // 提示文本数组（用于TTS语音合成）
         const PROMPT_TEXTS = [
             '提示：请继续描述...',
@@ -1368,6 +1368,20 @@
                     if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
                         window.InteractionTracker.printDataStructures(previousIndex);
                     }
+                    
+                    // 播报当前图片的提示语音
+                    (async () => {
+                        try {
+                            const imageNumber = state.currentIndex + 1; // 图片编号从1开始
+                            const promptText = `请描述你看到的第${imageNumber}张图片。`;
+                            console.log('[切换图片] 播报提示:', promptText);
+                            const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${promptText}`;
+                            await sendTextQuery(introQuery, { ensure: false });
+                            console.log('[切换图片] 提示已发送');
+                        } catch (err) {
+                            console.warn('[切换图片] 播报提示失败:', err);
+                        }
+                    })();
                 }
             }
             resetInactivityTimer();
@@ -1449,7 +1463,7 @@
             askNextQuestion();
         }
 
-        function askNextQuestion() {
+        async function askNextQuestion() {
             document.querySelectorAll('.grid-item.selected').forEach(el => el.classList.remove('selected'));
 
             if (currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
@@ -1464,15 +1478,27 @@
             const gridContainer = document.getElementById('post-test-grid');
 
             gridContainer.style.pointerEvents = 'none';
-            // 使用TTS播放问题文本（使用question.text而不是question.audio）
-            playAudio(question.text, () => {
-                if (question.key !== 'mood') {
-                    gridContainer.style.pointerEvents = 'auto';
-                } else {
-                    currentQuestionIndex++;
-                    setTimeout(askNextQuestion, 1500);
-                }
-            });
+            
+            // 直接使用 text 进行 TTS 播报
+            try {
+                // 使用 sendTextQuery 进行 TTS 播报，格式与其他地方保持一致
+                const ttsQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${question.text}`;
+                await sendTextQuery(ttsQuery, { ensure: false });
+                
+                // 估算 TTS 播放时间（每字约 300ms）
+                const estimatedDuration = Math.max(2000, question.text.length * 300);
+                await new Promise(resolve => setTimeout(resolve, estimatedDuration));
+            } catch (error) {
+                console.warn('[askNextQuestion] TTS 播报失败:', error);
+            }
+            
+            // 播放完成后，根据问题类型处理
+            if (question.key !== 'mood') {
+                gridContainer.style.pointerEvents = 'auto';
+            } else {
+                currentQuestionIndex++;
+                setTimeout(askNextQuestion, 1500);
+            }
         }
 
         function handleImageSelection(event) {
