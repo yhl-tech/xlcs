@@ -8,7 +8,7 @@ import { createHtmlPlugin } from 'vite-plugin-html';
 export default defineConfig({
   // 项目根目录
   root: '.',
-  
+  // publicPath:'/xlcp/',
   // 构建配置
   build: {
     // 输出目录

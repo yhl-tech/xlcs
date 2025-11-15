@@ -3,11 +3,13 @@
  * 通过 WebSocket 连接到后端服务器，实现实时语音对话
  */
 
+import { getWebSocketUrl } from './config.js';
+
 (function(window) {
     'use strict';
 
     const DIALOG_CONFIG = {
-        wsUrl: 'ws://localhost:8765',
+        wsUrl: getWebSocketUrl(),
         inputAudio: {
             sampleRate: 16000,
             channels: 1,
@@ -96,10 +98,42 @@
             }
 
             return new Promise((resolve, reject) => {
+                // 检测是否为移动端
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const connectionTimeout = isMobile ? 15000 : 10000; // 移动端使用更长的超时时间
+                
+                let timeoutId;
+                let hasResolved = false;
+
                 try {
+                    console.log('[Dialog] 开始连接 WebSocket:', this.config.wsUrl);
+                    console.log('[Dialog] 设备类型:', isMobile ? '移动端' : '桌面端');
+                    
                     this.ws = new WebSocket(this.config.wsUrl);
 
+                    // 设置连接超时
+                    timeoutId = setTimeout(() => {
+                        if (!hasResolved) {
+                            console.error('[Dialog] WebSocket 连接超时');
+                            if (this.ws) {
+                                this.ws.close();
+                            }
+                            const error = new Error(`连接超时（${connectionTimeout}ms），请检查网络连接`);
+                            error.isTimeout = true;
+                            error.isMobile = isMobile;
+                            this.isConnected = false;
+                            if (this.onError) {
+                                this.onError(error);
+                            }
+                            reject(error);
+                        }
+                    }, connectionTimeout);
+
                     this.ws.onopen = () => {
+                        if (hasResolved) return;
+                        hasResolved = true;
+                        clearTimeout(timeoutId);
+                        
                         try {
                             this.ws.binaryType = 'arraybuffer';
                         } catch (e) {
@@ -117,8 +151,12 @@
                         this.handleMessage(event);
                     };
 
-                    this.ws.onclose = () => {
-                        console.log('[Dialog] WebSocket 连接已关闭');
+                    this.ws.onclose = (event) => {
+                        console.log('[Dialog] WebSocket 连接已关闭', {
+                            code: event.code,
+                            reason: event.reason,
+                            wasClean: event.wasClean
+                        });
                         this.isConnected = false;
                         this.stopRecording();
                         this.audioQueue = [];
@@ -130,16 +168,43 @@
                     };
 
                     this.ws.onerror = (error) => {
+                        if (hasResolved) return;
+                        hasResolved = true;
+                        clearTimeout(timeoutId);
+                        
                         console.error('[Dialog] WebSocket 错误:', error);
+                        console.error('[Dialog] WebSocket 状态:', this.ws ? this.ws.readyState : 'null');
+                        console.error('[Dialog] WebSocket URL:', this.config.wsUrl);
+                        
                         this.isConnected = false;
+                        
+                        // 创建更详细的错误信息
+                        const detailedError = new Error('WebSocket 连接失败');
+                        detailedError.originalError = error;
+                        detailedError.url = this.config.wsUrl;
+                        detailedError.isMobile = isMobile;
+                        detailedError.readyState = this.ws ? this.ws.readyState : null;
+                        
                         if (this.onError) {
-                            this.onError(error);
+                            this.onError(detailedError);
                         }
-                        reject(error);
+                        reject(detailedError);
                     };
                 } catch (error) {
+                    if (timeoutId) clearTimeout(timeoutId);
                     console.error('[Dialog] 连接失败:', error);
-                    reject(error);
+                    console.error('[Dialog] 错误详情:', {
+                        message: error.message,
+                        stack: error.stack,
+                        url: this.config.wsUrl,
+                        isMobile: isMobile
+                    });
+                    
+                    const detailedError = new Error(`无法创建 WebSocket 连接: ${error.message}`);
+                    detailedError.originalError = error;
+                    detailedError.url = this.config.wsUrl;
+                    detailedError.isMobile = isMobile;
+                    reject(detailedError);
                 }
             });
         }
