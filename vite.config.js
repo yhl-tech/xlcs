@@ -21,18 +21,22 @@ export default defineConfig({
     manifest: false,
     
     // 压缩配置
-    minify: 'esbuild', // 使用 esbuild 进行压缩（快速且高效，Vite 默认）
-    // esbuild 配置（生产环境删除 console 和 debugger）
-    esbuild: {
-      drop: ['console', 'debugger'], // 生产环境删除 console 和 debugger
+    // 使用 terser 以获得更好的压缩效果和更可靠的 console 移除
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,  // 删除 console
+        drop_debugger: true, // 移除 debugger
+        pure_funcs: ['console.log', 'console.info', 'console.warn', 'console.error', 'console.debug'] // 移除特定的 console 方法
+      },
+      mangle: true, // 变量名混淆
+      format: {
+        comments: false // 移除注释
+      }
     },
-    // 如需使用 terser（更好的压缩效果），需要安装: npm install -D terser
-    // minify: 'terser',
-    // terserOptions: {
-    //   compress: {
-    //     drop_console: true,  // 删除 console
-    //     drop_debugger: true, // 移除 debugger
-    //   },
+    // esbuild 配置（已替换为 terser，此配置不再使用）
+    // esbuild: {
+    //   drop: ['console', 'debugger'], // 生产环境删除 console 和 debugger
     // },
     
     // CSS 代码分割（将 CSS 提取到独立文件）

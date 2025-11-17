@@ -378,6 +378,28 @@
      */
     const API = {
         /**
+         * 用户登出
+         * @returns {Promise} 请求Promise
+         */
+        async logout() {
+            try {
+                const userInfo = window.auth ? window.auth.getUserInfo() : null;
+                const token = window.auth ? window.auth.getToken() : null;
+                
+                // 调用登出接口
+                const response = await apiClient.post('/rorschach/user_logout', {
+                    username: userInfo?.username || '',
+                    token: token || ''
+                });
+                
+                return response;
+            } catch (error) {
+                console.error('[API] 登出失败:', error);
+                throw error;
+            }
+        },
+
+        /**
          * 提交完整的测试数据（包括交互数据、音频、时间戳等）
          * @param {Object} testData - 完整的测试数据
          * @returns {Promise} 请求Promise

@@ -15,6 +15,9 @@ importers:
         specifier: ^2.0.6
         version: 2.0.9
     devDependencies:
+      terser:
+        specifier: ^5.44.1
+        version: 5.44.1
       vite:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@24.10.0)(terser@5.44.1)

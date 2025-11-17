@@ -620,17 +620,26 @@
     <!-- 移动端调试工具 vConsole -->
     <script src="https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
-        // 自动检测移动端并启用 vConsole
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile || window.location.search.includes('debug=true')) {
-            if (typeof VConsole !== 'undefined') {
-                window.vConsole = new VConsole({
-                    theme: 'dark',
-                    maxLogNumber: 1000,
-                    onReady: function() {
-                        console.log('[vConsole] 移动端调试工具已启用');
-                    }
-                });
+         // 自动检测移动端并启用 vConsole（仅在非生产环境启用）
+        // 通过检查域名来判断是否为生产环境
+        const isProduction = window.location.hostname !== 'localhost' && 
+                           window.location.hostname !== '127.0.0.1' && 
+                           !window.location.hostname.startsWith('192.168.') &&
+                           window.location.protocol === 'https:';
+        
+        // 仅在非生产环境且满足条件时启用 vConsole
+        if (!isProduction) {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile || window.location.search.includes('debug=true')) {
+                if (typeof VConsole !== 'undefined') {
+                    window.vConsole = new VConsole({
+                        theme: 'dark',
+                        maxLogNumber: 1000,
+                        onReady: function() {
+                            console.log('[vConsole] 移动端调试工具已启用');
+                        }
+                    });
+                }
             }
         }
     </script>
