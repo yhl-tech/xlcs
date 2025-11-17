@@ -43,7 +43,11 @@ export default defineConfig({
     
     // 代码分割配置
     rollupOptions: {
-      input: 'index.html', // 入口文件
+      // 多入口配置，确保 index.html 和 login.html 都会被打包
+      input: {
+        main: 'index.html',
+        login: 'login.html'
+      },
       output: {
         // 资源文件命名
         assetFileNames: (assetInfo) => {
@@ -136,4 +140,3 @@ export default defineConfig({
     }),
   ],
 });
-

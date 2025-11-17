@@ -34,6 +34,16 @@ import { getWebSocketUrl } from './config.js';
     }
 
     async function playPCMWithWebAudio(pcmData, sampleRate, onendedCallback = null) {
+        // 在播放前保存PCM数据到录制器
+        if (window.AudioRecorder && window.AudioRecorder._instance && window.AudioRecorder._instance.isRecording) {
+            try {
+                const int16View = new Int16Array(pcmData);
+                window.AudioRecorder.addPCMData(int16View, sampleRate);
+            } catch (error) {
+                console.warn('[TTS] 保存音频数据失败:', error);
+            }
+        }
+
         const audioContext = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: sampleRate
         });
@@ -255,6 +265,16 @@ import { getWebSocketUrl } from './config.js';
             }
 
             const int16View = new Int16Array(arrayBuffer);
+            
+            // 在播放前保存PCM数据到录制器
+            if (window.AudioRecorder && window.AudioRecorder._instance && window.AudioRecorder._instance.isRecording) {
+                try {
+                    window.AudioRecorder.addPCMData(int16View, this.config.outputAudio.sampleRate);
+                } catch (error) {
+                    console.warn('[TTS] 保存音频数据失败:', error);
+                }
+            }
+            
             const float32Array = new Float32Array(int16View.length);
             for (let i = 0; i < int16View.length; i++) {
                 float32Array[i] = int16View[i] / 32768.0;

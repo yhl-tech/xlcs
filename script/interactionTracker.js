@@ -899,6 +899,153 @@
         setDebugMode(enabled) {
             this.config.debug = enabled;
         }
+
+        /**
+         * 生成旋转数据JSON文件
+         * @returns {Blob} JSON文件的Blob对象
+         */
+        generateRotateJSON() {
+            const rotateData = {};
+            for (let i = 1; i <= 10; i++) {
+                const key = String(i);
+                rotateData[key] = this.data.rotate[key] || [];
+            }
+            const jsonString = JSON.stringify(rotateData, null, 2);
+            return new Blob([jsonString], { type: 'application/json' });
+        }
+
+        /**
+         * 生成时间戳切分数据JSON文件
+         * @returns {Blob} JSON文件的Blob对象
+         */
+        generateSegTimeJSON() {
+            const segTimeData = {
+                start: this.timestamps.start,
+                plates: this.timestamps.plates,
+                select: this.timestamps.select,
+                stop: this.timestamps.stop
+            };
+            const jsonString = JSON.stringify(segTimeData, null, 2);
+            return new Blob([jsonString], { type: 'application/json' });
+        }
+
+        /**
+         * 提交放大缩小数据到服务器
+         * @param {string} userId - 用户ID
+         * @returns {Promise<Object>} 提交结果
+         */
+        async submitZoomData(userId) {
+            if (!window.API || !window.API.uploadZoom) {
+                throw new Error('API.uploadZoom 方法不可用');
+            }
+
+            try {
+                // 直接获取放大缩小数据对象，格式: { "1": [1, 1, -1], "2": [], ... }
+                const zoomData = {};
+                for (let i = 1; i <= 10; i++) {
+                    const key = String(i);
+                    zoomData[key] = this.data.zoom[key] || [];
+                }
+                
+                const result = await window.API.uploadZoom(zoomData, userId);
+                console.log('[InteractionTracker] 放大缩小数据提交成功:', result);
+                return { success: true, data: result };
+            } catch (error) {
+                console.error('[InteractionTracker] 放大缩小数据提交失败:', error);
+                return { success: false, error: error.message || '提交失败' };
+            }
+        }
+
+        /**
+         * 提交旋转数据到服务器
+         * @param {string} userId - 用户ID
+         * @returns {Promise<Object>} 提交结果
+         */
+        async submitRotateData(userId) {
+            if (!window.API || !window.API.uploadRotate) {
+                throw new Error('API.uploadRotate 方法不可用');
+            }
+
+            try {
+                // 获取旋转次数数据对象，格式: { "1": 0, "2": 4, "3": 22, ... }
+                const rotateData = {};
+                for (let i = 1; i <= 10; i++) {
+                    const key = String(i);
+                    // 计算旋转次数，如果数据不存在则默认为0
+                    const rotations = this.data.rotate[key] || [];
+                    rotateData[key] = Array.isArray(rotations) ? rotations.length : 0;
+                }
+                console.log('rotateData', rotateData);    
+                const result = await window.API.uploadRotate(rotateData, userId);
+                console.log('[InteractionTracker] 旋转数据提交成功:', result);
+                return { success: true, data: result };
+            } catch (error) {
+                console.error('[InteractionTracker] 旋转数据提交失败:', error);
+                return { success: false, error: error.message || '提交失败' };
+            }
+        }
+
+        /**
+         * 提交时间戳数据到服务器
+         * @param {string} userId - 用户ID
+         * @returns {Promise<Object>} 提交结果
+         */
+        async submitSegTimeData(userId) {
+            if (!window.API || !window.API.uploadSegTime) {
+                throw new Error('API.uploadSegTime 方法不可用');
+            }
+
+            try {
+                // 获取格式化后的时间戳数据对象（相对时间格式）
+                const segTimeData = this.getAudioTimestamps();
+                
+                const result = await window.API.uploadSegTime(segTimeData, userId);
+                console.log('[InteractionTracker] 时间戳数据提交成功:', result);
+                return { success: true, data: result };
+            } catch (error) {
+                console.error('[InteractionTracker] 时间戳数据提交失败:', error);
+                return { success: false, error: error.message || '提交失败' };
+            }
+        }
+
+        /**
+         * 提交所有数据到服务器（旋转和时间戳分开提交）
+         * @param {string} userId - 用户ID
+         * @returns {Promise<Object>} 提交结果
+         */
+        async submitAllData(userId) {
+            const results = {
+                zoom: null,
+                rotate: null,
+                segTime: null
+            };
+
+            // 提交放大缩小数据
+            try {
+                results.zoom = await this.submitZoomData(userId);
+            } catch (error) {
+                console.error('[InteractionTracker] 提交放大缩小数据时出错:', error);
+                results.zoom = { success: false, error: error.message };
+            }
+
+            // 提交旋转数据
+            try {
+                results.rotate = await this.submitRotateData(userId);
+            } catch (error) {
+                console.error('[InteractionTracker] 提交旋转数据时出错:', error);
+                results.rotate = { success: false, error: error.message };
+            }
+
+            // 提交时间戳数据
+            try {
+                results.segTime = await this.submitSegTimeData(userId);
+            } catch (error) {
+                console.error('[InteractionTracker] 提交时间戳数据时出错:', error);
+                results.segTime = { success: false, error: error.message };
+            }
+
+            return results;
+        }
     }
 
     // 创建单例实例
@@ -951,6 +1098,14 @@
         _trackDrawingStart: (x, y) => trackerInstance.trackDrawingStart(x, y),
         _trackDrawingPoint: (x, y) => trackerInstance.trackDrawingPoint(x, y),
         _trackDrawingEnd: () => trackerInstance.trackDrawingEnd(),
+
+        // 数据提交方法
+        generateRotateJSON: () => trackerInstance.generateRotateJSON(),
+        generateSegTimeJSON: () => trackerInstance.generateSegTimeJSON(),
+        submitZoomData: (userId) => trackerInstance.submitZoomData(userId),
+        submitRotateData: (userId) => trackerInstance.submitRotateData(userId),
+        submitSegTimeData: (userId) => trackerInstance.submitSegTimeData(userId),
+        submitAllData: (userId) => trackerInstance.submitAllData(userId),
         
         // 直接访问实例（高级用法）
         _instance: trackerInstance

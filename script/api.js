@@ -10,14 +10,8 @@
      * API 配置
      */
     const API_CONFIG = {
-        // 方案一（推荐）：使用代理服务器 - 运行 npm run dev
-        baseURL: '/api',
-        
-        // 方案二：直接访问后端（需要后端支持CORS）
-        // baseURL: 'http://localhost:3000/api',
-        
-        // 生产环境（部署时修改）
-        // baseURL: 'https://your-domain.com/api',
+        // 从配置文件获取 baseURL
+        baseURL: (typeof window !== 'undefined' && window.API_CONFIG?.baseURL) || '/api',
         
         timeout: 30000,
         headers: {
@@ -42,13 +36,57 @@
             this.axiosInstance = axios.create({
                 baseURL: this.config.baseURL,
                 timeout: this.config.timeout,
-                headers: this.config.headers
+                headers: this.config.headers,
+                // 确保 FormData 被正确处理
+                transformRequest: [(data, headers) => {
+                    // 如果是 FormData，直接返回，不进行任何转换
+                    if (data instanceof FormData) {
+                        return data;
+                    }
+                    // 如果是普通对象，且 Content-Type 是 application/json，则序列化为 JSON
+                    if (data && typeof data === 'object' && headers && headers['Content-Type'] === 'application/json') {
+                        return JSON.stringify(data);
+                    }
+                    // 其他情况使用默认处理（axios 会自动处理）
+                    return data;
+                }]
             });
             
             // 设置请求拦截器
             this.axiosInstance.interceptors.request.use(
                 (config) => {
-                    // 可以在这里添加请求前的处理
+                    // 确保 headers 对象存在
+                    if (!config.headers) {
+                        config.headers = {};
+                    }
+                    
+                    // 如果请求头中已经设置了 Authorization，则不覆盖（用于使用固定 api_key 的接口）
+                    // 但对于登录接口，不自动添加 token
+                    const isLoginRequest = config.url && config.url.includes('/user_login');
+                    if (!isLoginRequest && !config.headers.Authorization) {
+                        // 自动添加 token（仅当不是登录请求且没有 Authorization header 时）
+                        const token = localStorage.getItem('token');
+                        if (token) {
+                            config.headers.Authorization = `Bearer ${token}`;
+                        }
+                    }
+                    
+                    // 统一添加 User-Id header（与 test.py 中成功测试的格式一致）
+                    config.headers['User-Id'] = 'Bubble_Lis';
+                    
+                    // 确保所有自定义 headers 都被正确设置（特别是 FormData 请求）
+                    // 对于 FormData 请求，需要确保 headers 被正确传递
+                    if (config.data instanceof FormData) {
+                        // FormData 时，确保自定义 headers 被保留
+                        // axios 会自动处理 Content-Type，但其他 headers 需要手动设置
+                        if (config.headers && Object.keys(config.headers).length > 0) {
+                            // 确保 headers 对象是普通对象，而不是 axios 的特殊对象
+                            const headers = { ...config.headers };
+                            // 删除 Content-Type，让浏览器自动设置
+                            delete headers['Content-Type'];
+                            config.headers = headers;
+                        }
+                    }
                     return config;
                 },
                 (error) => {
@@ -68,8 +106,37 @@
                         // 服务器返回了错误状态码
                         const status = error.response.status;
                         const errorData = error.response.data || {};
+                        
+                        // 401 未授权，清除 token 并跳转登录
+                        if (status === 401) {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('userInfo');
+                            // 如果不在登录页，且不是提交测试数据的情况，才跳转到登录页
+                            // 提交测试数据时即使401也不跳转，让用户看到汇总页面
+                            const url = error.config?.url || '';
+                            const isSubmittingTestData = url.includes('upload_scale')||url.includes('upload_rotate') || 
+                                                         url.includes('upload_seg_time') ||
+                                                         url.includes('upload_media') ||
+                                                         url.includes('analyze');
+                            const isOnLoginPage = window.location.pathname.includes('login.html');
+                            const isOnSummaryPage = window.location.pathname.includes('index.html') && 
+                                                   (document.getElementById('summary-view')?.style.display !== 'none');
+                            
+                            // 只有在非登录页、非汇总页、且不是提交测试数据时才跳转
+                            if (!isOnLoginPage && !isSubmittingTestData && !isOnSummaryPage) {
+                                // window.location.href = './login.html';
+                            }
+                        }
+                        
+                        // 提取错误消息，优先使用 msg，然后是 message，最后是 statusText
+                        const errorMessage = errorData.msg || 
+                                            errorData.message || 
+                                            errorData.exception ||
+                                            error.message || 
+                                            `请求失败: ${error.response.statusText}`;
+                        
                         throw new APIError(
-                            errorData.message || error.message || `请求失败: ${error.response.statusText}`,
+                            errorMessage,
                             status,
                             errorData
                         );
@@ -123,6 +190,22 @@
                 ...options
             };
 
+            // 先初始化 headers，确保自定义 headers 能被正确传递
+            // 过滤掉 undefined 值
+            const cleanOptionsHeaders = {};
+            if (options.headers) {
+                Object.keys(options.headers).forEach(key => {
+                    if (options.headers[key] !== undefined) {
+                        cleanOptionsHeaders[key] = options.headers[key];
+                    }
+                });
+            }
+            
+            config.headers = {
+                ...this.config.headers,
+                ...cleanOptionsHeaders
+            };
+
             // 根据请求方法设置数据
             if (method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD' || method.toUpperCase() === 'DELETE') {
                 // GET/HEAD/DELETE 请求使用 params
@@ -133,19 +216,21 @@
                 // POST/PUT 请求使用 data
                 if (data) {
                     config.data = data;
-                    // 如果是 FormData，让 axios 自动设置 Content-Type
                     if (data instanceof FormData) {
-                        config.headers = {
-                            ...config.headers,
-                            'Content-Type': 'multipart/form-data'
-                        };
+                        // FormData 时，删除 Content-Type，让浏览器自动设置
+                        delete config.headers['Content-Type'];
+                        // 确保 axios 正确处理 FormData，不进行序列化
+                        // 确保 transformRequest 不会处理 FormData
+                        if (!config.transformRequest || !Array.isArray(config.transformRequest)) {
+                            config.transformRequest = [(data) => {
+                                if (data instanceof FormData) {
+                                    return data;
+                                }
+                                return data;
+                            }];
+                        }
                     }
                 }
-            }
-
-            // 合并额外的请求头
-            if (options.headers) {
-                config.headers = { ...config.headers, ...options.headers };
             }
 
             try {
@@ -298,62 +383,498 @@
          * @returns {Promise} 请求Promise
          */
         async submitCompleteTestData(testData) {
-            return apiClient.post('/test/complete', testData);
+            return apiClient.axiosInstance.post('/test/complete', testData);
         },
+
+        /**
+         * 获取用户基本信息
+         * @param {string} userId - 用户ID（可选）
+         * @returns {Promise} 请求Promise
+         */
+        async getBasicInfo(userId = null) {
+            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`
+            };
+            
+            // 准备请求数据
+            const requestData = {};
+            if (userId) {
+                requestData.user_id = userId;
+            }
+            
+            return apiClient.axiosInstance.post('/rorschach/analyze/get_basic_info', requestData, {
+                headers: headers
+            });
+        },
+
+        /**
+         * 上传旋转度文件
+         * @param {Object} rotateData - 旋转数据对象 { "1": 0, "2": 4, "3": 22, ... }
+         * @param {string} userId - 用户ID
+         * @returns {Promise} 请求Promise
+         */
+        async uploadRotate(rotateData, userId) {
+            if (!rotateData || typeof rotateData !== 'object') {
+                throw new Error('旋转数据参数无效');
+            }
+            
+            // 检查数据是否为空
+            const hasData = Object.keys(rotateData).length > 0;
+            if (!hasData) {
+                console.warn('[API] 旋转数据为空对象');
+            }
+            
+            console.log('[API] 上传旋转数据:', {
+                data: rotateData,
+                dataKeys: Object.keys(rotateData),
+                userId: userId
+            });
+            
+            // 准备表单数据
+            const formData = new FormData();
+            
+            // 将 JSON 数据转换为 Blob，然后添加到 FormData
+            const jsonString = JSON.stringify(rotateData);
+            console.log('[API] JSON字符串长度:', jsonString.length);
+            
+            if (jsonString.length === 2) { // 只有 "{}"
+                throw new Error('旋转数据为空，无法上传');
+            }
+            
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            console.log('[API] Blob大小:', blob.size, 'bytes');
+            
+            // 创建 File 对象（兼容性处理）
+            let file;
+            if (typeof File !== 'undefined') {
+                file = new File([blob], 'rotate.json', { type: 'application/json' });
+            } else {
+                // 降级到 Blob
+                file = blob;
+            }
+            
+            console.log('[API] File对象:', {
+                name: file.name || 'rotate.json',
+                size: file.size,
+                type: file.type
+            });
+            
+            // 添加文件到 FormData
+            formData.append('file', file, 'rotate.json');
+            
+            
+            // 验证 FormData
+            console.log('[API] FormData验证:', {
+                hasFile: formData.has('file'),
+                hasUserId: formData.has('user_id'),
+                fileValue: formData.get('file'),
+                userIdValue: formData.get('user_id'),
+                fileSize: file.size
+            });
+            
+            // 使用固定的 api_key
+            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                'User-Id': 'Bubble_Lis'
+            };
+            
+            console.log('[API] 上传旋转数据 - Headers:', headers);
+            
+            return apiClient.post('/rorschach/analyze/upload_rotate', formData, {
+                headers: headers
+            });
+        },
+
+        /**
+         * 上传放大缩小数据
+         * @param {Object} zoomData - 放大缩小数据对象 { "1": [1, 1, -1], "2": [], ... }
+         * @param {string} userId - 用户ID
+         * @returns {Promise} 请求Promise
+         */
+        async uploadZoom(zoomData, userId) {
+            if (!zoomData || typeof zoomData !== 'object') {
+                throw new Error('放大缩小数据参数无效');
+            }
+            
+            console.log('[API] 上传放大缩小数据:', {
+                data: zoomData,
+                userId: userId
+            });
+            
+            // 准备表单数据
+            const formData = new FormData();
+            
+            // 将 JSON 数据转换为 Blob，然后添加到 FormData
+            const jsonString = JSON.stringify(zoomData);
+            console.log('[API] Zoom JSON字符串长度:', jsonString.length);
+            
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            console.log('[API] Zoom Blob大小:', blob.size, 'bytes');
+            
+            const file = new File([blob], 'scale.json', { type: 'application/json' });
+            console.log('[API] Zoom File对象:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
+            
+            // 添加文件到 FormData
+            formData.append('file', file, 'scale.json');
+            
+            // 验证 FormData
+            console.log('[API] Zoom FormData验证:', {
+                hasFile: formData.has('file'),
+                hasUserId: formData.has('user_id'),
+                fileValue: formData.get('file'),
+                userIdValue: formData.get('user_id'),
+                fileSize: file.size
+            });
+            
+            // 使用固定的 api_key
+            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                'User-Id': 'Bubble_Lis'
+            };
+            
+            return apiClient.post('/rorschach/analyze/upload_scale', formData, {
+                headers: headers
+            });
+        },
+
+        /**
+         * 上传时间戳切分文件
+         * @param {Object} segTimeData - 时间戳数据对象
+         * @param {string} userId - 用户ID
+         * @returns {Promise} 请求Promise
+         */
+        async uploadSegTime(segTimeData, userId) {
+            if (!segTimeData || typeof segTimeData !== 'object') {
+                throw new Error('时间戳数据参数无效');
+            }
+            
+            console.log('[API] 上传时间戳数据:', {
+                data: segTimeData,
+                userId: userId
+            });
+            
+            // 准备表单数据
+            const formData = new FormData();
+            
+            // 将 JSON 数据转换为 Blob，然后添加到 FormData
+            const jsonString = JSON.stringify(segTimeData);
+            console.log('[API] SegTime JSON字符串长度:', jsonString.length);
+            
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            console.log('[API] SegTime Blob大小:', blob.size, 'bytes');
+            
+            const file = new File([blob], 'video_clip.json', { type: 'application/json' });
+            console.log('[API] SegTime File对象:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
+            
+            // 添加文件到 FormData
+            formData.append('file', file, 'video_clip.json');
+            
+            // 验证 FormData
+            console.log('[API] SegTime FormData验证:', {
+                hasFile: formData.has('file'),
+                hasUserId: formData.has('user_id'),
+                fileValue: formData.get('file'),
+                userIdValue: formData.get('user_id')
+            });
+            
+            // 使用固定的 api_key
+            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                'User-Id': 'Bubble_Lis'
+            };
+            
+            console.log('[API] 上传时间戳数据 - Headers:', headers);
+            
+            // 使用 axios 实例发送请求，确保与拦截器一致
+            return apiClient.post('/rorschach/analyze/upload_seg_time', formData, {
+                headers: headers
+            });
+        },
+
+        /**
+         * 上传音/视频文件
+         * @param {Blob|File} file - 音频或视频文件
+         * @param {string} userId - 用户ID（可选）
+         * @returns {Promise} 请求Promise
+         */
+        async uploadMedia(file, userId = null) {
+            // 确保文件有正确的文件名和类型
+            let fileToUpload = file;
+            
+            // 如果是 Blob，需要转换为 File 对象并确保有正确的扩展名
+            if (file instanceof Blob && !(file instanceof File)) {
+                // 根据 MIME 类型确定文件扩展名
+                let extension = '';
+                if (file.type === 'audio/mpeg' || file.type === 'audio/mp3') {
+                    extension = '.mp3';
+                } else if (file.type === 'audio/mp4' || file.type === 'audio/m4a') {
+                    extension = '.mp4';
+                } else if (file.type === 'video/mp4') {
+                    extension = '.mp4';
+                } else if (file.type.startsWith('audio/')) {
+                    // 其他音频格式，默认使用 .mp3
+                    extension = '.mp3';
+                } else if (file.type.startsWith('video/')) {
+                    // 其他视频格式，默认使用 .mp4
+                    extension = '.mp4';
+                } else {
+                    // 如果无法确定类型，根据已有文件名或默认使用 .mp3
+                    extension = '.mp3';
+                }
+                
+                // 创建 File 对象
+                const fileName = file.name || `audio${extension}`;
+                fileToUpload = new File([file], fileName, { type: file.type || 'audio/mpeg' });
+            } else if (file instanceof File) {
+                // 如果是 File 对象，确保文件名有正确的扩展名
+                const fileName = file.name;
+                const hasValidExtension = fileName.toLowerCase().endsWith('.mp3') || 
+                                         fileName.toLowerCase().endsWith('.mp4');
+                
+                if (!hasValidExtension) {
+                    // 根据 MIME 类型添加扩展名
+                    let extension = '';
+                    if (file.type === 'audio/mpeg' || file.type === 'audio/mp3') {
+                        extension = '.mp3';
+                    } else if (file.type === 'audio/mp4' || file.type === 'audio/m4a' || file.type === 'video/mp4') {
+                        extension = '.mp4';
+                    } else {
+                        extension = '.mp3'; // 默认
+                    }
+                    
+                    const newFileName = fileName.includes('.') 
+                        ? fileName.replace(/\.[^.]+$/, extension)
+                        : fileName + extension;
+                    fileToUpload = new File([file], newFileName, { type: file.type || 'audio/mpeg' });
+                }
+            }
+            
+            // 验证文件类型
+            const fileName = fileToUpload.name.toLowerCase();
+            const isValidFormat = fileName.endsWith('.mp3') || fileName.endsWith('.mp4');
+            if (!isValidFormat) {
+                throw new Error('只支持上传MP3/MP4格式文件');
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            
+
+            // 使用固定的 api_key
+            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+            };
+            
+            return apiClient.post('/rorschach/analyze/upload_media', formData, {
+                headers: headers
+            });
+        },
+
+        /**
+         * 下载测试报告
+         * @param {string} userId - 用户ID
+         * @returns {Promise} 请求Promise，返回PDF文件Blob
+         */
+        async downloadReport(userId) {
+            if (!userId) {
+                throw new Error('用户ID不能为空');
+            }
+            
+            try {
+                const response = await apiClient.post('/rorschach/user/get_report', 
+                    { user_id: userId }, 
+                    {
+                        responseType: 'blob',
+                        timeout: 300000, // 5分钟超时
+                        headers: {
+                            'Accept': 'application/pdf, application/octet-stream'
+                        }
+                    }
+                );
+                
+                return response;
+            } catch (error) {
+                console.error('[API] 下载报告失败:', error);
+                throw error;
+            }
+        },
+
+        /**
+         * 用户注册
+         * @param {string} username - 用户名
+         * @param {string} password - 密码
+         * @returns {Promise} 请求Promise
+         */
+        async register(username, password) {
+            if (!username || !password) {
+                throw new Error('用户名和密码不能为空');
+            }
+            
+            try {
+                // 注册请求不携带认证头
+                // 先清除可能存在的 Authorization header
+                if (window.apiClient) {
+                    window.apiClient.clearAuthToken();
+                }
+                
+                const response = await apiClient.post('/rorschach/user_register', {
+                    username: username,
+                    password: password
+                });
+                
+                return response;
+            } catch (error) {
+                console.error('[API] 注册失败:', error);
+                throw error;
+            }
+        }
     };
 
     /**
      * 测试数据提交辅助函数
      * 用于在测试完成后整理并提交所有数据
+     * 根据新的后端接口，分别提交旋转数据和时间戳数据
      */
     window.submitTestDataToServer = async function(interactionTracker, audioBlob = null, postTestAnswers = {}) {
         try {
-            // 收集所有测试数据
-            const testData = {
-                // 测试基本信息
-                timestamp: new Date().toISOString(),
-                testStartTime: interactionTracker.testStartTime ? new Date(interactionTracker.testStartTime).toISOString() : null,
-                testEndTime: new Date().toISOString(),
-                
-                // 交互追踪数据
-                interactionData: interactionTracker.getAllData({
-                    includeStats: true,
-                    includeMetadata: true
-                }),
-                
-                // 旋转次数统计
-                rotationCounts: interactionTracker.getRotationCounts(),
-                
-                // 画笔轨迹数据
-                drawingTracks: interactionTracker.getDrawingTracks(),
-                
-                // 时间戳数据
-                timestamps: {
-                    relative: interactionTracker.getAudioTimestamps(),
-                    absolute: interactionTracker.getAbsoluteTimestamps()
-                },
-                
-                // 后测试答案
-                postTestAnswers: postTestAnswers,
-                
-                // 完整统计数据
-                statistics: interactionTracker.printAllPlatesStatistics ? (() => {
-                    // 获取统计信息的辅助函数
-                    const allPlatesStats = {
-                        plates: {},
-                        global: {}
-                    };
-                    for (let i = 1; i <= 10; i++) {
-                        allPlatesStats.plates[String(i)] = interactionTracker.getStatistics(i);
-                    }
-                    allPlatesStats.global = interactionTracker.getStatistics();
-                    return allPlatesStats;
-                })() : null
+            // 获取用户ID（优先从get_basic_info接口获取的userId，其次从用户名）
+            let userId = 'unknown';
+            const userInfo = window.auth ? window.auth.getUserInfo() : null;
+            
+            if (userInfo?.userId) {
+                // 使用从get_basic_info接口获取的userId
+                userId = String(userInfo.userId);
+                console.log('[API] 使用保存的 userId:', userId);
+            } else if (userInfo?.username) {
+                // 降级使用用户名
+                userId = userInfo.username;
+                console.warn('[API] userId 不存在，降级使用用户名:', userId);
+            } else {
+                console.error('[API] 无法获取用户ID，userInfo:', userInfo);
+                throw new Error('用户ID不存在，请先登录');
+            }
+
+            console.log('[API] 开始提交测试数据，用户ID:', userId, 'userInfo:', userInfo);
+            console.log('[API] interactionTracker:', interactionTracker);
+
+            const results = {
+                zoom: null,
+                rotate: null,
+                segTime: null,
+                media: null
             };
 
-            // 提交测试数据
-            const result = await API.submitCompleteTestData(testData);
-            return result;
+            // 1. 提交放大缩小数据
+            if (interactionTracker && typeof interactionTracker.submitZoomData === 'function') {
+                try {
+                    console.log('[API] 开始提交放大缩小数据...');
+                    results.zoom = await interactionTracker.submitZoomData(userId);
+                    console.log('[API] 放大缩小数据提交结果:', results.zoom);
+                } catch (error) {
+                    console.error('[API] 放大缩小数据提交失败:', error);
+                    results.zoom = { success: false, error: error.message || '提交失败' };
+                }
+            } else {
+                console.error('[API] interactionTracker.submitZoomData 方法不存在', {
+                    hasTracker: !!interactionTracker,
+                    methods: interactionTracker ? Object.keys(interactionTracker) : []
+                });
+            }
+
+            // 2. 提交旋转数据
+            if (interactionTracker && typeof interactionTracker.submitRotateData === 'function') {
+                try {
+                    console.log('[API] 开始提交旋转数据...');
+                    results.rotate = await interactionTracker.submitRotateData(userId);
+                    console.log('[API] 旋转数据提交结果:', results.rotate);
+                } catch (error) {
+                    console.error('[API] 旋转数据提交失败:', error);
+                    results.rotate = { success: false, error: error.message || '提交失败' };
+                }
+            } else {
+                console.error('[API] interactionTracker.submitRotateData 方法不存在', {
+                    hasTracker: !!interactionTracker,
+                    methods: interactionTracker ? Object.keys(interactionTracker) : []
+                });
+            }
+
+            // 3. 提交时间戳数据
+            if (interactionTracker && typeof interactionTracker.submitSegTimeData === 'function') {
+                try {
+                    console.log('[API] 开始提交时间戳数据...');
+                    results.segTime = await interactionTracker.submitSegTimeData(userId);
+                    console.log('[API] 时间戳数据提交结果:', results.segTime);
+                } catch (error) {
+                    console.error('[API] 时间戳数据提交失败:', error);
+                    results.segTime = { success: false, error: error.message || '提交失败' };
+                }
+            } else {
+                console.error('[API] interactionTracker.submitSegTimeData 方法不存在', {
+                    hasTracker: !!interactionTracker,
+                    methods: interactionTracker ? Object.keys(interactionTracker) : []
+                });
+            }
+
+            // 4. 提交音频文件（优先使用录制器导出的MP3）
+            let audioFileToUpload = audioBlob;
+            
+            // 如果录制器有数据，优先使用录制器导出的MP3
+            if (window.AudioRecorder && window.AudioRecorder._instance) {
+                try {
+                    const status = window.AudioRecorder.getStatus();
+                    if (status.bufferCount > 0) {
+                        console.log('[API] 开始导出录制器音频为MP3...');
+                        window.AudioRecorder.stop();
+                        audioFileToUpload = await window.AudioRecorder.exportMP3();
+                        console.log('[API] MP3导出成功，大小:', audioFileToUpload.size, 'bytes');
+                    }
+                } catch (error) {
+                    console.error('[API] 导出录制器音频失败:', error);
+                    // 如果导出失败，继续使用原有的audioBlob
+                }
+            }
+            
+            if (audioFileToUpload && API.uploadMedia) {
+                try {
+                    results.media = await API.uploadMedia(audioFileToUpload, userId);
+                    console.log('[API] 音频文件提交结果:', results.media);
+                } catch (error) {
+                    console.error('[API] 音频文件提交失败:', error);
+                    results.media = { success: false, error: error.message };
+                }
+            }
+
+            // 返回所有提交结果
+            const allSuccess = (results.zoom === null || results.zoom?.success) &&
+                              (results.rotate === null || results.rotate?.success) &&
+                              (results.segTime === null || results.segTime?.success);
+            
+            console.log('[API] 所有数据提交完成:', {
+                success: allSuccess,
+                zoom: results.zoom?.success,
+                rotate: results.rotate?.success,
+                segTime: results.segTime?.success,
+                media: results.media?.success
+            });
+
+            return {
+                success: allSuccess,
+                results: results,
+                userId: userId
+            };
         } catch (error) {
             console.error('[API] 提交测试数据失败:', error);
             throw error;
@@ -374,4 +895,3 @@
     }
 
 })(window);
-

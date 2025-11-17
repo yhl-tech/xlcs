@@ -638,11 +638,23 @@
     <!-- Axios 库 -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     
-    <!-- 交互追踪系统 -->
-    <script type="module" src="./script/interactionTracker.js"></script>
+    <!-- 配置文件 -->
+    <script type="module" src="./script/config.js"></script>
     
     <!-- API 接口模块 -->
     <script type="module" src="./script/api.js"></script>
+    
+    <!-- 认证模块 -->
+    <script type="module" src="./script/auth.js"></script>
+    
+    <!-- 交互追踪系统 -->
+    <script type="module" src="./script/interactionTracker.js"></script>
+    
+    <!-- lamejs MP3编码库 -->
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+    
+    <!-- 音频录制器 -->
+    <script type="module" src="./script/audioRecorder.js"></script>
     
     <!-- TTS 语音合成客户端 -->
     <script type="module" src="./script/ttsClient.js"></script>
@@ -879,6 +891,12 @@
                         enterBtn.disabled = true;
                         enterBtn.textContent = '连接中...';
                         
+                        // 启动音频录制器
+                        if (window.AudioRecorder) {
+                            window.AudioRecorder.start();
+                            console.log('[测试] 音频录制器已启动');
+                        }
+                        
                         // 修复：在进入测试页前重置TTS状态
                         if (window.dialogClient) {
                             // 断开现有连接以确保干净的状态
@@ -1051,6 +1069,8 @@
                 // 保存音频Blob到state，供finishAndSave使用
                 state.audioBlob = audioBlob;
                 
+                // 注释掉自动下载webm文件的逻辑
+                /*
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -1061,6 +1081,7 @@
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(audioUrl);
+                */
                 state.audioChunks = [];
             };
 
@@ -1517,6 +1538,12 @@
 
         // 完成和汇总
         function finishAndSave() {
+            // 断开TTS连接
+            if (window.dialogClient) {
+                window.dialogClient.disconnect();
+                console.log('[测试完成] TTS连接已断开');
+            }
+            
             if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
                 state.mediaRecorder.stop();
             }
@@ -1570,9 +1597,40 @@
                             finishBtn.textContent = '正在提交数据...';
                         }
                         
-                        // 获取音频数据（从state.audioBlob或重新创建）
-                        let audioBlob = state.audioBlob;
-                        if (!audioBlob && state.audioChunks && state.audioChunks.length > 0) {
+                        // 获取音频数据（优先使用录制器导出的MP3）
+                        let audioBlob = null;
+                        
+                        // 如果录制器有数据，优先使用录制器导出的MP3
+                        if (window.AudioRecorder && window.AudioRecorder._instance) {
+                            try {
+                                const status = window.AudioRecorder.getStatus();
+                                if (status.bufferCount > 0) {
+                                    console.log('[测试完成] 开始导出录制器音频为MP3...');
+                                    window.AudioRecorder.stop();
+                                    audioBlob = await window.AudioRecorder.exportMP3();
+                                    console.log('[测试完成] MP3导出成功，大小:', audioBlob.size, 'bytes');
+                                    
+                                    // 立即下载MP3文件
+                                    try {
+                                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                                        // await window.AudioRecorder.downloadMP3(`rorschach-audio-${timestamp}.mp3`);
+                                        console.log('[测试完成] MP3文件已自动下载');
+                                    } catch (downloadError) {
+                                        console.error('[测试完成] MP3文件下载失败:', downloadError);
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('[测试完成] 导出录制器音频失败:', error);
+                                // 如果导出失败，尝试使用原有的audioBlob
+                                if (state.audioBlob) {
+                                    audioBlob = state.audioBlob;
+                                }
+                            }
+                        } else if (state.audioBlob) {
+                            // 如果没有录制器或录制器导出失败，使用原有的audioBlob
+                            audioBlob = state.audioBlob;
+                        } else if (state.audioChunks && state.audioChunks.length > 0) {
+                            // 如果都没有，从audioChunks创建（但这是WebM格式，后端可能不接受）
                             audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
                         }
                         
@@ -1611,7 +1669,7 @@
             progressText.textContent = '测试已完成！';
 
             const grid = document.getElementById('summary-grid');
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！您的录音文件已开始下载。</h3></div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3><button id="download-report-btn" style="margin-top: 15px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);" onclick="downloadReport()">📥 下载测试报告</button></div>';
 
             for (let i = 0; i < state.totalImages; i++) {
                 const item = document.createElement('div');
@@ -1634,6 +1692,60 @@
                 }
                 item.appendChild(compositeContainer);
                 grid.appendChild(item);
+            }
+        }
+
+        // 下载报告功能
+        async function downloadReport() {
+            try {
+                // 获取用户ID
+                let userId = 'unknown';
+                const userInfo = window.auth ? window.auth.getUserInfo() : null;
+                
+                if (userInfo?.userId) {
+                    userId = String(userInfo.userId);
+                } else if (userInfo?.username) {
+                    userId = userInfo.username;
+                } else {
+                    alert('用户信息不存在，请重新登录');
+                    return;
+                }
+
+                // 更新按钮状态
+                const downloadBtn = document.getElementById('download-report-btn');
+                const originalText = downloadBtn.innerHTML;
+                downloadBtn.innerHTML = '📄 报告生成中...';
+                downloadBtn.disabled = true;
+
+                // 调用API模块中的下载报告方法
+                const response = await window.API.downloadReport(userId);
+
+                // 创建下载链接
+                const blob = new Blob([response], { type: 'application/pdf' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `rorschach-test-report-${userId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // 恢复按钮状态
+                downloadBtn.innerHTML = '📥 下载测试报告';
+                downloadBtn.disabled = false;
+                
+                console.log('[报告下载] 下载成功');
+            } catch (error) {
+                console.error('[报告下载] 下载失败:', error);
+                
+                // 恢复按钮状态
+                const downloadBtn = document.getElementById('download-report-btn');
+                downloadBtn.innerHTML = '📥 下载测试报告';
+                downloadBtn.disabled = false;
+                
+                alert('报告下载失败，请稍后重试');
             }
         }
 
@@ -1750,9 +1862,46 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
+        // 等待模块加载完成
+        function waitForModules(callback, maxRetries = 50) {
+            let retries = 0;
+            const checkModules = () => {
+                if (window.auth && window.apiClient) {
+                    callback();
+                } else if (retries < maxRetries) {
+                    retries++;
+                    setTimeout(checkModules, 100);
+                } else {
+                    console.error('模块加载超时，跳转到登录页');
+                    window.location.href = './login.html';
+                }
+            };
+            checkModules();
+        }
+
+        // 登录检查和初始化
+        function checkLoginAndInit() {
+            // 检查登录状态
+            if (!window.auth.isLoggedIn()) {
+                // 未登录，跳转到登录页
+                window.location.href = './login.html';
+                return;
+            }
+            
+            // 已登录，初始化 token 到 API 客户端
+            const token = window.auth.getToken();
+            if (token && window.apiClient) {
+                window.apiClient.setAuthToken(token);
+            }
+            
+            // 已登录，继续初始化应用
+            setupEventListeners();
+        }
+
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            setupEventListeners();
+            // 等待模块加载完成后检查登录状态
+            waitForModules(checkLoginAndInit);
         });
     </script>
 </body>

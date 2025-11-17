@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const BACKEND_URL = 'http://localhost:3000'; // 修改为后端地址
+const BACKEND_URL = 'http://14.103.237.160:29876'; // 开发环境后端地址
 
 // 静态文件
 // 提供项目根目录的静态文件（index.html, script/ 等）
@@ -18,7 +18,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 // API 代理：所有 /api 请求转发到后端
 app.use('/api', createProxyMiddleware({
     target: BACKEND_URL,
-    changeOrigin: true
+    changeOrigin: true,
+    // 路径重写：将 /api 前缀去掉，直接转发到后端（与 users 项目保持一致）
+    pathRewrite: {
+        '^/api': '' // 去掉 /api 前缀，例如 /api/rorschach/user_login -> /rorschach/user_login
+    },
+    // 日志配置（开发环境）
+    logLevel: 'debug',
+    onProxyReq: (proxyReq, req, res) => {
+    },
+    onError: (err, req, res) => {
+        console.error('[代理错误]', err.message);
+        res.status(500).json({ error: '代理服务器错误' });
+    }
 }));
 
 // 其他请求返回 index.html
@@ -30,7 +42,7 @@ app.get('*', (req, res) => {
 function startServer(port = 8080) {
     const server = app.listen(port, () => {
         console.log(`前端: http://localhost:${port}`);
-        console.log(`代理: /api -> ${BACKEND_URL}/api`);
+        console.log(`代理: /api -> ${BACKEND_URL} (去掉 /api 前缀)`);
     });
 
     server.on('error', (err) => {
