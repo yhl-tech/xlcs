@@ -112,32 +112,7 @@
                         window.apiClient.setAuthToken(response.data.access_token);
                     }
                     
-                    // 调用 get_basic_info 接口获取 userId
-                    try {
-                        console.log('[Auth] 开始调用 get_basic_info 获取 userId...');
-                        // 传递用户名作为参数
-                        const basicInfoResponse = await window.API.getBasicInfo(username);
-                        console.log('[Auth] get_basic_info 响应:', basicInfoResponse);
-                        
-                        if (basicInfoResponse && basicInfoResponse.code === 0 && basicInfoResponse.data?.user_id) {
-                            // 保存 userId 到用户信息中
-                            const userInfo = this.getUserInfo() || { username: username };
-                            userInfo.userId = String(basicInfoResponse.data.user_id); // 确保是字符串
-                            this.setUserInfo(userInfo);
-                            
-                            // 验证保存是否成功
-                            const savedUserInfo = this.getUserInfo();
-                            console.log('[Auth] userId 保存成功:', {
-                                userId: savedUserInfo?.userId,
-                                userInfo: savedUserInfo,
-                                localStorage: localStorage.getItem(this.userInfoKey)
-                            });
-                        } else {
-                            console.warn('[Auth] 获取 userId 失败，响应数据:', basicInfoResponse);
-                        }
-                    } catch (error) {
-                        console.error('[Auth] 调用 get_basic_info 接口失败:', error);
-                    }
+
                     
                     return {
                         success: true,
