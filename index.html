@@ -568,7 +568,7 @@
 
         <div class="main-content" id="main-content">
             <div id="intro-overlay">
-                <img id="intro-image" src="./images/rorschach-blot-example.png" alt="介绍">
+                <img id="intro-image" src="./images/rorschach-blot-example.webp" alt="介绍">
                 <p id="intro-text"></p>
                 <button id="enter-btn" style="display: none;">进入</button>
             </div>
@@ -608,6 +608,7 @@
                     <div class="color-option" data-color="blue" style="background-color: #3b82f6;"></div>
                 </div>
                 <button id="eraser-tool">🗑️ 擦除</button>
+                <button id="clear-all-tool">🧹 一键擦除</button>
             </div>
             <div class="control-group">
                 <button id="next-btn">下一张 ▶</button>
@@ -695,7 +696,7 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 10000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 20000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
         // 提示文本数组（用于TTS语音合成）
         const PROMPT_TEXTS = [
             '提示：请继续描述...',
@@ -733,8 +734,7 @@
         }
 
         // 启动页介绍文案（用于显示与播报保持一致）
-        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。你要做的就是告诉我。你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
-你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。`;
+        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。`;
 
 
         async function ensureTTSInit(mode = 'audio') {
@@ -1270,6 +1270,18 @@
                 selectTool('eraser');
                 resetInactivityTimer();
             });
+            document.getElementById('clear-all-tool').addEventListener('click', () => {
+                clearAllDrawing();
+                // 只选中一键擦除按钮本身，不影响其他工具按钮
+                selectClearAllTool(true);
+                // 清除其他工具的选中状态
+                document.getElementById('pen-tool').classList.remove('selected');
+                document.getElementById('eraser-tool').classList.remove('selected');
+                // 重置工具状态
+                state.tool = null;
+                resetInactivityTimer();
+                
+            });
             document.querySelectorAll('.color-option').forEach(opt => {
                 opt.addEventListener('click', (e) => {
                     selectColor(e.target.dataset.color);
@@ -1432,7 +1444,7 @@
             // 移除之前的 onload 事件处理器，避免冲突
             rorschachImage.onload = null;
             
-            rorschachImage.src = `./images/rorschach-blot-${index + 1}.png`;
+            rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`;
             
             // 确保图片加载后加载该图版的画布状态
             if (rorschachImage.complete) {
@@ -1486,7 +1498,7 @@
                 const item = document.createElement('div');
                 item.className = 'grid-item';
                 item.dataset.index = i;
-                item.innerHTML = `<img src="./images/rorschach-blot-${i + 1}.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`;
+                item.innerHTML = `<img src="./images/rorschach-blot-${i + 1}.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`;
                 item.addEventListener('click', handleImageSelection);
                 grid.appendChild(item);
             }
@@ -1687,7 +1699,7 @@
                 const compositeContainer = document.createElement('div');
                 compositeContainer.style.position = 'relative';
                 const baseImage = document.createElement('img');
-                baseImage.src = `./images/rorschach-blot-${i + 1}.png`;
+                baseImage.src = `./images/rorschach-blot-${i + 1}.webp`;
                 compositeContainer.appendChild(baseImage);
                 if (state.canvasStates[i]) {
                     const drawingImage = document.createElement('img');
@@ -1841,6 +1853,19 @@
             state.tool = tool;
             document.getElementById('pen-tool').classList.toggle('selected', tool === 'pen');
             document.getElementById('eraser-tool').classList.toggle('selected', tool === 'eraser');
+            // 确保一键擦除按钮不被选中
+            document.getElementById('clear-all-tool').classList.remove('selected');
+        }
+
+        // 添加专门处理一键擦除按钮选中状态的函数
+        function selectClearAllTool(selected) {
+            // 确保只选中一键擦除按钮
+            document.getElementById('clear-all-tool').classList.toggle('selected', selected);
+            // 确保其他工具按钮不被选中
+            if (selected) {
+                document.getElementById('pen-tool').classList.remove('selected');
+                document.getElementById('eraser-tool').classList.remove('selected');
+            }
         }
 
         function selectColor(color) {
@@ -1849,6 +1874,8 @@
                 opt.classList.toggle('selected', opt.dataset.color === color);
             });
             selectTool('pen');
+            // 确保一键擦除按钮不被选中
+            document.getElementById('clear-all-tool').classList.remove('selected');
         }
 
         function saveCanvasState(index) {
@@ -1869,6 +1896,18 @@
 
         function clearCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 一键清除所有绘图
+        function clearAllDrawing() {
+            clearCanvas();
+            // 保存空的画布状态
+            saveCanvasState(state.currentIndex);
+            
+            // 记录一键擦除操作
+            if (window.InteractionTracker && window.InteractionTracker._trackClearAll) {
+                window.InteractionTracker._trackClearAll();
+            }
         }
 
         // 等待模块加载完成

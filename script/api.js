@@ -16,8 +16,11 @@
         timeout: 30000,
         headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+            'Accept': 'application/json',
+            'User-Id': 'Bubble_Lis'
+        },
+        // 分析接口使用的固定 API Key
+        analyzeApiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dSIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM"
     };
 
     /**
@@ -71,8 +74,11 @@
                         }
                     }
                     
-                    // 统一添加 User-Id header（与 test.py 中成功测试的格式一致）
-                    config.headers['User-Id'] = 'Bubble_Lis';
+                    // 统一添加默认请求头（从API_CONFIG获取）
+                    // 注意：User-Id已经在headers中，这里只添加Authorization
+                    if (!config.headers.Authorization) {
+                        config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
+                    }
                     
                     // 确保所有自定义 headers 都被正确设置（特别是 FormData 请求）
                     // 对于 FormData 请求，需要确保 headers 被正确传递
@@ -414,20 +420,13 @@
          * @returns {Promise} 请求Promise
          */
         async getBasicInfo(userId = null) {
-            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`
-            };
-            
             // 准备请求数据
             const requestData = {};
             if (userId) {
                 requestData.user_id = userId;
             }
             
-            return apiClient.axiosInstance.post('/rorschach/analyze/get_basic_info', requestData, {
-                headers: headers
-            });
+            return apiClient.axiosInstance.post('/rorschach/analyze/get_basic_info', requestData);
         },
 
         /**
@@ -495,18 +494,7 @@
                 fileSize: file.size
             });
             
-            // 使用固定的 api_key
-            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-                'User-Id': 'Bubble_Lis'
-            };
-            
-            console.log('[API] 上传旋转数据 - Headers:', headers);
-            
-            return apiClient.post('/rorschach/analyze/upload_rotate', formData, {
-                headers: headers
-            });
+            return apiClient.post('/rorschach/analyze/upload_rotate', formData);
         },
 
         /**
@@ -554,16 +542,7 @@
                 fileSize: file.size
             });
             
-            // 使用固定的 api_key
-            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-                'User-Id': 'Bubble_Lis'
-            };
-            
-            return apiClient.post('/rorschach/analyze/upload_scale', formData, {
-                headers: headers
-            });
+            return apiClient.post('/rorschach/analyze/upload_scale', formData);
         },
 
         /**
@@ -610,19 +589,7 @@
                 userIdValue: formData.get('user_id')
             });
             
-            // 使用固定的 api_key
-            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-                'User-Id': 'Bubble_Lis'
-            };
-            
-            console.log('[API] 上传时间戳数据 - Headers:', headers);
-            
-            // 使用 axios 实例发送请求，确保与拦截器一致
-            return apiClient.post('/rorschach/analyze/upload_seg_time', formData, {
-                headers: headers
-            });
+            return apiClient.post('/rorschach/analyze/upload_seg_time', formData);
         },
 
         /**
@@ -694,15 +661,7 @@
             formData.append('file', fileToUpload);
             
 
-            // 使用固定的 api_key
-            const apiKey = window.ANALYZE_API_KEY || "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dUIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM";
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-            };
-            
-            return apiClient.post('/rorschach/analyze/upload_media', formData, {
-                headers: headers
-            });
+            return apiClient.post('/rorschach/analyze/upload_media', formData);
         },
 
         /**

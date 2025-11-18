@@ -491,6 +491,46 @@
         }
 
         /**
+         * 记录一键擦除操作
+         */
+        trackClearAll() {
+            if (this.status !== 'active') {
+                return;
+            }
+
+            const plateKey = this._getCurrentPlateKey();
+            const timestamp = this._getTimestamp();
+            
+            // 记录一键擦除操作（在drawingTracks中用特殊标记表示）
+            // 如果当前图版的轨迹数据是0，初始化为对象
+            if (this.data.drawingTracks[plateKey] === 0) {
+                this.data.drawingTracks[plateKey] = {};
+            }
+            
+            // 记录一键擦除操作
+            const timeKey = this._formatTime(Date.now());
+            if (!this.data.drawingTracks[plateKey][timeKey]) {
+                this.data.drawingTracks[plateKey][timeKey] = {};
+            }
+            
+            // 添加一键擦除标记
+            const clearCount = Object.keys(this.data.drawingTracks[plateKey][timeKey]).length;
+            const clearKey = `clearAll_${clearCount + 1}`;
+            this.data.drawingTracks[plateKey][timeKey][clearKey] = 'clear_all';
+            
+            // 触发事件
+            this._emit('clearAll', {
+                plateIndex: parseInt(plateKey),
+                timestamp: timestamp
+            });
+
+            // 调试日志
+            if (this.config.debug) {
+                console.log(`[InteractionTracker] 记录一键擦除操作: 图版${plateKey}`);
+            }
+        }
+
+        /**
          * 获取画笔轨迹数据
          * @returns {Object} 画笔轨迹数据，格式: { "1": 0, "2": {"25:23": {"track1": [[x,y],...]}}, ... }
          */
@@ -1098,6 +1138,7 @@
         _trackDrawingStart: (x, y) => trackerInstance.trackDrawingStart(x, y),
         _trackDrawingPoint: (x, y) => trackerInstance.trackDrawingPoint(x, y),
         _trackDrawingEnd: () => trackerInstance.trackDrawingEnd(),
+        _trackClearAll: () => trackerInstance.trackClearAll(),
 
         // 数据提交方法
         generateRotateJSON: () => trackerInstance.generateRotateJSON(),
