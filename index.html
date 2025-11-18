@@ -685,7 +685,8 @@
             audioBlob: null,  // 保存完整的音频Blob，供接口提交使用
             postTestAnswers: {},
             inactivityLevel: 0,
-            nextButtonCooldown: 0  // "下一张"按钮冷却时间（秒）
+            nextButtonCooldown: 0,  // "下一张"按钮冷却时间（秒）
+            visitedImages: new Set()  // 已浏览过的图片索引集合
         };
         
         // 将 state 挂载到 window 对象，以便 InteractionTracker 可以访问
@@ -1342,9 +1343,13 @@
             saveCanvasState(state.currentIndex);
             const newIndex = state.currentIndex + direction;
             
+            // 检查是否需要冷却豁免（如果是已浏览过的图片）
+            const isVisitedImage = state.visitedImages.has(newIndex);
+            
             // 如果是点击下一张，检查是否在冷却中
             // 但如果是最后一张图（即将进入选择阶段），允许操作
-            if (direction === 1 && state.nextButtonCooldown > 0) {
+            // 或者如果是已浏览过的图片，也允许操作
+            if (direction === 1 && state.nextButtonCooldown > 0 && !isVisitedImage) {
                 // 如果即将进入选择阶段，允许操作并清除冷却
                 if (newIndex === state.totalImages) {
                     // 清除冷却定时器
@@ -1394,6 +1399,9 @@
                 state.currentIndex = newIndex;
                 console.log('[调试] state.currentIndex 更新为:', state.currentIndex);
                 
+                // 将当前图片标记为已浏览
+                state.visitedImages.add(state.currentIndex);
+                
                 // 更新追踪器的当前图版索引（记录时间戳）
                 // 注意：这里记录的是切换到新图版的时间，即新图版开始的时间
                 if (window.InteractionTracker && window.InteractionTracker._updateCurrentPlate) {
@@ -1405,7 +1413,8 @@
                 console.log('[调试] updateProgress 后，currentIndex:', state.currentIndex);
                 
                 // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
-                if (direction === 1) {
+                // 但如果目标图片已浏览过，则不启动冷却
+                if (direction === 1 && !isVisitedImage) {
                     disableNextButton();
                     if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
                         window.InteractionTracker.printDataStructures(previousIndex);
