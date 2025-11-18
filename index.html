@@ -697,7 +697,7 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 10000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 20000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
         // 提示文本数组（用于TTS语音合成）
         const PROMPT_TEXTS = [
             '提示：请继续描述...',
@@ -735,8 +735,7 @@
         }
 
         // 启动页介绍文案（用于显示与播报保持一致）
-        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。你要做的就是告诉我。你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
-你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。
+        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。
 `;
 
 
@@ -827,6 +826,55 @@
                 }
             }
             
+            // 在发送文本查询前，确保用户没有在说话
+            if (window.dialogClient && typeof window.dialogClient.canPlayAIVoice === 'function') {
+                // 等待用户停止说话并保持静默
+                while (!window.dialogClient.canPlayAIVoice()) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            
+            const msg = JSON.stringify({
+                type: 'text_query',
+                content: String(text || '')
+            });
+            
+            // 添加发送前检查
+            if (window.dialogClient.ws && window.dialogClient.ws.readyState === WebSocket.OPEN) {
+                window.dialogClient.ws && window.dialogClient.ws.send(msg);
+            } else {
+                throw new Error('WebSocket连接不可用，无法发送消息');
+            }
+        }
+        
+        // 专门用于启动页播报的函数，不包含停顿检测逻辑
+        async function sendIntroTextQuery(text) {
+            if (!window.dialogClient) {
+                throw new Error('dialogClient 未加载');
+            }
+            
+            // 确保连接是活动的
+            if (!window.dialogClient.isConnected) {
+                console.log('[sendIntroTextQuery] 检测到连接断开，尝试重新连接');
+                try {
+                    await window.dialogClient.connect();
+                } catch (e) {
+                    console.warn('[sendIntroTextQuery] 重新连接失败:', e);
+                    // 如果连接失败，尝试重新初始化
+                    await ensureTTSInit('audio');
+                }
+            }
+            
+            // 双重检查连接状态
+            if (!window.dialogClient.isConnected || !window.dialogClient.ws || window.dialogClient.ws.readyState !== WebSocket.OPEN) {
+                console.warn('[sendIntroTextQuery] WebSocket连接异常，尝试修复');
+                try {
+                    await window.dialogClient.connect();
+                } catch (e) {
+                    throw new Error('无法建立WebSocket连接: ' + e.message);
+                }
+            }
+            
             const msg = JSON.stringify({
                 type: 'text_query',
                 content: String(text || '')
@@ -881,7 +929,7 @@
                 try {
                     await ensureTTSInit('audio');
                     const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${INTRO_TEXT}`;
-                    await sendTextQuery(introQuery, { ensure: false });
+                    await sendIntroTextQuery(introQuery);
                 } catch (e) {
                     console.warn('[启动页介绍] 播报失败，已忽略：', e);
                     enterBtn.disabled = false;
@@ -958,9 +1006,9 @@
                             try {
                                 console.log('[进入测试页] 发送开场白');
                                 const openingText = '现在开始测试，请描述你看到的第一张图片。';
-                                // 使用 sendTextQuery 方式，与启动页保持一致
+                                // 使用 sendIntroTextQuery 方式，避免停顿检测
                                 const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${openingText}`;
-                                await sendTextQuery(introQuery, { ensure: false });
+                                await sendIntroTextQuery(introQuery);
                                 console.log('[进入测试页] 开场白已发送');
                             } catch (err) {
                                 console.warn('发送开场白失败:', err);
@@ -1100,19 +1148,50 @@
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.8; // 增加平滑处理
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            // VAD改进参数 - 支持长停顿检测
+            let speakingThreshold = 15; // 提高说话检测阈值
+            let silenceThreshold = 8;   // 降低静默检测阈值
+            let speakingCount = 0;      // 连续说话帧计数
+            let silenceCount = 0;       // 连续静默帧计数
+            const speakingFrameThreshold = 3;  // 确认说话需要的连续帧数
+            const silenceFrameThreshold = 45;  // 增加确认静默需要的连续帧数，更好地支持长停顿
 
             function checkSpeaking() {
                 analyser.getByteFrequencyData(dataArray);
                 let sum = dataArray.reduce((a, b) => a + b, 0);
-                if (sum / dataArray.length > 10) {
-                    state.isSpeaking = true;
-                    resetInactivityTimer();
-                } else {
-                    state.isSpeaking = false;
+                let avg = sum / dataArray.length;
+                
+                if (avg > speakingThreshold) {
+                    speakingCount++;
+                    silenceCount = 0;
+                } else if (avg < silenceThreshold) {
+                    silenceCount++;
+                    speakingCount = 0;
                 }
+                
+                // 只有连续多帧检测到说话才认为在说话
+                if (speakingCount >= speakingFrameThreshold) {
+                    state.isSpeaking = true;
+                    // 通知TTS客户端用户正在说话
+                    if (window.dialogClient && typeof window.dialogClient.setUserSpeaking === 'function') {
+                        window.dialogClient.setUserSpeaking(true);
+                    }
+                    resetInactivityTimer();
+                } 
+                // 只有连续多帧检测到静默才认为停止说话
+                else if (silenceCount >= silenceFrameThreshold) {
+                    state.isSpeaking = false;
+                    // 通知TTS客户端用户停止说话
+                    if (window.dialogClient && typeof window.dialogClient.setUserSpeaking === 'function') {
+                        window.dialogClient.setUserSpeaking(false);
+                    }
+                }
+                
                 requestAnimationFrame(checkSpeaking);
             }
             checkSpeaking();

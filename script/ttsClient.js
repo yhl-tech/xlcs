@@ -91,11 +91,40 @@ import { getWebSocketUrl } from './config.js';
             this.isPlaying = false;
             this.nextPlayTime = 0;
             
+            // 添加用户语音活动状态跟踪
+            this.isUserSpeaking = false;
+            this.lastUserSpeakTime = 0;
+            this.minSilenceDuration = 3000; // 用户停止说话后至少等待3秒再回应，更好地支持长停顿场景
+            
             this.onConnect = null;
             this.onDisconnect = null;
             this.onError = null;
             this.onRecordingStart = null;
             this.onRecordingStop = null;
+        }
+
+        // 更新用户语音活动状态
+        setUserSpeaking(isSpeaking) {
+            this.isUserSpeaking = isSpeaking;
+            if (isSpeaking) {
+                this.lastUserSpeakTime = Date.now();
+            }
+        }
+
+        // 检查是否可以开始播放AI语音
+        canPlayAIVoice() {
+            // 如果用户正在说话，不能播放
+            if (this.isUserSpeaking) {
+                return false;
+            }
+            
+            // 如果用户停止说话时间不够长，不能播放
+            const silenceDuration = Date.now() - this.lastUserSpeakTime;
+            if (silenceDuration < this.minSilenceDuration) {
+                return false;
+            }
+            
+            return true;
         }
 
         async connect() {
@@ -240,8 +269,30 @@ import { getWebSocketUrl } from './config.js';
         }
 
         async playQueue() {
+            // 检查是否可以播放AI语音
+            if (!this.canPlayAIVoice()) {
+                // 如果不能播放，等待一段时间后重试
+                setTimeout(() => {
+                    if (this.audioQueue.length > 0 && !this.isPlaying) {
+                        this.playQueue();
+                    }
+                }, 50);  // 减少等待时间以提高响应性
+                return;
+            }
+
             if (this.audioQueue.length === 0) {
                 this.isPlaying = false;
+                return;
+            }
+
+            // 确保前一个音频播放完成后再开始播放下一个
+            if (this.isPlaying) {
+                // 如果正在播放，等待播放完成后再继续
+                setTimeout(() => {
+                    if (this.audioQueue.length > 0) {
+                        this.playQueue();
+                    }
+                }, 10);  // 大幅减少等待时间以提高流畅性
                 return;
             }
 
@@ -256,7 +307,10 @@ import { getWebSocketUrl } from './config.js';
             }
 
             if (!this.audioContext || arrayBuffer.byteLength === 0) {
-                this.playQueue();
+                this.isPlaying = false;
+                if (this.audioQueue.length > 0) {
+                    this.playQueue();
+                }
                 return;
             }
 
@@ -293,7 +347,14 @@ import { getWebSocketUrl } from './config.js';
 
             this.nextPlayTime = startTime + audioBuffer.duration;
             source.onended = () => {
-                this.playQueue();
+                this.isPlaying = false;
+                // 播放完成后检查是否还有音频需要播放
+                if (this.audioQueue.length > 0) {
+                    // 确保在下一个音频播放前有适当的间隔
+                    setTimeout(() => {
+                        this.playQueue();
+                    }, 10);  // 减少等待时间以提高流畅性
+                }
             };
         }
 
