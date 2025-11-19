@@ -60,7 +60,7 @@
         .info-card {
             background: var(--card-bg);
             border-radius: 20px;
-            padding: 50px 40px;
+            padding: 30px 40px;
             box-shadow: var(--shadow-lg);
             max-width: 450px;
             width: 100%;
@@ -81,7 +81,7 @@
         .info-card h1 {
             color: var(--primary-color);
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             font-size: 28px;
             font-weight: 700;
         }
@@ -193,8 +193,8 @@
             overflow: hidden;
             background: #fafafa;
         }
-
-        #intro-overlay {
+        
+     #welcome-text-container, #intro-overlay {
             position: absolute;
             top: 0;
             left: 0;
@@ -540,6 +540,10 @@
         <div class="info-card">
             <h1>🎨 罗夏墨迹测试</h1>
             <div class="info-form-group">
+                <label for="sex">性别</label>
+                <input type="text" id="sex" placeholder="例如：男">
+            </div>
+            <div class="info-form-group">
                 <label for="age">年龄</label>
                 <input type="text" id="age" placeholder="例如：25">
             </div>
@@ -567,7 +571,14 @@
         </div>
 
         <div class="main-content" id="main-content">
-            <div id="intro-overlay">
+            <div id="welcome-text-container">
+                <p>Hello，亲爱的用户您好，欢迎您来到罗夏墨迹测试，在进行罗夏墨迹（Rorschach Inkblot）心理测试之前，需要提前准备和确认以下信息。</p>
+                <p>罗夏墨迹心理测试需要坐在电脑前，使用本网站，采用语音交互完成。</p>
+                <p>首先，确定您的电脑话筒和音响正常，测试期间，您需要根据 AI 语音的指示进行测试。</p>
+                <p>心理测试全程时长大概30min至最长约2小时，测试时需要保持安静，在一个安静、放松的环境里，不被外界电话、信息打扰。</p>
+                <p>测试后大约1~3天会收到测试报告。</p>
+            </div>
+            <div id="intro-overlay" style="display: none;">
                 <img id="intro-image" src="./images/rorschach-blot-example.webp" alt="介绍">
                 <p id="intro-text"></p>
                 <button id="enter-btn" style="display: none;">进入</button>
@@ -864,19 +875,20 @@
 
         // 启动测试
         async function startTest() {
+            fetchUserInfo();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 initAudio(stream);
 
                 infoScreen.style.display = 'none';
                 appWindow.style.display = 'flex';
-
+                hideWelcomeText()   
                 introText.textContent = INTRO_TEXT;
                 // 显示"进入"按钮
                 enterBtn.style.display = 'block';
                 enterBtn.disabled = true;
                 enterBtn.textContent = '语音播报中...';
-
+                showIntroImage() 
                 // 在用户点击"开始测试"后，使用实时 TTS 播报启动页介绍
                 try {
                     await ensureTTSInit('audio');
@@ -1011,6 +1023,25 @@
             }
         }
 
+
+        function fetchUserInfo(){
+            const sex = document.getElementById('sex').value;
+            const age = document.getElementById('age').value;
+            const education = document.getElementById('education').value;
+            const occupation = document.getElementById('occupation').value;
+            const mood = document.getElementById('mood').value;
+
+            const basicInfo = {
+                '性别': sex,
+                '年龄': age,
+                '学历': education,
+                '职业': occupation,
+                '当前心情': mood
+            };
+        const userInfo = window.auth.getUserInfo();
+        window.API.setBasicInfo(userInfo.username, basicInfo)
+  
+        }
         function initTest() {
             // 初始化交互追踪器
             // 注意：InteractionTracker.start() 已在语音播放完成后调用，这里不再重复调用
@@ -1937,6 +1968,58 @@
             };
             checkModules();
         }
+        async function playWelcomeMessage() {
+            hideIntroImage()
+            // displayWelcomeText()
+            const welcomeText =getWelcomeText();
+            
+            try {
+                // 确保TTS已初始化
+                await ensureTTSInit('audio');
+                
+                // 构造播报查询
+                const welcomeQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${welcomeText}`;
+                
+                // 发送播报请求
+                await sendTextQuery(welcomeQuery, { ensure: false });
+                
+                console.log('[欢迎页] 欢迎信息播报已发送');
+            } catch (error) {
+                console.warn('[欢迎页] 欢迎信息播报失败:', error);
+            }
+        }
+       
+        function getWelcomeText() {
+            return `Hello，亲爱的用户您好，欢迎您来到罗夏墨迹测试，在进行罗夏墨迹（Rorschach Inkblot）心理测试之前，需要提前准备和确认以下信息。
+- 罗夏墨迹心理测试需要坐在电脑前，使用本网站，采用语音交互完成。
+- 首先，确定您的电脑话筒和音响正常，测试期间，您需要根据 AI 语音的指示进行测试。
+- 心理测试全程时长大概30min至最长约2小时，测试时需要保持安静，在一个安静、放松的环境里，不被外界电话、信息打扰。
+- 测试后大约1~3天会收到测试报告。`;
+        }
+
+        function hideWelcomeText() {
+            const welcomeTextContainer = document.getElementById('welcome-text-container');
+            if (welcomeTextContainer) {
+                welcomeTextContainer.style.display =  'none';
+            }
+        }
+      
+        // 隐藏intro-image元素
+        function hideIntroImage() {
+            const introImage = document.getElementById('intro-image');
+            if (introImage) {
+                introImage.style.display = 'none';
+            }
+        }
+
+        // 显示intro-image元素
+        function showIntroImage() {
+            const introImage = document.getElementById('intro-overlay');
+            if (introImage) {
+                introImage.style.display = 'flex';
+            }
+        }
+
 
         // 登录检查和初始化
         function checkLoginAndInit() {
@@ -1961,6 +2044,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             // 等待模块加载完成后检查登录状态
             waitForModules(checkLoginAndInit);
+            setTimeout(() => {
+                playWelcomeMessage();
+            }, 1000);
         });
     </script>
 </body>

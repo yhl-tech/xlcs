@@ -68,17 +68,18 @@
                     const isLoginRequest = config.url && config.url.includes('/user_login');
                     if (!isLoginRequest && !config.headers.Authorization) {
                         // 自动添加 token（仅当不是登录请求且没有 Authorization header 时）
-                        const token = localStorage.getItem('token');
-                        if (token) {
-                            config.headers.Authorization = `Bearer ${token}`;
-                        }
+                        // const token = localStorage.getItem('token');
+                        // if (token) {
+                        //     config.headers.Authorization = `Bearer ${token}`;
+                        // }
                     }
                     
                     // 统一添加默认请求头（从API_CONFIG获取）
                     // 注意：User-Id已经在headers中，这里只添加Authorization
-                    if (!config.headers.Authorization) {
-                        config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
-                    }
+                    config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
+                    // if (!config.headers.Authorization) {
+                       
+                    // }
                     
                     // 确保所有自定义 headers 都被正确设置（特别是 FormData 请求）
                     // 对于 FormData 请求，需要确保 headers 被正确传递
@@ -112,11 +113,12 @@
                         // 服务器返回了错误状态码
                         const status = error.response.status;
                         const errorData = error.response.data || {};
+                        console.log('[API] 错误状态码:', status);
                         
                         // 401 未授权，清除 token 并跳转登录
                         if (status === 401) {
-                            localStorage.removeItem('token');
-                            localStorage.removeItem('userInfo');
+                            // localStorage.removeItem('token');
+                            // localStorage.removeItem('userInfo');
                             // 如果不在登录页，且不是提交测试数据的情况，才跳转到登录页
                             // 提交测试数据时即使401也不跳转，让用户看到汇总页面
                             const url = error.config?.url || '';
@@ -719,6 +721,35 @@
                 return response;
             } catch (error) {
                 console.error('[API] 注册失败:', error);
+                throw error;
+            }
+        },
+
+        /**
+         * 设置用户基本信息
+         * @param {string} userId - 用户ID
+         * @param {Object} basicInfo - 基本信息对象
+         * @returns {Promise} 请求Promise
+         */
+        async setBasicInfo(userId, basicInfo) {
+            if (!userId) {
+                throw new Error('用户ID不能为空');
+            }
+            
+            if (!basicInfo || typeof basicInfo !== 'object') {
+                throw new Error('基本信息参数无效');
+            }
+            
+            try {
+                const requestData = {
+                    user_id:userId,
+                    basic_info: basicInfo
+                };
+                
+                const response = await apiClient.post('/rorschach/analyze/set_basic_info', requestData);
+                return response;
+            } catch (error) {
+                console.error('[API] 设置用户基本信息失败:', error);
                 throw error;
             }
         }
