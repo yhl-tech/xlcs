@@ -1446,11 +1446,14 @@
                 
                 // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
                 // 但如果目标图片已浏览过，则不启动冷却
-                if (direction === 1 && !isVisitedImage) {
-                    disableNextButton();
+            if (direction === 1) {
                     if (window.InteractionTracker && window.InteractionTracker.printDataStructures) {
                         window.InteractionTracker.printDataStructures(previousIndex);
                     }
+            }
+
+            if (direction === 1 && !isVisitedImage) {
+                    disableNextButton();
                     
                     // 播报当前图片的提示语音
                     (async () => {
@@ -1836,11 +1839,38 @@
 
         let lastX = 0, lastY = 0;
 
+        /**
+         * 将屏幕坐标转换为画布坐标，考虑当前的缩放与旋转
+         * @param {MouseEvent} event
+         * @returns {{x: number, y: number}}
+         */
+        function getCanvasCoordinates(event) {
+            const rect = canvas.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const dx = event.clientX - centerX;
+            const dy = event.clientY - centerY;
+
+            const rotationRad = (state.rotation || 0) * Math.PI / 180;
+            const cos = Math.cos(-rotationRad);
+            const sin = Math.sin(-rotationRad);
+            const scale = state.zoom || 1;
+
+            const transformedX = (dx * cos - dy * sin) / scale;
+            const transformedY = (dx * sin + dy * cos) / scale;
+
+            return {
+                x: transformedX + canvas.width / 2,
+                y: transformedY + canvas.height / 2
+            };
+        }
+
         function startDrawing(e) {
             state.drawing = true;
-            const rect = canvas.getBoundingClientRect();
-            lastX = e.clientX - rect.left;
-            lastY = e.clientY - rect.top;
+            const point = getCanvasCoordinates(e);
+            lastX = point.x;
+            lastY = point.y;
             
             // 追踪画笔轨迹开始（仅记录画笔，不记录橡皮擦）
             if (state.tool === 'pen' && window.InteractionTracker && window.InteractionTracker._trackDrawingStart) {
@@ -1852,9 +1882,9 @@
 
         function draw(e) {
             if (!state.drawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const point = getCanvasCoordinates(e);
+            const x = point.x;
+            const y = point.y;
 
             ctx.beginPath();
             if (state.tool === 'pen') {
