@@ -90,6 +90,7 @@ import { getWebSocketUrl } from './config.js';
             this.audioQueue = [];
             this.isPlaying = false;
             this.nextPlayTime = 0;
+            this.currentSource = null;
             
             this.onConnect = null;
             this.onDisconnect = null;
@@ -286,6 +287,7 @@ import { getWebSocketUrl } from './config.js';
             const source = this.audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(this.audioContext.destination);
+            this.currentSource = source;
 
             const currentTime = this.audioContext.currentTime;
             const startTime = Math.max(currentTime, this.nextPlayTime);
@@ -293,6 +295,9 @@ import { getWebSocketUrl } from './config.js';
 
             this.nextPlayTime = startTime + audioBuffer.duration;
             source.onended = () => {
+                if (this.currentSource === source) {
+                    this.currentSource = null;
+                }
                 this.playQueue();
             };
         }
@@ -438,6 +443,25 @@ import { getWebSocketUrl } from './config.js';
             this.nextPlayTime = 0;
             
             console.log('[Dialog] 已断开所有连接');
+        }
+
+        stopPlayback() {
+            this.audioQueue = [];
+            this.isPlaying = false;
+            if (this.currentSource) {
+                try {
+                    this.currentSource.stop();
+                } catch (err) {
+                    console.warn('[Dialog] 停止当前音频失败:', err);
+                }
+                this.currentSource = null;
+            }
+            if (this.audioContext) {
+                this.nextPlayTime = this.audioContext.currentTime;
+            } else {
+                this.nextPlayTime = 0;
+            }
+            console.log('[Dialog] 已清空音频播放队列');
         }
     }
 

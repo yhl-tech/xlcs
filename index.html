@@ -706,7 +706,7 @@
         let nextButtonCooldownTimer = null;  // "下一张"按钮冷却定时器
         const INACTIVITY_THRESHOLD_1 = 10000;  // 第一次提示
         const INACTIVITY_THRESHOLD_2 = 20000;  // 第二次提示
-        const NEXT_BUTTON_COOLDOWN = 30;  // "下一张"按钮冷却时间（秒）
+        const NEXT_BUTTON_COOLDOWN = 1;  // "下一张"按钮冷却时间（秒）
         // 提示文本数组（用于TTS语音合成）
         const PROMPT_TEXTS = [
             '提示：请继续描述...',
@@ -744,8 +744,7 @@
         }
 
         // 启动页介绍文案（用于显示与播报保持一致）
-        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。你要做的就是告诉我。你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
-你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。
+        const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。
 `;
 
 
@@ -873,6 +872,7 @@
 
         // 启动测试
         async function startTest() {
+            stopAllPlayback();
             fetchUserInfo();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1034,7 +1034,8 @@
                 '年龄': age,
                 '学历': education,
                 '职业': occupation,
-                '当前心情': mood
+                '当前心情': mood,
+                '测试时间': new Date().toLocaleString()
             };
         const userInfo = window.auth.getUserInfo();
         window.API.setBasicInfo(userInfo.username, basicInfo)
@@ -1966,6 +1967,24 @@
             };
             checkModules();
         }
+        function stopAllPlayback() {
+            try {
+                if (window.dialogClient && typeof window.dialogClient.stopPlayback === 'function') {
+                    window.dialogClient.stopPlayback();
+                }
+            } catch (err) {
+                console.warn('[播放控制] 停止实时播报失败:', err);
+            }
+            if (audioPlayer && !audioPlayer.paused) {
+                try {
+                    audioPlayer.pause();
+                    audioPlayer.currentTime = 0;
+                } catch (err) {
+                    console.warn('[播放控制] 停止音频元素失败:', err);
+                }
+            }
+        }
+
         async function playWelcomeMessage() {
             hideIntroImage()
             // displayWelcomeText()
@@ -2026,12 +2045,6 @@
                 // 未登录，跳转到登录页
                 window.location.href = './login.html';
                 return;
-            }
-            
-            // 已登录，初始化 token 到 API 客户端
-            const token = window.auth.getToken();
-            if (token && window.apiClient) {
-                window.apiClient.setAuthToken(token);
             }
             
             // 已登录，继续初始化应用

@@ -20,8 +20,60 @@
             'User-Id': 'Bubble_Lis'
         },
         // 分析接口使用的固定 API Key
-        analyzeApiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dSIsImV4cCI6MTc2MzQ1NzU1Nn0.gCGNkTXgLcOhC8GuQZNfiXCljyA5JJCOqgRaPT83wkM"
+        analyzeApiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dSIsImV4cCI6MTc2MzgxODkwOX0.1UceWZ7pl3MmunjP-XQj9gbNBDcwTUQ0B5NMPOIihZo"
     };
+
+    const TENANT_TOKEN_STORAGE_KEY = 'tenantAccessToken';
+    const DEFAULT_TENANT_CREDENTIALS = {
+        username: 'dongrixinyu',
+        password: '12345678'
+    };
+
+    function getStoredTenantToken() {
+        if (typeof localStorage === 'undefined') {
+            return '';
+        }
+        try {
+            return localStorage.getItem(TENANT_TOKEN_STORAGE_KEY) || '';
+        } catch (error) {
+            console.warn('[API] 读取租户 token 失败:', error);
+            return '';
+        }
+    }
+
+    function storeTenantToken(token) {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        try {
+            if (token) {
+                localStorage.setItem(TENANT_TOKEN_STORAGE_KEY, token);
+            } else {
+                localStorage.removeItem(TENANT_TOKEN_STORAGE_KEY);
+            }
+        } catch (error) {
+            console.warn('[API] 保存租户 token 失败:', error);
+        }
+    }
+
+    function applyAnalyzeApiKey(token) {
+        if (!token) {
+            return;
+        }
+        API_CONFIG.analyzeApiKey = token;
+        const client = (typeof window !== 'undefined' && window.apiClient) || null;
+        if (client?.axiosInstance) {
+            client.axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`;
+        }
+    }
+
+    function setTenantToken(token) {
+        if (!token) {
+            return;
+        }
+        applyAnalyzeApiKey(token);
+        storeTenantToken(token);
+    }
 
     /**
      * API 客户端类
@@ -63,23 +115,18 @@
                         config.headers = {};
                     }
                     
-                    // 如果请求头中已经设置了 Authorization，则不覆盖（用于使用固定 api_key 的接口）
-                    // 但对于登录接口，不自动添加 token
-                    const isLoginRequest = config.url && config.url.includes('/user_login');
-                    if (!isLoginRequest && !config.headers.Authorization) {
-                        // 自动添加 token（仅当不是登录请求且没有 Authorization header 时）
-                        // const token = localStorage.getItem('token');
-                        // if (token) {
-                        //     config.headers.Authorization = `Bearer ${token}`;
-                        // }
+                    const requestUrl = config.url || '';
+                    const isUserLoginRequest = requestUrl.includes('/user_login');
+                    const isTenantLoginRequest = requestUrl.includes('/admin_login');
+                    const hasCustomAuthorization = !!config.headers.Authorization;
+
+                    // 登录相关请求不自动附加 Authorization
+                    if (isUserLoginRequest || isTenantLoginRequest) {
+                        delete config.headers.Authorization;
+                    } else if (!hasCustomAuthorization) {
+                        // 默认使用 analyzeApiKey
+                        config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
                     }
-                    
-                    // 统一添加默认请求头（从API_CONFIG获取）
-                    // 注意：User-Id已经在headers中，这里只添加Authorization
-                    config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
-                    // if (!config.headers.Authorization) {
-                       
-                    // }
                     
                     // 确保所有自定义 headers 都被正确设置（特别是 FormData 请求）
                     // 对于 FormData 请求，需要确保 headers 被正确传递
@@ -380,6 +427,13 @@
      * 创建API客户端实例
      */
     const apiClient = new APIClient();
+    if (typeof window !== 'undefined') {
+        window.apiClient = apiClient;
+    }
+    const cachedTenantToken = getStoredTenantToken();
+    if (cachedTenantToken) {
+        applyAnalyzeApiKey(cachedTenantToken);
+    }
 
     /**
      * 业务接口方法
@@ -404,6 +458,41 @@
             } catch (error) {
                 console.error('[API] 登出失败:', error);
                 throw error;
+            }
+        },
+
+        /**
+         * 租户登录（管理员登录），用于刷新 analyzeApiKey
+         * @param {Object} credentials - 自定义租户凭证
+         * @returns {Promise<{success: boolean, message?: string, data?: Object, error?: Error}>}
+         */
+        async tenantLogin(credentials = DEFAULT_TENANT_CREDENTIALS) {
+            const payload = {
+                username: credentials?.username || DEFAULT_TENANT_CREDENTIALS.username,
+                password: credentials?.password || DEFAULT_TENANT_CREDENTIALS.password
+            };
+
+            try {
+                const response = await apiClient.post('/rorschach/admin_login', payload);
+                if (response.code === 0 && response.data?.access_token) {
+                    setTenantToken(response.data.access_token);
+                    return {
+                        success: true,
+                        data: response
+                    };
+                }
+                return {
+                    success: false,
+                    message: response.msg || '租户登录失败',
+                    data: response
+                };
+            } catch (error) {
+                console.error('[API] 租户登录失败:', error);
+                return {
+                    success: false,
+                    message: error.message || '租户登录请求失败',
+                    error
+                };
             }
         },
 

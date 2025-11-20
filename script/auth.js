@@ -107,12 +107,22 @@
                     this.setToken(response.data.access_token);
                     this.setUserInfo({ username: username });
                     
-                    // 立即设置 token 到 API 客户端
-                    if (window.apiClient) {
-                        window.apiClient.setAuthToken(response.data.access_token);
+                    // 用户登录成功后，执行租户登录以刷新 analyzeApiKey
+                    if (window.API && typeof window.API.tenantLogin === 'function') {
+                        const tenantResult = await window.API.tenantLogin();
+                        if (!tenantResult?.success) {
+                            const tenantMessage = tenantResult?.message || '租户登录失败，请稍后重试';
+                            this.clearToken();
+                            if (window.apiClient && typeof window.apiClient.clearAuthToken === 'function') {
+                                window.apiClient.clearAuthToken();
+                            }
+                            return {
+                                success: false,
+                                message: tenantMessage,
+                                data: response
+                            };
+                        }
                     }
-                    
-
                     
                     return {
                         success: true,
@@ -196,11 +206,7 @@
          * 初始化认证状态（从 localStorage 恢复）
          */
         init() {
-            const token = this.getToken();
-            if (token && window.apiClient) {
-                // 恢复 token 到 API 客户端
-                window.apiClient.setAuthToken(token);
-            }
+            this.getToken();
         }
     }
 
