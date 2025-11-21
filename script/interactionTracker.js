@@ -334,6 +334,115 @@
         }
 
         /**
+         * 序列化当前追踪数据（用于会话快照）
+         * @returns {Object}
+         */
+        serialize() {
+            return {
+                data: JSON.parse(JSON.stringify(this.data)),
+                status: this.status,
+                config: { ...this.config },
+                currentPlateIndex: this.currentPlateIndex,
+                testStartTime: this.testStartTime,
+                timestamps: JSON.parse(JSON.stringify(this.timestamps)),
+                currentTrack: this.currentTrack ? JSON.parse(JSON.stringify(this.currentTrack)) : null,
+                currentTrackStartTime: this.currentTrackStartTime,
+                eventsBound: this._eventsBound
+            };
+        }
+
+        /**
+         * 从序列化数据恢复追踪状态
+         * @param {Object} snapshot
+         * @returns {boolean}
+         */
+        restore(snapshot = {}) {
+            if (!snapshot || typeof snapshot !== 'object') {
+                console.warn('[InteractionTracker] 无效的快照，无法恢复');
+                return false;
+            }
+
+            const {
+                data,
+                status,
+                config,
+                currentPlateIndex,
+                testStartTime,
+                timestamps,
+                currentTrack,
+                currentTrackStartTime,
+                eventsBound
+            } = snapshot;
+
+            if (data) {
+                const clonedData = JSON.parse(JSON.stringify(data));
+
+                ['zoom', 'rotate', 'navigation'].forEach(key => {
+                    this.data[key] = this.data[key] || {};
+                    for (let i = 1; i <= 10; i++) {
+                        const plateKey = String(i);
+                        const value = clonedData[key]?.[plateKey];
+                        if (Array.isArray(value)) {
+                            this.data[key][plateKey] = value;
+                        } else if (value !== undefined) {
+                            this.data[key][plateKey] = value;
+                        } else {
+                            this.data[key][plateKey] = [];
+                        }
+                    }
+                });
+
+                this.data.drawingTracks = {};
+                for (let i = 1; i <= 10; i++) {
+                    const plateKey = String(i);
+                    const drawingValue = clonedData.drawingTracks?.[plateKey];
+                    if (drawingValue === 0) {
+                        this.data.drawingTracks[plateKey] = 0;
+                    } else if (drawingValue && typeof drawingValue === 'object') {
+                        this.data.drawingTracks[plateKey] = drawingValue;
+                    } else {
+                        this.data.drawingTracks[plateKey] = 0;
+                    }
+                }
+            } else {
+                this._initializeDataStructure();
+            }
+
+            this.status = status || 'idle';
+            this.config = { ...this.config, ...(config || {}) };
+            this.currentPlateIndex = typeof currentPlateIndex === 'number' ? currentPlateIndex : null;
+            this.testStartTime = typeof testStartTime === 'number' ? testStartTime : null;
+            this.timestamps = timestamps && typeof timestamps === 'object'
+                ? JSON.parse(JSON.stringify(timestamps))
+                : {
+                    start: null,
+                    plates: {},
+                    select: null,
+                    stop: null
+                };
+            this.currentTrack = Array.isArray(currentTrack)
+                ? JSON.parse(JSON.stringify(currentTrack))
+                : null;
+            this.currentTrackStartTime = typeof currentTrackStartTime === 'number'
+                ? currentTrackStartTime
+                : null;
+            this._eventsBound = Boolean(eventsBound);
+
+            if (this.currentTrack && this.status !== 'active') {
+                // 如果恢复时存在未结束的轨迹但状态不是active，重置轨迹，避免数据不一致
+                this.currentTrack = null;
+                this.currentTrackStartTime = null;
+            }
+
+            if (this.config.autoTrack && this.status === 'active' && !this.testStartTime) {
+                this.testStartTime = Date.now();
+                this.timestamps.start = this.testStartTime;
+            }
+
+            return true;
+        }
+
+        /**
          * 获取所有数据
          * @param {Object} options - 选项
          * @returns {Object} 追踪数据
@@ -1106,6 +1215,8 @@
         resume: () => trackerInstance.resume(),
         stop: () => trackerInstance.stop(),
         reset: () => trackerInstance.reset(),
+        serialize: () => trackerInstance.serialize(),
+        restore: (snapshot) => trackerInstance.restore(snapshot),
 
         // 数据获取
         getAllData: (options) => trackerInstance.getAllData(options),
