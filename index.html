@@ -14,23 +14,31 @@
             <h1>🎨 罗夏墨迹测试</h1>
             <div class="info-form-group">
                 <label for="sex">性别</label>
-                <input type="text" id="sex" placeholder="例如：男">
+                <select id="sex" required>
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                </select>
+                <div id="sex-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <div class="info-form-group">
                 <label for="age">年龄</label>
-                <input type="text" id="age" placeholder="例如：25">
+                <input type="number" id="age" placeholder="例如：25" min="0" step="1" inputmode="numeric" required>
+                <div id="age-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <div class="info-form-group">
                 <label for="education">学历</label>
-                <input type="text" id="education" placeholder="例如：本科">
+                <input type="text" id="education" placeholder="例如：本科" required>
+                <div id="education-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <div class="info-form-group">
                 <label for="occupation">职业</label>
-                <input type="text" id="occupation" placeholder="例如：工程师">
+                <input type="text" id="occupation" placeholder="例如：工程师" required>
+                <div id="occupation-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <div class="info-form-group">
                 <label for="mood">当前心情</label>
-                <input type="text" id="mood" placeholder="例如：平静">
+                <input type="text" id="mood" placeholder="例如：平静" required>
+                <div id="mood-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <button id="start-test-btn">开始测试</button>
             <button id="resume-test-btn" style="display: none; margin-top: 12px; background: #0ea5e9;">恢复未完成测试</button>
