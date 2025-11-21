@@ -1,7 +1,3 @@
-/**
- * 应用的核心常量与状态定义。
- * 将这些内容独立出来，方便其他模块复用并保持 index.html 清爽。
- */
 
 export const INTRO_STEPS = {
     INFO_FORM: 'info_form',
