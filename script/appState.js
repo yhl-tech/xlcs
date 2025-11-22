@@ -14,7 +14,7 @@ export const SESSION_SAVE_DEBOUNCE = 600;
 
 export const INACTIVITY_THRESHOLD_1 = 10000;
 export const INACTIVITY_THRESHOLD_2 = 20000;
-export const NEXT_BUTTON_COOLDOWN = 1;
+export const NEXT_BUTTON_COOLDOWN = 30; //冷却时间
 
 export const PROMPT_TEXTS = [
     '提示：请继续描述...',
@@ -58,7 +58,7 @@ export const state = {
     rotation: 0,
     drawing: false,
     tool: 'pen',
-    color: 'red',
+    color: '#ef4444', // 红色（默认）
     canvasStates: new Array(10).fill(null),
     isSpeaking: false,
     mediaRecorder: null,

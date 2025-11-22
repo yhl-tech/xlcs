@@ -181,6 +181,20 @@ const previewState = {
     canvasStates: new Array(10).fill(null) // 每张图片的画布状态
 };
 
+// 预览图片错误处理函数
+function handlePreviewImageError(img) {
+    if (!img) return;
+    // 隐藏图片，避免显示破裂图标
+    img.style.display = 'none';
+    // 或者可以设置一个透明的占位符
+    // img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="100%25" height="100%25" fill="transparent"/%3E%3C/svg%3E';
+}
+
+// 为初始图片添加错误处理
+if (introPreviewImage) {
+    introPreviewImage.onerror = () => handlePreviewImageError(introPreviewImage);
+}
+
 // 预览窗口交互函数
 function initPreviewCanvasInteractions() {
     if (!previewCanvas || !previewCtx) return;
@@ -188,6 +202,9 @@ function initPreviewCanvasInteractions() {
     // 初始化画布尺寸
     const introPreviewImage = document.getElementById('intro-preview-image');
     if (introPreviewImage && previewCanvas) {
+        // 添加错误处理
+        introPreviewImage.onerror = () => handlePreviewImageError(introPreviewImage);
+        
         const initCanvasSize = () => {
             previewCanvas.width = introPreviewImage.clientWidth || introPreviewImage.naturalWidth || 400;
             previewCanvas.height = introPreviewImage.clientHeight || introPreviewImage.naturalHeight || 400;
@@ -245,6 +262,10 @@ function initPreviewCanvasInteractions() {
         // 更新图片
         const introPreviewImage = document.getElementById('intro-preview-image');
         if (introPreviewImage) {
+            // 添加错误处理
+            introPreviewImage.onerror = () => handlePreviewImageError(introPreviewImage);
+            // 确保图片可见（如果之前因为错误被隐藏了）
+            introPreviewImage.style.display = '';
             introPreviewImage.src = `./images/rorschach-blot-${previewState.currentImageIndex + 1}.webp`;
         }
         // 重置画布尺寸并恢复状态
@@ -578,10 +599,12 @@ function validateBasicInfoForm() {
 
     const ageInput = inputs.age;
     const ageValue = (ageInput?.value || '').trim();
-    if (!ageValue) {
-        markFieldInvalid(ageInput, `${BASIC_INFO_LABELS.age}为必填项`, errors);
-    } else if (!/^-?\d+$/.test(ageValue)) {
+    const hasInvalidNumberInput = ageInput && ageInput.validity.badInput;
+    
+    if (hasInvalidNumberInput || (ageValue && !/^-?\d+$/.test(ageValue))) {
         markFieldInvalid(ageInput, `${BASIC_INFO_LABELS.age}只能填写数字`, errors);
+    } else if (!ageValue) {
+        markFieldInvalid(ageInput, `${BASIC_INFO_LABELS.age}为必填项`, errors);
     } else if (Number(ageValue) < 0) {
         markFieldInvalid(ageInput, `${BASIC_INFO_LABELS.age}不能小于 0`, errors);
     } else {
@@ -1605,6 +1628,9 @@ function setupEventListeners() {
             resetInactivityTimer();
         });
     });
+    
+    // 初始化颜色选择器状态
+    syncColorSelectorState();
 
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
@@ -2040,7 +2066,13 @@ function showSummary() {
     progressText.textContent = '测试已完成！';
 
     const grid = document.getElementById('summary-grid');
-    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3><button id="download-report-btn" style="margin-top: 15px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);" onclick="downloadReport()">📥 下载测试报告</button></div>';
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3><button id="download-report-btn" style="margin-top: 15px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);">📥 下载测试报告</button></div>';
+    
+    // 为下载按钮添加事件监听器
+    const downloadBtn = document.getElementById('download-report-btn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', downloadReport);
+    }
 
     for (let i = 0; i < state.totalImages; i++) {
         const item = document.createElement('div');
@@ -2120,6 +2152,9 @@ async function downloadReport() {
         alert('报告下载失败，请稍后重试');
     }
 }
+
+// 将 downloadReport 函数暴露到全局作用域，以便在需要时可以从外部调用
+window.downloadReport = downloadReport;
 
 function startInactivityMonitoring() {
     inactivityActive = true;
@@ -2262,14 +2297,37 @@ function selectClearAllTool(selected) {
     }
 }
 
+// 颜色映射：将颜色名称转换为十六进制值
+const COLOR_MAP = {
+    red: '#ef4444',
+    green: '#10b981',
+    blue: '#3b82f6'
+};
+
+// 反向映射：从十六进制值映射回颜色名称
+const COLOR_REVERSE_MAP = {
+    '#ef4444': 'red',
+    '#10b981': 'green',
+    '#3b82f6': 'blue'
+};
+
 function selectColor(color) {
-    state.color = color;
+    // 如果传入的是颜色名称，转换为十六进制值；否则直接使用
+    state.color = COLOR_MAP[color] || color;
     document.querySelectorAll('.color-option').forEach(opt => {
         opt.classList.toggle('selected', opt.dataset.color === color);
     });
     selectTool('pen');
     // 确保一键擦除按钮不被选中
     document.getElementById('clear-all-tool').classList.remove('selected');
+}
+
+// 初始化颜色选择器状态，确保与 state.color 一致
+function syncColorSelectorState() {
+    const colorName = COLOR_REVERSE_MAP[state.color] || 'red';
+    document.querySelectorAll('.color-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.dataset.color === colorName);
+    });
 }
 
 function saveCanvasState(index) {

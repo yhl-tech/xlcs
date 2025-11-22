@@ -766,14 +766,26 @@
             }
             
             try {
+                // 从 localStorage 获取用户 token
+                const token = typeof localStorage !== 'undefined' 
+                    ? localStorage.getItem('token') 
+                    : null;
+                
+                const headers = {
+                    'Accept': 'application/pdf, application/octet-stream'
+                };
+                
+                // 如果存在 token，添加到 Authorization 头
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
                 const response = await apiClient.post('/rorschach/user/get_report', 
                     { user_id: userId }, 
                     {
                         responseType: 'blob',
                         timeout: 300000, // 5分钟超时
-                        headers: {
-                            'Accept': 'application/pdf, application/octet-stream'
-                        }
+                        headers: headers
                     }
                 );
                 

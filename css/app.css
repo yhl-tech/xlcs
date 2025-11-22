@@ -53,7 +53,7 @@ body {
 .info-card {
     background: var(--card-bg);
     border-radius: 20px;
-    padding: 30px 40px;
+    padding: 24px 40px;
     box-shadow: var(--shadow-lg);
     max-width: 450px;
     width: 100%;
@@ -74,13 +74,13 @@ body {
 .info-card h1 {
     color: var(--primary-color);
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     font-size: 28px;
     font-weight: 700;
 }
 
 .info-form-group {
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     display: flex;
     flex-direction: column;
 }
@@ -89,7 +89,7 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
 }
@@ -131,7 +131,7 @@ body {
 .input-error-message {
     font-size: 12px;
     color: var(--danger-color);
-    margin-top: 6px;
+    margin-top: 4px;
     line-height: 1.4;
     min-height: 18px;
     display: none;
@@ -144,7 +144,7 @@ body {
 #start-test-btn {
     width: 100%;
     padding: 14px;
-    margin-top: 30px;
+    margin-top: 20px;
     background: var(--primary-light);
     color: white;
     border: none;
