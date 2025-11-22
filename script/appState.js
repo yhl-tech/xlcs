@@ -36,12 +36,14 @@ export const POST_TEST_QUESTIONS = [
     { key: 'mood', text: '测试到此为止了，你现在心情如何？相比刚开始测试时？', audio: './audio/q_mood.wav' }
 ];
 
-export const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。
+export const INTRO_TEXT = `罗夏墨迹是瑞士心理学家。发明的一种投射法心理测试方法。我会依次给你展示十张墨迹的图片，这些墨迹点的绘制都是随机的，也是抽象的，每个人看到的内容都不同。
+你要做的就是告诉我，你从图片中看到了什么，并且描述一下你所看到的东西、联想到的东西。不管看见什么，都可以表述回答，没有什么正确、错误的回答。
+你可以观察一下这个软件界面上的各种按钮，在测试的时候可以根据自己的需要进行调整观察图片的视角，比如放大、缩小、旋转图片，还可以在描述的时候使用画笔来勾画等等。总之，观看理解图片，不受任何限制。测试过程中，我不会询问你的隐私信息，所以安全性你可以放心。
 `;
 
 export function getEmptyBasicInfoDraft() {
     return {
-        sex: '',
+        sex: '男',
         age: '',
         education: '',
         occupation: '',

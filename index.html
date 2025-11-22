@@ -15,7 +15,7 @@
             <div class="info-form-group">
                 <label for="sex">性别</label>
                 <select id="sex" required>
-                    <option value="男">男</option>
+                    <option value="男" selected>男</option>
                     <option value="女">女</option>
                 </select>
                 <div id="sex-error" class="input-error-message" role="status" aria-live="polite"></div>
@@ -55,9 +55,54 @@
         <div class="main-content" id="main-content">
             <div id="welcome-text-container"></div>
             <div id="intro-overlay" style="display: none;">
-                <img id="intro-image" src="./images/rorschach-blot-example.webp" alt="介绍">
-                <p id="intro-text"></p>
-                <button id="enter-btn" style="display: none;">进入</button>
+                <div class="intro-preview-layout">
+                    <div class="intro-preview-panel test-preview-panel">
+                        <div class="test-preview-window">
+                            <div class="test-preview-body">
+                                <div class="test-preview-image-area">
+                                    <div class="test-preview-image-frame">
+                                        <img id="intro-preview-image" src="./images/rorschach-blot-2.webp" alt="罗夏墨迹介绍图">
+                                        <canvas class="test-preview-canvas"></canvas>
+                                    </div>
+                                </div>
+                                <div class="test-preview-controls">
+                                    <div class="control-group">
+                                        <button disabled data-action="prev">◀ 上一张</button>
+                                    </div>
+                                    <div class="control-group">
+                                        <button disabled data-action="zoom-in">🔍+ 放大</button>
+                                        <button disabled data-action="zoom-out">🔍- 缩小</button>
+                                        <button disabled data-action="rotate-left">↶ 左转</button>
+                                        <button disabled data-action="rotate-right">↷ 右转</button>
+                                    </div>
+                                    <div class="control-group">
+                                        <button disabled class="selected" data-action="pen">✏️ 画笔</button>
+                                        <div class="color-selector">
+                                            <div class="color-option selected" data-color="red" style="background-color: #ef4444;"></div>
+                                            <div class="color-option" data-color="green" style="background-color: #10b981;"></div>
+                                            <div class="color-option" data-color="blue" style="background-color: #3b82f6;"></div>
+                                        </div>
+                                        <button disabled data-action="erase">🗑️ 擦除</button>
+                                        <button disabled data-action="clear">🧹 一键擦除</button>
+                                    </div>
+                                    <div class="control-group">
+                                        <button disabled data-action="next">下一张 ▶</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="intro-info-panel">
+                        <div class="intro-info-header">
+                            <div class="intro-info-icon">🎧</div>
+                            <div>
+                                <p class="intro-info-label">测试说明</p>
+                            </div>
+                        </div>
+                        <div id="intro-text" class="intro-info-text"></div>
+                        <button id="enter-btn" class="intro-enter-btn" style="display: none;">进入</button>
+                    </div>
+                </div>
             </div>
             <div id="image-container">
                 <div id="image-placeholder" class="image-placeholder hidden">

@@ -166,6 +166,266 @@ const resumeTestBtn = document.getElementById('resume-test-btn');
 const introOverlay = document.getElementById('intro-overlay');
 const introText = document.getElementById('intro-text');
 const enterBtn = document.getElementById('enter-btn');
+const introPreviewImage = document.getElementById('intro-preview-image');
+const previewCanvas = document.querySelector('.test-preview-canvas');
+const previewCtx = previewCanvas ? previewCanvas.getContext('2d') : null;
+
+// 预览窗口的独立状态管理（不记录到 interactionTracker）
+const previewState = {
+    zoom: 1,
+    rotation: 0,
+    tool: 'pen',
+    color: '#ef4444', // red
+    drawing: false,
+    currentImageIndex: 0, // 预览窗口显示的图片索引（0-9）
+    canvasStates: new Array(10).fill(null) // 每张图片的画布状态
+};
+
+// 预览窗口交互函数
+function initPreviewCanvasInteractions() {
+    if (!previewCanvas || !previewCtx) return;
+
+    // 初始化画布尺寸
+    const introPreviewImage = document.getElementById('intro-preview-image');
+    if (introPreviewImage && previewCanvas) {
+        const initCanvasSize = () => {
+            previewCanvas.width = introPreviewImage.clientWidth || introPreviewImage.naturalWidth || 400;
+            previewCanvas.height = introPreviewImage.clientHeight || introPreviewImage.naturalHeight || 400;
+        };
+        if (introPreviewImage.complete) {
+            initCanvasSize();
+        } else {
+            introPreviewImage.onload = initCanvasSize;
+        }
+    }
+
+    // 保存当前画布状态
+    function savePreviewCanvasState() {
+        if (previewCanvas) {
+            previewState.canvasStates[previewState.currentImageIndex] = previewCanvas.toDataURL();
+        }
+    }
+
+    // 恢复画布状态
+    function restorePreviewCanvasState() {
+        const savedState = previewState.canvasStates[previewState.currentImageIndex];
+        if (savedState && previewCanvas) {
+            const img = new Image();
+            img.onload = () => {
+                previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                previewCtx.drawImage(img, 0, 0);
+            };
+            img.src = savedState;
+        } else {
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        }
+    }
+
+    // 应用变换到画布
+    function applyPreviewTransform() {
+        if (!previewCanvas) return;
+        const frame = previewCanvas.closest('.test-preview-image-frame');
+        if (frame) {
+            frame.style.transform = `scale(${previewState.zoom}) rotate(${previewState.rotation}deg)`;
+        }
+    }
+
+    // 切换图片
+    function switchPreviewImage(direction) {
+        savePreviewCanvasState();
+        if (direction === 'next') {
+            if (previewState.currentImageIndex < 9) {
+                previewState.currentImageIndex++;
+            }
+        } else {
+            if (previewState.currentImageIndex > 0) {
+                previewState.currentImageIndex--;
+            }
+        }
+        // 更新图片
+        const introPreviewImage = document.getElementById('intro-preview-image');
+        if (introPreviewImage) {
+            introPreviewImage.src = `./images/rorschach-blot-${previewState.currentImageIndex + 1}.webp`;
+        }
+        // 重置画布尺寸并恢复状态
+        if (introPreviewImage && previewCanvas) {
+            introPreviewImage.onload = () => {
+                previewCanvas.width = introPreviewImage.clientWidth;
+                previewCanvas.height = introPreviewImage.clientHeight;
+                restorePreviewCanvasState();
+                applyPreviewTransform();
+            };
+        } else {
+            restorePreviewCanvasState();
+            applyPreviewTransform();
+        }
+    }
+
+    // 缩放
+    function zoomPreview(direction) {
+        if (direction === 'in') {
+            previewState.zoom = Math.min(previewState.zoom + 0.1, 3);
+        } else {
+            previewState.zoom = Math.max(previewState.zoom - 0.1, 0.5);
+        }
+        applyPreviewTransform();
+    }
+
+    // 旋转
+    function rotatePreview(direction) {
+        if (direction === 'left') {
+            previewState.rotation -= 90;
+        } else {
+            previewState.rotation += 90;
+        }
+        applyPreviewTransform();
+    }
+
+    // 切换工具
+    function setPreviewTool(tool) {
+        previewState.tool = tool;
+        const penBtn = document.querySelector('[data-action="pen"]');
+        const eraseBtn = document.querySelector('[data-action="erase"]');
+        if (penBtn) penBtn.classList.toggle('selected', tool === 'pen');
+        if (eraseBtn) eraseBtn.classList.toggle('selected', tool === 'erase');
+    }
+
+    // 清除画布
+    function clearPreviewCanvas() {
+        if (previewCtx && previewCanvas) {
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            savePreviewCanvasState();
+        }
+    }
+
+    // 暴露函数供按钮使用
+    window.previewActions = {
+        prev: () => switchPreviewImage('prev'),
+        next: () => switchPreviewImage('next'),
+        zoomIn: () => zoomPreview('in'),
+        zoomOut: () => zoomPreview('out'),
+        rotateLeft: () => rotatePreview('left'),
+        rotateRight: () => rotatePreview('right'),
+        pen: () => setPreviewTool('pen'),
+        erase: () => setPreviewTool('erase'),
+        clear: clearPreviewCanvas
+    };
+
+    // 绘制函数
+    function drawPreview(e) {
+        if (!previewState.drawing) return;
+        const rect = previewCanvas.getBoundingClientRect();
+        // 考虑缩放和旋转，将屏幕坐标转换为画布坐标
+        const scale = previewState.zoom;
+        const rotation = previewState.rotation * Math.PI / 180;
+        let x = (e.clientX || e.touches[0].clientX) - rect.left;
+        let y = (e.clientY || e.touches[0].clientY) - rect.top;
+        
+        // 转换为相对于画布中心的坐标
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        x = (x - centerX) / scale;
+        y = (y - centerY) / scale;
+        
+        // 反向旋转
+        const cos = Math.cos(-rotation);
+        const sin = Math.sin(-rotation);
+        const rotatedX = x * cos - y * sin;
+        const rotatedY = x * sin + y * cos;
+        
+        // 转换回画布坐标
+        x = rotatedX + previewCanvas.width / 2;
+        y = rotatedY + previewCanvas.height / 2;
+
+        previewCtx.lineWidth = previewState.tool === 'erase' ? 20 : 3;
+        previewCtx.lineCap = 'round';
+        
+        if (previewState.tool === 'erase') {
+            previewCtx.globalCompositeOperation = 'destination-out';
+        } else {
+            previewCtx.globalCompositeOperation = 'source-over';
+            previewCtx.strokeStyle = previewState.color;
+        }
+        
+        previewCtx.lineTo(x, y);
+        previewCtx.stroke();
+        previewCtx.beginPath();
+        previewCtx.moveTo(x, y);
+    }
+
+    // 鼠标/触摸事件
+    previewCanvas.addEventListener('mousedown', (e) => {
+        previewState.drawing = true;
+        const rect = previewCanvas.getBoundingClientRect();
+        const scale = previewState.zoom;
+        const rotation = previewState.rotation * Math.PI / 180;
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+        
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        x = (x - centerX) / scale;
+        y = (y - centerY) / scale;
+        
+        const cos = Math.cos(-rotation);
+        const sin = Math.sin(-rotation);
+        const rotatedX = x * cos - y * sin;
+        const rotatedY = x * sin + y * cos;
+        
+        x = rotatedX + previewCanvas.width / 2;
+        y = rotatedY + previewCanvas.height / 2;
+        
+        previewCtx.beginPath();
+        previewCtx.moveTo(x, y);
+    });
+
+    previewCanvas.addEventListener('mousemove', drawPreview);
+    previewCanvas.addEventListener('mouseup', () => {
+        if (previewState.drawing) {
+            previewState.drawing = false;
+            savePreviewCanvasState();
+        }
+    });
+
+    previewCanvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        previewState.drawing = true;
+        const rect = previewCanvas.getBoundingClientRect();
+        const scale = previewState.zoom;
+        const rotation = previewState.rotation * Math.PI / 180;
+        let x = e.touches[0].clientX - rect.left;
+        let y = e.touches[0].clientY - rect.top;
+        
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        x = (x - centerX) / scale;
+        y = (y - centerY) / scale;
+        
+        const cos = Math.cos(-rotation);
+        const sin = Math.sin(-rotation);
+        const rotatedX = x * cos - y * sin;
+        const rotatedY = x * sin + y * cos;
+        
+        x = rotatedX + previewCanvas.width / 2;
+        y = rotatedY + previewCanvas.height / 2;
+        
+        previewCtx.beginPath();
+        previewCtx.moveTo(x, y);
+    });
+
+    previewCanvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        drawPreview(e);
+    });
+
+    previewCanvas.addEventListener('touchend', () => {
+        if (previewState.drawing) {
+            previewState.drawing = false;
+            savePreviewCanvasState();
+        }
+    });
+}
+
 const audioPlayer = document.getElementById('audio-player');
 const controlsBar = document.getElementById('controls-bar');
 const rorschachImage = document.getElementById('rorschach-image');
@@ -765,7 +1025,6 @@ async function resumeIntroExperienceFromSnapshot(snapshot) {
     try {
         if (resumeTestBtn) {
             resumeTestBtn.disabled = true;
-            resumeTestBtn.textContent = '恢复中...';
         }
         await prepareIntroExperience({ resume: true });
         if (resumeTestBtn) {
@@ -813,12 +1072,19 @@ async function prepareIntroExperience({ resume = false } = {}) {
 
     infoScreen.style.display = 'none';
     appWindow.style.display = 'flex';
+    appWindow.classList.add('intro-mode');
     hideWelcomeText();
-    introText.textContent = INTRO_TEXT;
+    // 格式化文字为段落，添加样式
+    const formattedText = INTRO_TEXT
+        .split(/\n+/)
+        .filter(line => line.trim())
+        .map(line => `<p>${line.trim()}</p>`)
+        .join('');
+    introText.innerHTML = formattedText;
     introOverlay.style.display = 'flex';
     enterBtn.style.display = 'block';
     enterBtn.disabled = true;
-    enterBtn.textContent = resume ? '恢复中...' : '语音播报中...';
+    enterBtn.textContent = '语音播报中...';
     showIntroImage();
 
     state.introStep = INTRO_STEPS.INTRO_OVERLAY;
@@ -826,6 +1092,8 @@ async function prepareIntroExperience({ resume = false } = {}) {
 
     try {
         await ensureTTSInit('audio');
+        // 开始播报时，更新按钮文字为"语音播报中..."
+        enterBtn.textContent = '语音播报中...';
         const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${INTRO_TEXT}`;
         await sendTextQuery(introQuery, { ensure: false });
     } catch (e) {
@@ -843,6 +1111,67 @@ async function prepareIntroExperience({ resume = false } = {}) {
     }, estimatedIntroDuration);
 
     enterBtn.onclick = () => enterTestExperience();
+
+    // 初始化预览窗口交互
+    initPreviewCanvasInteractions();
+    
+    // 启用预览窗口控制按钮并添加事件监听
+    const previewControlButtons = document.querySelectorAll('.test-preview-controls button');
+    previewControlButtons.forEach(btn => {
+        btn.disabled = false;
+        const action = btn.getAttribute('data-action');
+        if (action && window.previewActions) {
+            btn.addEventListener('click', () => {
+                switch(action) {
+                    case 'prev':
+                        window.previewActions.prev();
+                        break;
+                    case 'next':
+                        window.previewActions.next();
+                        break;
+                    case 'zoom-in':
+                        window.previewActions.zoomIn();
+                        break;
+                    case 'zoom-out':
+                        window.previewActions.zoomOut();
+                        break;
+                    case 'rotate-left':
+                        window.previewActions.rotateLeft();
+                        break;
+                    case 'rotate-right':
+                        window.previewActions.rotateRight();
+                        break;
+                    case 'pen':
+                        window.previewActions.pen();
+                        break;
+                    case 'erase':
+                        window.previewActions.erase();
+                        break;
+                    case 'clear':
+                        window.previewActions.clear();
+                        break;
+                }
+            });
+        }
+    });
+
+    // 颜色选择器
+    const colorOptions = document.querySelectorAll('.color-selector .color-option');
+    colorOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            colorOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+            const color = option.getAttribute('data-color');
+            const colorMap = {
+                red: '#ef4444',
+                green: '#10b981',
+                blue: '#3b82f6'
+            };
+            if (previewState && colorMap[color]) {
+                previewState.color = colorMap[color];
+            }
+        });
+    });
 }
 
 async function enterTestExperience({ skipOpeningSpeech = false, restoredSnapshot = null } = {}) {
@@ -906,6 +1235,7 @@ async function enterTestExperience({ skipOpeningSpeech = false, restoredSnapshot
         }
 
         introOverlay.style.display = 'none';
+        appWindow.classList.remove('intro-mode');
         const shouldShowControls = state.stage !== 'post' && state.stage !== 'summary';
         if (shouldShowControls) {
             controlsBar.style.display = 'flex';
@@ -2084,17 +2414,15 @@ function hideWelcomeText() {
 
 // 隐藏intro-image元素
 function hideIntroImage() {
-    const introImage = document.getElementById('intro-image');
-    if (introImage) {
-        introImage.style.display = 'none';
+    if (introPreviewImage) {
+        introPreviewImage.style.visibility = 'hidden';
     }
 }
 
 // 显示intro-image元素
 function showIntroImage() {
-    const introImage = document.getElementById('intro-image');
-    if (introImage) {
-        introImage.style.display = 'block';
+    if (introPreviewImage) {
+        introPreviewImage.style.visibility = 'visible';
     }
 }
 
