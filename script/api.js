@@ -7,6 +7,25 @@
     'use strict';
 
     /**
+     * 从 localStorage 获取用户信息中的 username
+     * @returns {string} 用户名，如果不存在则返回空字符串
+     */
+    function getUserInfoFromStorage() {
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const userInfoStr = localStorage.getItem('userInfo');
+                if (userInfoStr) {
+                    const userInfo = JSON.parse(userInfoStr);
+                    return userInfo?.username || '';
+                }
+            }
+        } catch (error) {
+            console.warn('[API] 读取 userInfo 失败:', error);
+        }
+        return '';
+    }
+
+    /**
      * API 配置
      */
     const API_CONFIG = {
@@ -17,10 +36,9 @@
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'USER_ID': 'Bubble_Lis'
+            'USER_ID': getUserInfoFromStorage()
         },
-        // 分析接口使用的固定 API Key
-        analyzeApiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dSIsImV4cCI6MTc2MzgxODkwOX0.1UceWZ7pl3MmunjP-XQj9gbNBDcwTUQ0B5NMPOIihZo"
+        analyzeApiKey: ""
     };
 
     const TENANT_TOKEN_STORAGE_KEY = 'tenantAccessToken';
@@ -126,6 +144,15 @@
                     } else if (!hasCustomAuthorization) {
                         // 默认使用 analyzeApiKey
                         config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`;
+                    }
+                    
+                    // 处理 USER_ID：如果接口header传参中有USER_ID，则使用接口header传参中的USER_ID
+                    // 如果没有，则取API_CONFIG中的headers.USER_ID（从localStorage动态读取）
+                    if (!config.headers['USER_ID']) {
+                        const userIdFromStorage = getUserInfoFromStorage();
+                        if (userIdFromStorage) {
+                            config.headers['USER_ID'] = userIdFromStorage;
+                        }
                     }
                     
                     // 确保所有自定义 headers 都被正确设置（特别是 FormData 请求）
@@ -444,27 +471,6 @@
      * 业务接口方法
      */
     const API = {
-        /**
-         * 用户登出
-         * @returns {Promise} 请求Promise
-         */
-        async logout() {
-            try {
-                const userInfo = window.auth ? window.auth.getUserInfo() : null;
-                const token = window.auth ? window.auth.getToken() : null;
-                
-                // 调用登出接口
-                const response = await apiClient.post('/rorschach/user_logout', {
-                    username: userInfo?.username || '',
-                    token: token || ''
-                });
-                
-                return response;
-            } catch (error) {
-                console.error('[API] 登出失败:', error);
-                throw error;
-            }
-        },
 
         /**
          * 租户登录（管理员登录），用于刷新 analyzeApiKey

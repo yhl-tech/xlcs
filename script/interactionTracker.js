@@ -16,7 +16,7 @@
                 zoom: {},      // 放大缩小操作: { "1": [1, 1, -1], "2": [], ... }
                 rotate: {},    // 旋转操作: { "1": [30, -30], "2": [], ... }
                 navigation: {}, // 导航操作: { "1": ["prev"], "2": ["next"], ... }
-                drawingTracks: {} // 画笔轨迹: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+                drawingTracks: {} // 画笔轨迹: { "1": {}, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
             };
 
             // 当前绘制的轨迹状态
@@ -619,13 +619,13 @@
 
         /**
          * 获取画笔轨迹数据
-         * @returns {Object} 画笔轨迹数据，格式: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+         * @returns {Object} 画笔轨迹数据，格式: { "1": {}, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
          */
         getDrawingTracks() {
             const tracks = {};
             for (let i = 1; i <= 10; i++) {
                 const key = String(i);
-                tracks[key] = this.data.drawingTracks[key] || 0;
+                tracks[key] = this.data.drawingTracks[key] === 0 ? {} : (this.data.drawingTracks[key] || {});
             }
             return tracks;
         }
@@ -1123,7 +1123,7 @@
             }
 
             try {
-                // 获取笔迹轨迹数据对象，格式: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+                // 获取笔迹轨迹数据对象，格式: { "1": {}, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
                 const drawingTracksData = this.getDrawingTracks();
                 
                 const result = await window.API.uploadDrawingTracks(drawingTracksData, userId);

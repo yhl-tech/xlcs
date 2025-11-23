@@ -1209,7 +1209,6 @@ async function prepareIntroExperience({ resume = false } = {}) {
     }
     
     const estimatedIntroDuration = Math.min(65000, Math.max(3000, Math.floor(INTRO_TEXT.length * 215)));
-    console.log('estimatedIntroDuration', estimatedIntroDuration);
 
     setTimeout(() => {
         enterBtn.disabled = false;
@@ -2642,13 +2641,80 @@ function showIntroImage() {
 }
 
 
+// 更新登录/退出UI显示
+function updateAuthUI() {
+    const authControls = document.getElementById('auth-controls');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const usernameDisplay = document.getElementById('username-display');
+
+    if (!authControls || !loginBtn || !logoutBtn || !usernameDisplay) {
+        return;
+    }
+
+    if (window.auth && window.auth.isLoggedIn()) {
+        // 已登录：显示用户名和退出按钮
+        const userInfo = window.auth.getUserInfo();
+        const username = userInfo?.username || '用户';
+        usernameDisplay.textContent = username;
+        authControls.style.display = 'flex';
+        loginBtn.style.display = 'none';
+    } else {
+        // 未登录：显示登录按钮
+        authControls.style.display = 'none';
+        loginBtn.style.display = 'block';
+    }
+}
+
+// 绑定登录/退出按钮事件
+function setupAuthControls() {
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            window.location.href = './login.html';
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            if (!window.auth) {
+                console.error('认证模块未加载');
+                return;
+            }
+
+            try {
+                // 显示退出中状态
+                logoutBtn.disabled = true;
+                logoutBtn.textContent = '退出中...';
+
+                // 调用登出接口
+                await window.auth.logout();
+
+                // 跳转到登录页
+                window.location.href = './login.html';
+            } catch (error) {
+                console.error('退出失败:', error);
+                // 即使出错，也跳转到登录页
+                window.location.href = './login.html';
+            }
+        });
+    }
+}
+
 // 登录检查和初始化
 function checkLoginAndInit() {
+    // 先更新UI（无论是否登录）
+    updateAuthUI();
+    
     if (!window.auth.isLoggedIn()) {
+        // 未登录：跳转到登录页
         window.location.href = './login.html';
         return;
     }
 
+    // 已登录：继续初始化
     configureSessionPersistence();
     ensureSessionId();
     setupEventListeners();
@@ -2662,8 +2728,15 @@ window.addEventListener('beforeunload', () => {
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     renderWelcomeText();
+    // 先设置登录/退出按钮事件（不依赖模块加载）
+    setupAuthControls();
     // 等待模块加载完成后检查登录状态
-    waitForModules(checkLoginAndInit);
+    waitForModules(() => {
+        // 先更新UI（即使未登录也显示登录按钮）
+        updateAuthUI();
+        // 然后执行原有的初始化逻辑
+        checkLoginAndInit();
+    });
     welcomeMessageTimer = setTimeout(() => {
         if (shouldPlayWelcomeMessage) {
             playWelcomeMessage();

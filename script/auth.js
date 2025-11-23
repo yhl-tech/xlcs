@@ -178,31 +178,88 @@
          * @returns {Promise<Object>}
          */
         async logout() {
+            const userInfo = this.getUserInfo();
+            
+            // 获取 storage 中的 token
+            let token = '';
             try {
-                const token = this.getToken();
-                const userInfo = this.getUserInfo();
+                if (typeof localStorage !== 'undefined') {
+                    token = localStorage.getItem('token') || '';
+                }
+            } catch (error) {
+                console.warn('[Auth] 读取 token 失败:', error);
+            }
 
-                if (token && userInfo?.username && window.apiClient) {
-                    // 调用登出接口
-                    try {
-                        await window.apiClient.post('/rorschach/user_logout', {
-                            username: userInfo.username,
-                            token: token
-                        });
-                    } catch (error) {
-                        console.warn('登出接口调用失败:', error);
-                        // 即使接口失败，也清除本地存储
+            if (!window.apiClient) {
+                throw new Error('apiClient 未初始化');
+            }
+
+            if (!token) {
+                throw new Error('token 不存在');
+            }
+
+            if (!userInfo?.username) {
+                throw new Error('用户信息不存在');
+            }
+
+            // 调用登出接口，Authorization header 和 body 中的 token 都使用 storage 中的 token
+            await window.apiClient.post('/rorschach/user_logout', {
+                username: userInfo.username,
+                token: token
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            // 接口成功后才清除所有本地存储
+            this.clearAllStorage();
+            return { success: true };
+        }
+
+        /**
+         * 清除所有本地存储（包括token、userInfo、tenant_token、session等）
+         */
+        clearAllStorage() {
+            // 清除认证相关的存储
+            this.clearToken();
+
+            // 清除租户token（需要清除两个可能的key）
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    // api.js 中使用的 key
+                    localStorage.removeItem('tenantAccessToken');
+                }
+            } catch (error) {
+                console.warn('[Auth] 清除租户token失败:', error);
+            }
+
+            // 清除所有session相关的存储
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && (key.startsWith('xlcs_session_') || key.startsWith('xlcs_session_meta_'))) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
+                    if (keysToRemove.length > 0) {
+                        console.log('[Auth] 已清除', keysToRemove.length, '个session存储项');
                     }
                 }
-
-                // 清除本地存储
-                this.clearToken();
-                return { success: true };
             } catch (error) {
-                console.error('登出失败:', error);
-                // 即使出错，也清除本地存储
-                this.clearToken();
-                return { success: true };
+                console.warn('[Auth] 清除session存储失败:', error);
+            }
+
+            // 清除SessionManager的状态
+            if (window.SessionManager && typeof window.SessionManager.clearSnapshot === 'function') {
+                try {
+                    window.SessionManager.clearSnapshot();
+                } catch (error) {
+                    console.warn('[Auth] 清除SessionManager快照失败:', error);
+                }
             }
         }
 

@@ -202,9 +202,55 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
+.title-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
 .progress-info {
     font-size: 14px;
     opacity: 0.9;
+}
+
+.auth-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 16px;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.username {
+    font-size: 14px;
+    opacity: 0.95;
+    font-weight: 500;
+}
+
+.logout-btn,
+.login-btn {
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.logout-btn:hover,
+.login-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.logout-btn:active,
+.login-btn:active {
+    transform: translateY(0);
 }
 
 .main-content {

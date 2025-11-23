@@ -58,7 +58,14 @@
     <div id="app-window" class="app-window screen">
         <div class="title-bar">
             <span>🎨 罗夏墨迹测试</span>
-            <span class="progress-info" id="progress-text">准备中...</span>
+            <div class="title-bar-right">
+                <span class="progress-info" id="progress-text">准备中...</span>
+                <div class="auth-controls" id="auth-controls" style="display: none;">
+                    <span class="username" id="username-display"></span>
+                    <button class="logout-btn" id="logout-btn">退出</button>
+                </div>
+                <button class="login-btn" id="login-btn" style="display: none;">登录</button>
+            </div>
         </div>
 
         <div class="main-content" id="main-content">
