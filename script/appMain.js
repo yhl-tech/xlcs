@@ -1452,7 +1452,8 @@ function initTest(restoredSnapshot = null) {
     if (!isRestored && state.currentIndex === 0) {
         disableNextButton();
     } else if (isRestored && state.nextButtonCooldown > 0) {
-        disableNextButton(state.nextButtonCooldown);
+        // 恢复时强制设置，确保按钮状态和定时器正确恢复
+        disableNextButton(state.nextButtonCooldown, true);
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -1775,11 +1776,19 @@ function setupEventListeners() {
 
 /**
  * 禁用"下一张"按钮并开始冷却倒计时
+ * @param {number} initialCooldown - 初始冷却时间（秒）
+ * @param {boolean} force - 是否强制设置（用于恢复状态时）
  */
-function disableNextButton(initialCooldown = NEXT_BUTTON_COOLDOWN) {
-    // 如果已经在冷却中，直接返回
-    if (state.nextButtonCooldown > 0) {
+function disableNextButton(initialCooldown = NEXT_BUTTON_COOLDOWN, force = false) {
+    // 如果已经在冷却中且不是强制设置，直接返回
+    if (state.nextButtonCooldown > 0 && !force) {
         return;
+    }
+
+    // 如果强制设置，先清除现有定时器
+    if (force && nextButtonCooldownTimer) {
+        clearInterval(nextButtonCooldownTimer);
+        nextButtonCooldownTimer = null;
     }
 
     // 禁用按钮
@@ -1967,6 +1976,10 @@ function updateNavButtons() {
     // "下一张"按钮的禁用状态由冷却时间控制
     // 如果是最后一张图，始终允许点击（进入选择阶段不受冷却限制）
     if (state.currentIndex === state.totalImages - 1) {
+        nextBtn.disabled = false;
+        nextBtn.textContent = '下一张 ▶';
+    } else if (state.nextButtonCooldown === 0) {
+        // 如果冷却时间为0，确保按钮可用
         nextBtn.disabled = false;
         nextBtn.textContent = '下一张 ▶';
     }
@@ -2380,6 +2393,11 @@ function getCanvasCoordinates(event) {
 }
 
 function startDrawing(e) {
+    // 如果工具状态无效，不开始绘制
+    if (state.tool !== 'pen' && state.tool !== 'eraser') {
+        return;
+    }
+    
     state.drawing = true;
     const point = getCanvasCoordinates(e);
     lastX = point.x;
@@ -2395,6 +2413,11 @@ function startDrawing(e) {
 
 function draw(e) {
     if (!state.drawing) return;
+    // 如果工具状态无效，不执行绘制
+    if (state.tool !== 'pen' && state.tool !== 'eraser') {
+        return;
+    }
+    
     const point = getCanvasCoordinates(e);
     const x = point.x;
     const y = point.y;
