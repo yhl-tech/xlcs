@@ -17,7 +17,7 @@
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Id': 'Bubble_Lis'
+            'USER_ID': 'Bubble_Lis'
         },
         // 分析接口使用的固定 API Key
         analyzeApiKey: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkb25ncml4aW55dSIsImV4cCI6MTc2MzgxODkwOX0.1UceWZ7pl3MmunjP-XQj9gbNBDcwTUQ0B5NMPOIihZo"
@@ -151,6 +151,11 @@
             // 设置响应拦截器
             this.axiosInstance.interceptors.response.use(
                 (response) => {
+                    // 对于 blob 响应类型，返回完整响应对象以便检查 Content-Type
+                    // 其他类型直接返回数据
+                    if (response.config?.responseType === 'blob') {
+                        return response;
+                    }
                     // 直接返回数据
                     return response.data;
                 },
@@ -637,6 +642,148 @@
         },
 
         /**
+         * 规范化时间字符串格式，确保分钟和秒数都是两位数
+         * @param {string} timeStr - 时间字符串，如 "0:4" 或 "1:23"
+         * @returns {string} 规范化后的时间字符串，如 "00:04" 或 "01:23"
+         */
+        normalizeTimeString(timeStr) {
+            if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
+                return timeStr; // 如果不是时间格式，直接返回
+            }
+            
+            const parts = timeStr.split(':');
+            if (parts.length !== 2) {
+                return timeStr; // 格式错误，直接返回
+            }
+            
+            try {
+                const minutes = parseInt(parts[0], 10);
+                const seconds = parseInt(parts[1], 10);
+                
+                // 验证秒数范围
+                if (isNaN(minutes) || isNaN(seconds) || seconds < 0 || seconds > 59) {
+                    return timeStr; // 无效数据，直接返回
+                }
+                
+                // 格式化为 "MM:SS"（分钟和秒数都必须补零为两位数）
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } catch (error) {
+                console.warn('[API] 时间字符串规范化失败:', timeStr, error);
+                return timeStr; // 出错时直接返回
+            }
+        },
+
+        /**
+         * 规范化笔迹轨迹数据中的时间格式和坐标格式
+         * @param {Object} data - 原始数据对象
+         * @returns {Object} 规范化后的数据对象
+         */
+        normalizeDrawingTracksData(data) {
+            if (!data || typeof data !== 'object') {
+                return data;
+            }
+            
+            const normalized = {};
+            const self = this; // 保存 this 引用
+            
+            // 递归处理坐标数组，x 坐标保留一个小数，y 坐标不做改变
+            const formatCoordinates = (coords) => {
+                if (!Array.isArray(coords)) {
+                    return coords;
+                }
+                // 如果是坐标数组 [x, y]
+                if (coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+                    return [parseFloat(coords[0].toFixed(1)), coords[1]];
+                }
+                // 如果是嵌套数组，递归处理
+                return coords.map(item => Array.isArray(item) ? formatCoordinates(item) : item);
+            };
+            
+            for (const [plateKey, plateData] of Object.entries(data)) {
+                // 如果 plateData 是数字（如 "1": 0），直接复制
+                if (typeof plateData === 'number' || plateData === null || plateData === undefined) {
+                    normalized[plateKey] = plateData;
+                    continue;
+                }
+                
+                // 如果 plateData 是对象（包含时间键），规范化时间键和坐标
+                if (typeof plateData === 'object' && !Array.isArray(plateData)) {
+                    const normalizedPlateData = {};
+                    for (const [timeKey, coordinates] of Object.entries(plateData)) {
+                        const normalizedTimeKey = self.normalizeTimeString(timeKey);
+                        normalizedPlateData[normalizedTimeKey] = formatCoordinates(coordinates);
+                    }
+                    normalized[plateKey] = normalizedPlateData;
+                } else {
+                    // 其他情况直接复制
+                    normalized[plateKey] = plateData;
+                }
+            }
+            
+            return normalized;
+        },
+
+        /**
+         * 上传笔迹轨迹数据
+         * @param {Object} drawingTracksData - 笔迹轨迹数据对象 { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+         * @param {string} userId - 用户ID
+         * @returns {Promise} 请求Promise
+         */
+        async uploadDrawingTracks(drawingTracksData, userId) {
+            if (!drawingTracksData || typeof drawingTracksData !== 'object') {
+                throw new Error('笔迹轨迹数据参数无效');
+            }
+            
+            // 规范化时间格式（确保秒数为两位数）
+            const normalizedData = this.normalizeDrawingTracksData(drawingTracksData);
+                       
+            console.log('[API] 上传笔迹轨迹数据:', {
+                originalData: drawingTracksData,
+                normalizedData: normalizedData,
+                userId: userId
+            });
+            
+            // 准备表单数据
+            const formData = new FormData();
+            
+            // 将规范化后的 JSON 数据转换为 Blob，然后添加到 FormData
+            const jsonString = JSON.stringify(normalizedData);
+            console.log('[API] DrawingTracks JSON字符串长度:', jsonString.length);
+            
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            console.log('[API] DrawingTracks Blob大小:', blob.size, 'bytes');
+            
+            const file = new File([blob], 'mouse_track.json', { type: 'application/json' });
+            console.log('[API] DrawingTracks File对象:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
+            
+            // 添加文件到 FormData
+            formData.append('file', file, 'mouse_track.json');
+            
+            // 添加 user_id 到 FormData（对应 Python 的 data 参数）
+            formData.append('user_id', userId);
+            
+            // 验证 FormData
+            console.log('[API] DrawingTracks FormData验证:', {
+                hasFile: formData.has('file'),
+                hasUserId: formData.has('user_id'),
+                fileValue: formData.get('file'),
+                userIdValue: formData.get('user_id'),
+                fileSize: file.size
+            });
+            
+            // 修正 URL 拼写错误，并在 headers 中设置 USER_ID
+            return apiClient.post('/rorschach/analyze/upload_mouse_track', formData, {
+                headers: {
+                    'USER_ID': userId
+                }
+            });
+        },
+
+        /**
          * 上传时间戳切分文件
          * @param {Object} segTimeData - 时间戳数据对象
          * @param {string} userId - 用户ID
@@ -789,10 +936,139 @@
                     }
                 );
                 
-                return response;
+                // 首先检查 HTTP 状态码
+                const status = response.status || response.statusCode || 200;
+                if (status < 200 || status >= 300) {
+                    // 状态码错误，尝试解析错误信息
+                    if (response.data instanceof Blob) {
+                        const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+                        if (contentType.includes('application/json') || contentType.includes('text/json')) {
+                            const text = await response.data.text();
+                            try {
+                                const errorData = JSON.parse(text);
+                                const errorMessage = errorData.msg || 
+                                                  errorData.message || 
+                                                  errorData.exception ||
+                                                  `服务器错误 (${status})`;
+                                throw new APIError(errorMessage, status, errorData);
+                            } catch (parseError) {
+                                // JSON 解析失败，使用状态码信息
+                                throw new APIError(
+                                    `服务器返回错误状态码: ${status}`,
+                                    status,
+                                    { contentType, parseError }
+                                );
+                            }
+                        }
+                    }
+                    throw new APIError(
+                        `服务器返回错误状态码: ${status}`,
+                        status,
+                        { status }
+                    );
+                }
+                
+                // 检查响应数据
+                if (!(response.data instanceof Blob)) {
+                    throw new APIError(
+                        '服务器返回的响应格式不正确，期望 PDF 文件',
+                        status,
+                        { dataType: typeof response.data }
+                    );
+                }
+                
+                // 检查 Content-Type
+                const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+                
+                // 如果 Content-Type 是 JSON，说明返回的是错误信息
+                if (contentType.includes('application/json') || contentType.includes('text/json')) {
+                    const text = await response.data.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(text);
+                    } catch (parseError) {
+                        // 如果解析失败，但仍然抛出错误，因为 Content-Type 明确是 JSON
+                        throw new APIError(
+                            '服务器返回了错误响应，但无法解析错误信息',
+                            status,
+                            { parseError, contentType, rawText: text.substring(0, 200) }
+                        );
+                    }
+                    
+                    // 提取错误消息
+                    const errorMessage = errorData.msg || 
+                                      errorData.message || 
+                                      errorData.exception ||
+                                      '报告文件不存在';
+                    
+                    throw new APIError(errorMessage, status, errorData);
+                }
+                
+                // 验证 Content-Type 是否为 PDF（允许 application/pdf 或 application/octet-stream）
+                const isValidPDF = contentType.includes('application/pdf') || 
+                                 contentType.includes('application/octet-stream') ||
+                                 contentType === ''; // 某些服务器可能不返回 Content-Type
+                
+                if (!isValidPDF && contentType) {
+                    // 如果不是 PDF 且 Content-Type 不为空，可能是错误响应
+                    // 检查 Blob 大小，如果很小可能是错误信息
+                    if (response.data.size < 1024) { // 小于 1KB 可能是错误信息
+                        const text = await response.data.text();
+                        // 尝试解析为 JSON
+                        try {
+                            const errorData = JSON.parse(text);
+                            const errorMessage = errorData.msg || 
+                                              errorData.message || 
+                                              errorData.exception ||
+                                              '报告文件不存在';
+                            throw new APIError(errorMessage, status, errorData);
+                        } catch {
+                            // 不是 JSON，可能是其他错误信息
+                            throw new APIError(
+                                `服务器返回了非 PDF 格式的响应 (Content-Type: ${contentType})`,
+                                status,
+                                { contentType, preview: text.substring(0, 200) }
+                            );
+                        }
+                    }
+                }
+                
+                // 检查 Blob 大小是否异常小（可能是错误信息）
+                if (response.data.size < 100) {
+                    const text = await response.data.text();
+                    // 尝试解析为 JSON 错误
+                    try {
+                        const errorData = JSON.parse(text);
+                        const errorMessage = errorData.msg || 
+                                          errorData.message || 
+                                          errorData.exception ||
+                                          '报告文件不存在';
+                        throw new APIError(errorMessage, status, errorData);
+                    } catch {
+                        throw new APIError(
+                            '下载的文件大小异常，可能不是有效的 PDF 文件',
+                            status,
+                            { size: response.data.size, preview: text.substring(0, 200) }
+                        );
+                    }
+                }
+                
+                // 返回 PDF Blob
+                return response.data;
             } catch (error) {
                 console.error('[API] 下载报告失败:', error);
-                throw error;
+                
+                // 如果是 APIError，直接抛出
+                if (error instanceof APIError) {
+                    throw error;
+                }
+                
+                // 其他错误，包装为 APIError
+                throw new APIError(
+                    error.message || '报告下载失败，请稍后重试',
+                    error.status || 0,
+                    { originalError: error }
+                );
             }
         },
 
@@ -887,6 +1163,7 @@
                 zoom: null,
                 rotate: null,
                 segTime: null,
+                drawingTracks: null,
                 media: null
             };
 
@@ -941,7 +1218,24 @@
                 });
             }
 
-            // 4. 提交音频文件（优先使用录制器导出的MP3）
+            // 4. 提交笔迹轨迹数据
+            if (interactionTracker && typeof interactionTracker.submitDrawingTracksData === 'function') {
+                try {
+                    console.log('[API] 开始提交笔迹轨迹数据...');
+                    results.drawingTracks = await interactionTracker.submitDrawingTracksData(userId);
+                    console.log('[API] 笔迹轨迹数据提交结果:', results.drawingTracks);
+                } catch (error) {
+                    console.error('[API] 笔迹轨迹数据提交失败:', error);
+                    results.drawingTracks = { success: false, error: error.message || '提交失败' };
+                }
+            } else {
+                console.error('[API] interactionTracker.submitDrawingTracksData 方法不存在', {
+                    hasTracker: !!interactionTracker,
+                    methods: interactionTracker ? Object.keys(interactionTracker) : []
+                });
+            }
+
+            // 5. 提交音频文件（优先使用录制器导出的MP3）
             let audioFileToUpload = audioBlob;
             
             // 如果录制器有数据，优先使用录制器导出的MP3
@@ -973,13 +1267,15 @@
             // 返回所有提交结果
             const allSuccess = (results.zoom === null || results.zoom?.success) &&
                               (results.rotate === null || results.rotate?.success) &&
-                              (results.segTime === null || results.segTime?.success);
+                              (results.segTime === null || results.segTime?.success) &&
+                              (results.drawingTracks === null || results.drawingTracks?.success);
             
             console.log('[API] 所有数据提交完成:', {
                 success: allSuccess,
                 zoom: results.zoom?.success,
                 rotate: results.rotate?.success,
                 segTime: results.segTime?.success,
+                drawingTracks: results.drawingTracks?.success,
                 media: results.media?.success
             });
 

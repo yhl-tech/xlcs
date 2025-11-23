@@ -15,7 +15,8 @@ import {
     getEmptyBasicInfoDraft,
     state,
     sessionState,
-    TTS
+    TTS,
+    buildTTSQuery
 } from './appState.js';
 
 let sessionSaveTimer = null;
@@ -199,21 +200,41 @@ if (introPreviewImage) {
 function initPreviewCanvasInteractions() {
     if (!previewCanvas || !previewCtx) return;
 
-    // 初始化画布尺寸
+    // 初始化画布尺寸 - 使用容器的尺寸而不是图片的尺寸
     const introPreviewImage = document.getElementById('intro-preview-image');
-    if (introPreviewImage && previewCanvas) {
+    const imageFrame = previewCanvas.closest('.test-preview-image-frame');
+    
+    const resizePreviewCanvas = () => {
+        if (!previewCanvas || !imageFrame) return;
+        // 获取容器的实际尺寸
+        const rect = imageFrame.getBoundingClientRect();
+        previewCanvas.width = rect.width || 400;
+        previewCanvas.height = rect.height || 400;
+    };
+    
+    if (introPreviewImage && previewCanvas && imageFrame) {
         // 添加错误处理
         introPreviewImage.onerror = () => handlePreviewImageError(introPreviewImage);
         
+        // 初始化画布尺寸
         const initCanvasSize = () => {
-            previewCanvas.width = introPreviewImage.clientWidth || introPreviewImage.naturalWidth || 400;
-            previewCanvas.height = introPreviewImage.clientHeight || introPreviewImage.naturalHeight || 400;
+            // 等待一帧确保布局完成
+            requestAnimationFrame(() => {
+                resizePreviewCanvas();
+            });
         };
+        
         if (introPreviewImage.complete) {
             initCanvasSize();
         } else {
             introPreviewImage.onload = initCanvasSize;
         }
+        
+        // 添加resize监听器
+        const resizeObserver = new ResizeObserver(() => {
+            resizePreviewCanvas();
+        });
+        resizeObserver.observe(imageFrame);
     }
 
     // 保存当前画布状态
@@ -270,11 +291,21 @@ function initPreviewCanvasInteractions() {
         }
         // 重置画布尺寸并恢复状态
         if (introPreviewImage && previewCanvas) {
+            const imageFrame = previewCanvas.closest('.test-preview-image-frame');
             introPreviewImage.onload = () => {
-                previewCanvas.width = introPreviewImage.clientWidth;
-                previewCanvas.height = introPreviewImage.clientHeight;
-                restorePreviewCanvasState();
-                applyPreviewTransform();
+                // 使用容器的尺寸而不是图片的尺寸
+                if (imageFrame) {
+                    requestAnimationFrame(() => {
+                        const rect = imageFrame.getBoundingClientRect();
+                        previewCanvas.width = rect.width || 400;
+                        previewCanvas.height = rect.height || 400;
+                        restorePreviewCanvasState();
+                        applyPreviewTransform();
+                    });
+                } else {
+                    restorePreviewCanvasState();
+                    applyPreviewTransform();
+                }
             };
         } else {
             restorePreviewCanvasState();
@@ -1114,17 +1145,69 @@ async function prepareIntroExperience({ resume = false } = {}) {
     saveSessionSnapshot('intro_step', { immediate: true });
 
     try {
+        // 关键修复：先主动断开连接，利用用户点击"开始测试"的交互时机
+        if (window.dialogClient && window.dialogClient.isConnected) {
+            console.log('[介绍页] 主动断开现有连接，准备重新连接');
+            window.dialogClient.disconnect();
+            // 等待连接完全关闭
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // 重新连接并初始化（此时仍在用户交互上下文中）
         await ensureTTSInit('audio');
+        
+        // 关键修复：在发送消息前，确保 audioContext 已创建并恢复
+        // 此时仍在用户点击"开始测试"的交互上下文中
+        if (window.dialogClient) {
+            // 如果 audioContext 不存在，提前创建它（使用与 playQueue 相同的配置）
+            if (!window.dialogClient.audioContext) {
+                const sampleRate = window.dialogClient.config?.outputAudio?.sampleRate || 24000;
+                window.dialogClient.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: sampleRate
+                });
+                window.dialogClient.nextPlayTime = window.dialogClient.audioContext.currentTime;
+                console.log('[介绍页] 提前创建音频上下文，采样率:', sampleRate);
+            }
+            
+            // 如果 audioContext 处于 suspended 状态，立即恢复（利用用户交互时机）
+            if (window.dialogClient.audioContext.state === 'suspended') {
+                try {
+                    await window.dialogClient.audioContext.resume();
+                    console.log('[介绍页] 音频上下文已恢复，状态:', window.dialogClient.audioContext.state);
+                } catch (e) {
+                    console.warn('[介绍页] AudioContext resume 失败:', e);
+                }
+            } else {
+                console.log('[介绍页] 音频上下文状态:', window.dialogClient.audioContext.state);
+            }
+        }
+        
         // 开始播报时，更新按钮文字为"语音播报中..."
         enterBtn.textContent = '语音播报中...';
-        const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${INTRO_TEXT}`;
-        await sendTextQuery(introQuery, { ensure: false });
+        const introQuery = buildTTSQuery(INTRO_TEXT);
+        // 使用 ensure: true 确保连接正确初始化
+        await sendTextQuery(introQuery, { ensure: true });
+        
+        // 发送消息后，再次检查并恢复音频上下文（防止在发送过程中状态变化）
+        // 使用 setTimeout 确保在音频数据开始到达时检查
+        setTimeout(async () => {
+            if (window.dialogClient && window.dialogClient.audioContext) {
+                if (window.dialogClient.audioContext.state === 'suspended') {
+                    try {
+                        await window.dialogClient.audioContext.resume();
+                        console.log('[介绍页] 音频上下文已恢复（延迟检查）');
+                    } catch (e) {
+                        console.warn('[介绍页] AudioContext resume 失败（延迟检查）:', e);
+                    }
+                }
+            }
+        }, 300);
     } catch (e) {
         console.warn('[启动页介绍] 播报失败，已忽略：', e);
         enterBtn.disabled = false;
         enterBtn.textContent = '进入';
     }
-
+    
     const estimatedIntroDuration = Math.min(65000, Math.max(3000, Math.floor(INTRO_TEXT.length * 215)));
     console.log('estimatedIntroDuration', estimatedIntroDuration);
 
@@ -1248,7 +1331,7 @@ async function enterTestExperience({ skipOpeningSpeech = false, restoredSnapshot
                 try {
                     console.log('[进入测试页] 发送开场白');
                     const openingText = '现在开始测试，请描述你看到的第一张图片。';
-                    const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${openingText}`;
+                    const introQuery = buildTTSQuery(openingText);
                     await sendTextQuery(introQuery, { ensure: false });
                     console.log('[进入测试页] 开场白已发送');
                 } catch (err) {
@@ -1399,6 +1482,8 @@ function resizeCanvas() {
 }
 
 // 音频和语音检测
+// 优化：降低前端语音检测敏感度，依赖后端豆包VAD进行智能检测
+// 前端仅用于不活动检测，不再用于判断用户是否在说话（避免误判）
 function initAudio(stream) {
     state.mediaRecorder = new MediaRecorder(stream);
     state.mediaRecorder.ondataavailable = event => state.audioChunks.push(event.data);
@@ -1425,21 +1510,44 @@ function initAudio(stream) {
         state.audioChunks = [];
     };
 
+    // 优化：降低前端语音检测敏感度，提高阈值以减少误判
+    // 前端检测仅用于不活动监控，真正的语音检测由后端豆包VAD处理
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8; // 增加平滑，减少波动
     const source = audioContext.createMediaStreamSource(stream);
     source.connect(analyser);
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+    // 使用更保守的检测逻辑，避免误判
+    let speakingCount = 0; // 连续检测到语音的帧数
+    const SPEAKING_THRESHOLD = 25; // 提高阈值，减少环境噪音误判（原值10）
+    const MIN_SPEAKING_FRAMES = 3; // 需要连续3帧才认为在说话，减少瞬时噪音影响
+
     function checkSpeaking() {
         analyser.getByteFrequencyData(dataArray);
         let sum = dataArray.reduce((a, b) => a + b, 0);
-        if (sum / dataArray.length > 10) {
-            state.isSpeaking = true;
-            resetInactivityTimer();
+        const average = sum / dataArray.length;
+        
+        // 使用更保守的检测逻辑
+        if (average > SPEAKING_THRESHOLD) {
+            speakingCount++;
+            // 只有连续检测到语音才认为在说话
+            if (speakingCount >= MIN_SPEAKING_FRAMES) {
+                state.isSpeaking = true;
+                resetInactivityTimer();
+            }
         } else {
-            state.isSpeaking = false;
+            speakingCount = 0;
+            // 延迟清除状态，避免短暂停顿误判
+            if (state.isSpeaking) {
+                setTimeout(() => {
+                    if (speakingCount === 0) {
+                        state.isSpeaking = false;
+                    }
+                }, 200);
+            }
         }
         requestAnimationFrame(checkSpeaking);
     }
@@ -1504,27 +1612,48 @@ async function playAudio(src, onendedCallback = null, options = {}) {
 }
 
 // 优化的不活动逻辑
+// 优化：添加AI播放状态检测，避免在AI说话时触发提示
+function isAIPlaying() {
+    // 检查dialogClient是否正在播放音频
+    if (window.dialogClient && window.dialogClient.isPlaying) {
+        return true;
+    }
+    // 检查audioPlayer是否正在播放
+    if (audioPlayer && !audioPlayer.paused) {
+        return true;
+    }
+    return false;
+}
+
 function playRandomPrompt() {
-    if (audioPlayer.paused && !state.isSpeaking) {
-        if (state.inactivityLevel === 0) {
-            // 第一次提示：使用TTS播放随机提示文本
-            const randomIndex = Math.floor(Math.random() * PROMPT_TEXTS.length);
-            const promptText = PROMPT_TEXTS[randomIndex];
-            showPromptIndicator(promptText);
-            playAudio(promptText, () => {
-                state.inactivityLevel = 1;
-                resetInactivityTimer();
-            });
-        } else if (state.inactivityLevel === 1) {
-            // 第二次提示：使用TTS播放最终提示文本
-            showPromptIndicator(FINAL_PROMPT_TEXT);
-            playAudio(FINAL_PROMPT_TEXT, () => {
-                state.inactivityLevel = 0;
-                resetInactivityTimer();
-            });
-        }
-    } else {
+    // 优化：如果AI正在播放，不触发提示，避免打断AI
+    if (isAIPlaying()) {
         resetInactivityTimer();
+        return;
+    }
+    
+    // 优化：如果用户正在说话（由后端VAD检测），也不触发提示
+    if (state.isSpeaking) {
+        resetInactivityTimer();
+        return;
+    }
+    
+    if (state.inactivityLevel === 0) {
+        // 第一次提示：使用TTS播放随机提示文本
+        const randomIndex = Math.floor(Math.random() * PROMPT_TEXTS.length);
+        const promptText = PROMPT_TEXTS[randomIndex];
+        showPromptIndicator(promptText);
+        playAudio(promptText, () => {
+            state.inactivityLevel = 1;
+            resetInactivityTimer();
+        });
+    } else if (state.inactivityLevel === 1) {
+        // 第二次提示：使用TTS播放最终提示文本
+        showPromptIndicator(FINAL_PROMPT_TEXT);
+        playAudio(FINAL_PROMPT_TEXT, () => {
+            state.inactivityLevel = 0;
+            resetInactivityTimer();
+        });
     }
 }
 
@@ -1535,16 +1664,23 @@ function resetInactivityTimer() {
     clearTimeout(inactivityTimer);
     state.inactivityLevel = 0;
 
+    // 优化：检查AI是否正在播放，如果正在播放则不启动不活动检测
+    if (isAIPlaying()) {
+        return;
+    }
+
     // 第一次提示：4秒
     inactivityTimer = setTimeout(() => {
-        if (!state.isSpeaking && audioPlayer.paused) {
+        // 双重检查：确保AI不在播放且用户不在说话
+        if (!isAIPlaying() && !state.isSpeaking) {
             playRandomPrompt();
         }
     }, INACTIVITY_THRESHOLD_1);
 
     // 第二次提示：8秒（在第一次基础上再4秒）
     setTimeout(() => {
-        if (state.inactivityLevel === 1 && !state.isSpeaking && audioPlayer.paused) {
+        // 双重检查：确保AI不在播放且用户不在说话
+        if (state.inactivityLevel === 1 && !isAIPlaying() && !state.isSpeaking) {
             playRandomPrompt();
         }
     }, INACTIVITY_THRESHOLD_2);
@@ -1773,7 +1909,7 @@ function navigate(direction) {
                     const imageNumber = state.currentIndex + 1; // 图片编号从1开始
                     const promptText = `请描述你看到的第${imageNumber}张图片。`;
                     console.log('[切换图片] 播报提示:', promptText);
-                    const introQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${promptText}`;
+                    const introQuery = buildTTSQuery(promptText);
                     await sendTextQuery(introQuery, { ensure: false });
                     console.log('[切换图片] 提示已发送');
                 } catch (err) {
@@ -1893,7 +2029,7 @@ async function askNextQuestion() {
     // 直接使用 text 进行 TTS 播报
     try {
         // 使用 sendTextQuery 进行 TTS 播报，格式与其他地方保持一致
-        const ttsQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${question.text}`;
+        const ttsQuery = buildTTSQuery(question.text);
         await sendTextQuery(ttsQuery, { ensure: false });
 
         // 估算 TTS 播放时间（每字约 300ms）
@@ -2122,10 +2258,19 @@ async function downloadReport() {
         downloadBtn.disabled = true;
 
         // 调用API模块中的下载报告方法
-        const response = await window.API.downloadReport(userId);
+        const blob = await window.API.downloadReport(userId);
+
+        // 验证返回的是 Blob
+        if (!(blob instanceof Blob)) {
+            throw new Error('服务器返回的数据格式不正确，期望 PDF 文件');
+        }
+
+        // 验证 Blob 大小（PDF 文件通常至少几 KB）
+        if (blob.size < 1024) {
+            throw new Error('下载的文件大小异常，可能不是有效的 PDF 文件');
+        }
 
         // 创建下载链接
-        const blob = new Blob([response], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
@@ -2133,8 +2278,12 @@ async function downloadReport() {
         a.download = `rorschach-test-report-${userId}.pdf`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        
+        // 延迟清理，确保下载开始
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }, 100);
 
         // 恢复按钮状态
         downloadBtn.innerHTML = '📥 下载测试报告';
@@ -2149,7 +2298,15 @@ async function downloadReport() {
         downloadBtn.innerHTML = '📥 下载测试报告';
         downloadBtn.disabled = false;
 
-        alert('报告下载失败，请稍后重试');
+        // 提取错误消息，优先显示服务器返回的具体错误信息
+        let errorMessage = '报告下载失败，请稍后重试';
+        if (error instanceof window.APIError) {
+            errorMessage = error.message || errorMessage;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        alert(errorMessage);
     }
 }
 
@@ -2410,7 +2567,7 @@ async function playWelcomeMessage() {
         await ensureTTSInit('audio');
 
         // 构造播报查询
-        const welcomeQuery = `请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：\n${welcomeText}`;
+        const welcomeQuery = buildTTSQuery(welcomeText);
 
         // 发送播报请求
         await sendTextQuery(welcomeQuery, { ensure: false });

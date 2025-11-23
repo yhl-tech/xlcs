@@ -27,7 +27,16 @@
             </div>
             <div class="info-form-group">
                 <label for="education">学历</label>
-                <input type="text" id="education" placeholder="例如：本科" required>
+                <select id="education" required>
+                    <option value="小学">小学</option>
+                    <option value="初中">初中</option>
+                    <option value="高中">高中</option>
+                    <option value="中专">中专</option>
+                    <option value="大专">大专</option>
+                    <option value="本科">本科</option>
+                    <option value="硕士">硕士</option>
+                    <option value="博士">博士</option>
+                </select>
                 <div id="education-error" class="input-error-message" role="status" aria-live="polite"></div>
             </div>
             <div class="info-form-group">
@@ -61,7 +70,7 @@
                             <div class="test-preview-body">
                                 <div class="test-preview-image-area">
                                     <div class="test-preview-image-frame">
-                                        <img id="intro-preview-image" src="./images/rorschach-blot-2.webp" alt="">
+                                        <img id="intro-preview-image" src="./images/rorschach-blot-1.webp" alt="">
                                         <canvas class="test-preview-canvas"></canvas>
                                     </div>
                                 </div>

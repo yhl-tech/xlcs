@@ -14,7 +14,7 @@ export const SESSION_SAVE_DEBOUNCE = 600;
 
 export const INACTIVITY_THRESHOLD_1 = 10000;
 export const INACTIVITY_THRESHOLD_2 = 20000;
-export const NEXT_BUTTON_COOLDOWN = 30; //冷却时间
+export const NEXT_BUTTON_COOLDOWN = 1; //冷却时间
 
 export const PROMPT_TEXTS = [
     '提示：请继续描述...',
@@ -94,4 +94,16 @@ export const TTS = {
     inited: false,
     currentMode: null
 };
+
+// TTS播报提示词模板（用于确保AI只朗读指定内容，不添加额外解释）
+export const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：';
+
+/**
+ * 生成TTS播报查询文本
+ * @param {string} text - 要播报的文本内容
+ * @returns {string} 格式化后的TTS查询文本
+ */
+export function buildTTSQuery(text) {
+    return `${TTS_READ_ONLY_PROMPT}\n${text}`;
+}
 

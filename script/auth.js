@@ -129,10 +129,10 @@
                         data: response
                     };
                 } else {
-                    // 登录失败
+                    // 登录失败，优先使用 exception 字段，如果没有则使用 msg 字段
                     return {
                         success: false,
-                        message: response.msg || '登录失败，请检查用户名和密码',
+                        message: response.exception || response.msg || '登录失败，请检查用户名和密码',
                         data: response
                     };
                 }
@@ -146,11 +146,15 @@
                 } else if (typeof error === 'string') {
                     errorMessage = error;
                 } else if (error && typeof error === 'object') {
-                    // 如果是 APIError，尝试获取详细信息
-                    if (error.data && error.data.msg) {
+                    // 如果是 APIError，尝试获取详细信息，优先使用 exception 字段
+                    if (error.data && error.data.exception) {
+                        errorMessage = error.data.exception;
+                    } else if (error.data && error.data.msg) {
                         errorMessage = error.data.msg;
                     } else if (error.data && error.data.message) {
                         errorMessage = error.data.message;
+                    } else if (error.exception) {
+                        errorMessage = String(error.exception);
                     } else if (error.message) {
                         errorMessage = String(error.message);
                     } else if (error.msg) {

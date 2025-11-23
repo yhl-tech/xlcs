@@ -374,6 +374,20 @@
                             window.auth.setToken(response.data.access_token);
                             window.auth.setUserInfo({ username: username });
                             
+                            // 注册成功后，执行租户登录以刷新 analyzeApiKey
+                            try {
+                                if (window.API && typeof window.API.tenantLogin === 'function') {
+                                    const tenantResult = await window.API.tenantLogin();
+                                    if (!tenantResult?.success) {
+                                        console.warn('[注册] 租户登录失败:', tenantResult?.message);
+                                        // 租户登录失败不影响注册成功，但会记录警告
+                                    }
+                                }
+                            } catch (error) {
+                                console.warn('[注册] 租户登录异常:', error);
+                                // 租户登录异常不影响注册成功，但会记录警告
+                            }
+                            
                             // 延迟1秒后跳转到主页
                             setTimeout(() => {
                                 window.location.href = './index.html';
@@ -394,8 +408,8 @@
                             }, 3000);
                         }
                     } else {
-                        // 注册失败
-                        showRegisterError(response.msg || '注册失败，请稍后重试');
+                        // 注册失败，优先使用 exception 字段，如果没有则使用 msg 字段
+                        showRegisterError(response.exception || response.msg || '注册失败，请稍后重试');
                         registerBtn.disabled = false;
                         registerBtn.textContent = '注册';
                     }

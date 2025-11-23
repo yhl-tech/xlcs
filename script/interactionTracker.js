@@ -16,7 +16,7 @@
                 zoom: {},      // 放大缩小操作: { "1": [1, 1, -1], "2": [], ... }
                 rotate: {},    // 旋转操作: { "1": [30, -30], "2": [], ... }
                 navigation: {}, // 导航操作: { "1": ["prev"], "2": ["next"], ... }
-                drawingTracks: {} // 画笔轨迹: { "1": 0, "2": {"25:23": {"track1": [[x,y],...]}}, ... }
+                drawingTracks: {} // 画笔轨迹: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
             };
 
             // 当前绘制的轨迹状态
@@ -490,12 +490,9 @@
                 totalZoom += this.data.zoom[key].length;
                 totalRotate += this.data.rotate[key].length;
                 totalNavigation += this.data.navigation[key].length;
-                // 统计画笔轨迹数量（如果drawingTracks不是0，计算轨迹段数）
+                // 统计画笔轨迹数量（如果drawingTracks不是0，计算时间点数量）
                 if (this.data.drawingTracks[key] !== 0 && typeof this.data.drawingTracks[key] === 'object') {
-                    const timeKeys = Object.keys(this.data.drawingTracks[key]);
-                    timeKeys.forEach(timeKey => {
-                        totalDrawingTracks += Object.keys(this.data.drawingTracks[key][timeKey]).length;
-                    });
+                    totalDrawingTracks += Object.keys(this.data.drawingTracks[key]).length;
                 }
             }
 
@@ -582,17 +579,13 @@
                 this.data.drawingTracks[plateKey] = {};
             }
             
-            // 如果该时间点不存在，初始化
+            // 如果该时间点不存在，初始化为数组
             if (!this.data.drawingTracks[plateKey][timeKey]) {
-                this.data.drawingTracks[plateKey][timeKey] = {};
+                this.data.drawingTracks[plateKey][timeKey] = [];
             }
             
-            // 计算当前轨迹编号
-            const trackCount = Object.keys(this.data.drawingTracks[plateKey][timeKey]).length;
-            const trackKey = `track${trackCount + 1}`;
-            
-            // 保存轨迹
-            this.data.drawingTracks[plateKey][timeKey][trackKey] = this.currentTrack;
+            // 将当前轨迹的点合并到该时间点的数组中
+            this.data.drawingTracks[plateKey][timeKey] = this.data.drawingTracks[plateKey][timeKey].concat(this.currentTrack);
             
             // 清空当前轨迹
             this.currentTrack = null;
@@ -601,6 +594,8 @@
 
         /**
          * 记录一键擦除操作
+         * 注意：由于数据结构改为数组，一键擦除操作不再在drawingTracks中记录
+         * 可以通过其他方式（如navigation或单独的数据结构）来记录
          */
         trackClearAll() {
             if (this.status !== 'active') {
@@ -609,23 +604,6 @@
 
             const plateKey = this._getCurrentPlateKey();
             const timestamp = this._getTimestamp();
-            
-            // 记录一键擦除操作（在drawingTracks中用特殊标记表示）
-            // 如果当前图版的轨迹数据是0，初始化为对象
-            if (this.data.drawingTracks[plateKey] === 0) {
-                this.data.drawingTracks[plateKey] = {};
-            }
-            
-            // 记录一键擦除操作
-            const timeKey = this._formatTime(Date.now());
-            if (!this.data.drawingTracks[plateKey][timeKey]) {
-                this.data.drawingTracks[plateKey][timeKey] = {};
-            }
-            
-            // 添加一键擦除标记
-            const clearCount = Object.keys(this.data.drawingTracks[plateKey][timeKey]).length;
-            const clearKey = `clearAll_${clearCount + 1}`;
-            this.data.drawingTracks[plateKey][timeKey][clearKey] = 'clear_all';
             
             // 触发事件
             this._emit('clearAll', {
@@ -641,7 +619,7 @@
 
         /**
          * 获取画笔轨迹数据
-         * @returns {Object} 画笔轨迹数据，格式: { "1": 0, "2": {"25:23": {"track1": [[x,y],...]}}, ... }
+         * @returns {Object} 画笔轨迹数据，格式: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
          */
         getDrawingTracks() {
             const tracks = {};
@@ -1135,6 +1113,29 @@
         }
 
         /**
+         * 提交笔迹轨迹数据到服务器
+         * @param {string} userId - 用户ID
+         * @returns {Promise<Object>} 提交结果
+         */
+        async submitDrawingTracksData(userId) {
+            if (!window.API || !window.API.uploadDrawingTracks) {
+                throw new Error('API.uploadDrawingTracks 方法不可用');
+            }
+
+            try {
+                // 获取笔迹轨迹数据对象，格式: { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+                const drawingTracksData = this.getDrawingTracks();
+                
+                const result = await window.API.uploadDrawingTracks(drawingTracksData, userId);
+                console.log('[InteractionTracker] 笔迹轨迹数据提交成功:', result);
+                return { success: true, data: result };
+            } catch (error) {
+                console.error('[InteractionTracker] 笔迹轨迹数据提交失败:', error);
+                return { success: false, error: error.message || '提交失败' };
+            }
+        }
+
+        /**
          * 提交时间戳数据到服务器
          * @param {string} userId - 用户ID
          * @returns {Promise<Object>} 提交结果
@@ -1166,7 +1167,8 @@
             const results = {
                 zoom: null,
                 rotate: null,
-                segTime: null
+                segTime: null,
+                drawingTracks: null
             };
 
             // 提交放大缩小数据
@@ -1191,6 +1193,14 @@
             } catch (error) {
                 console.error('[InteractionTracker] 提交时间戳数据时出错:', error);
                 results.segTime = { success: false, error: error.message };
+            }
+
+            // 提交笔迹轨迹数据
+            try {
+                results.drawingTracks = await this.submitDrawingTracksData(userId);
+            } catch (error) {
+                console.error('[InteractionTracker] 提交笔迹轨迹数据时出错:', error);
+                results.drawingTracks = { success: false, error: error.message };
             }
 
             return results;
@@ -1257,6 +1267,7 @@
         submitZoomData: (userId) => trackerInstance.submitZoomData(userId),
         submitRotateData: (userId) => trackerInstance.submitRotateData(userId),
         submitSegTimeData: (userId) => trackerInstance.submitSegTimeData(userId),
+        submitDrawingTracksData: (userId) => trackerInstance.submitDrawingTracksData(userId),
         submitAllData: (userId) => trackerInstance.submitAllData(userId),
         
         // 直接访问实例（高级用法）
