@@ -692,6 +692,131 @@ body {
     pointer-events: none;
 }
 
+/* Driver.js 引导弹窗 */
+.intro-driver-popover {
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    color: var(--text-primary);
+    padding: 20px;
+    min-width: 260px;
+    font-family: inherit;
+}
+
+.intro-driver-popover .driver-popover-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+.intro-driver-popover .driver-popover-description {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.intro-driver-popover .driver-popover-progress-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.intro-driver-popover .driver-popover-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.intro-driver-popover .driver-popover-footer button {
+    border-radius: 999px;
+    border: none;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.intro-driver-popover .driver-prev-btn,
+.intro-driver-popover .driver-close-btn {
+    background: #e2e8f0;
+    color: var(--text-primary);
+}
+
+.intro-driver-popover .driver-next-btn,
+.intro-driver-popover .driver-done-btn {
+    background: var(--primary-light);
+    color: #fff;
+}
+
+.intro-driver-popover .driver-popover-footer button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.intro-driver-popover .driver-popover-footer button:active {
+    transform: translateY(0);
+}
+
+.intro-driver-popover .driver-popover-arrow {
+    width: 0;
+    height: 0;
+    border: 9px solid transparent;
+    z-index: 1;
+    box-shadow: none;
+}
+
+.intro-driver-popover .driver-popover-arrow-side-right,
+.intro-driver-popover .driver-popover-arrow-side-left {
+    top: 50% !important;
+    bottom: auto !important;
+    transform: translateY(-50%) !important;
+}
+
+.intro-driver-popover .driver-popover-arrow-side-right {
+    border-right-color: var(--card-bg);
+    border-left: none;
+    left: -9px !important;
+    right: auto !important;
+    filter: drop-shadow(1px 0 0 rgba(15, 23, 42, 0.12));
+}
+
+.intro-driver-popover .driver-popover-arrow-side-left {
+    border-left-color: var(--card-bg);
+    border-right: none;
+    right: -9px !important;
+    left: auto !important;
+    filter: drop-shadow(-1px 0 0 rgba(15, 23, 42, 0.12));
+}
+
+.intro-driver-popover .driver-popover-arrow-side-top,
+.intro-driver-popover .driver-popover-arrow-side-bottom {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+}
+
+.intro-driver-popover .driver-popover-arrow-side-top {
+    border-top-color: var(--card-bg);
+    border-bottom: none;
+    top: auto !important;
+    bottom: -9px !important;
+    filter: drop-shadow(0 -1px 0 rgba(15, 23, 42, 0.12));
+}
+
+.intro-driver-popover .driver-popover-arrow-side-bottom {
+    border-bottom-color: var(--card-bg);
+    border-top: none;
+    bottom: auto !important;
+    top: -9px !important;
+    filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.12));
+}
+
 @media (max-width: 768px) {
     .welcome-card {
         border-radius: 16px;

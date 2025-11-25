@@ -18,6 +18,7 @@ import {
     TTS,
     buildTTSQuery
 } from './appState.js';
+import { startIntroGuide, destroyIntroGuide } from './driverGuide.js';
 
 let sessionSaveTimer = null;
 let pendingSessionSnapshot = null;
@@ -1277,9 +1278,12 @@ async function prepareIntroExperience({ resume = false } = {}) {
             }
         });
     });
+
+    startIntroGuide();
 }
 
 async function enterTestExperience({ skipOpeningSpeech = false, restoredSnapshot = null } = {}) {
+    destroyIntroGuide();
     try {
         if (enterBtn) {
             enterBtn.disabled = true;
