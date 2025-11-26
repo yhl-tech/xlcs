@@ -2370,7 +2370,12 @@ function showSummary() {
 
   const grid = document.getElementById("summary-grid")
   grid.innerHTML =
-    '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;"><h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3><button id="download-report-btn" style="margin-top: 15px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);">📥 下载测试报告</button></div>'
+    '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;">' +
+    '<h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3>' +
+    '<p style="margin: 8px 0 4px 0; color: var(--text-secondary); font-size: 13px;">您可以将本次测试结果下载为 PDF 报告，保存到本地。</p>' +
+    '<div id="download-report-status" style="margin-top: 4px; font-size: 12px; color: var(--text-secondary); min-height: 18px;"></div>' +
+    '<button id="download-report-btn" style="margin-top: 12px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);">📥 下载测试报告</button>' +
+    "</div>"
 
   // 为下载按钮添加事件监听器
   const downloadBtn = document.getElementById("download-report-btn")
@@ -2403,6 +2408,9 @@ function showSummary() {
   saveSessionSnapshot("stage_change", { immediate: true })
 }
 
+// 下载报告进度模拟定时器
+let downloadProgressInterval = null
+
 // 下载报告功能
 async function downloadReport() {
   try {
@@ -2419,11 +2427,53 @@ async function downloadReport() {
       return
     }
 
-    // 更新按钮状态
+    // 更新按钮状态与提示
     const downloadBtn = document.getElementById("download-report-btn")
+    const statusEl = document.getElementById("download-report-status")
     const originalText = downloadBtn.innerHTML
     downloadBtn.innerHTML = "📄 报告生成中..."
     downloadBtn.disabled = true
+
+    // 清理旧的进度定时器
+    if (downloadProgressInterval) {
+      clearInterval(downloadProgressInterval)
+      downloadProgressInterval = null
+    }
+
+    const startTime = Date.now()
+    const estimatedMinSeconds = 10
+    const estimatedMaxSeconds = 30
+
+    if (statusEl) {
+      statusEl.textContent = `⏳ 正在生成报告，预计约 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒完成，请耐心等待...`
+    }
+
+    // 模拟进度：前 60% 较快，后面缓慢接近 90%
+    let fakeProgress = 0
+    downloadProgressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      if (elapsed < 5000) {
+        // 0-5 秒：0% → 60%
+        fakeProgress = Math.min(60, (elapsed / 5000) * 60)
+      } else if (elapsed < 20000) {
+        // 5-20 秒：60% → 90%
+        const t = (elapsed - 5000) / 15000
+        fakeProgress = 60 + t * 30
+      } else {
+        // 20 秒后保持在 90%，等待真实完成
+        fakeProgress = 90
+      }
+
+      const usedSeconds = Math.floor(elapsed / 1000)
+      const textParts = [
+        `⏳ 正在生成报告（模拟进度 ${Math.round(fakeProgress)}%）`,
+        `已用时约 ${usedSeconds} 秒，通常需要 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒`,
+      ]
+
+      if (statusEl) {
+        statusEl.textContent = textParts.join("，")
+      }
+    }, 800)
 
     const blob = await window.API.downloadReport(userId)
 
@@ -2450,8 +2500,18 @@ async function downloadReport() {
       document.body.removeChild(a)
     }, 100)
 
+    // 清理进度定时器并更新提示
+    if (downloadProgressInterval) {
+      clearInterval(downloadProgressInterval)
+      downloadProgressInterval = null
+    }
+    if (statusEl) {
+      statusEl.textContent =
+        "✅ 报告已生成并开始下载，如浏览器未自动弹出保存，请检查下载栏或稍后重试。"
+    }
+
     // 恢复按钮状态
-    downloadBtn.innerHTML = "📥 下载测试报告"
+    downloadBtn.innerHTML = originalText
     downloadBtn.disabled = false
 
     console.log("[报告下载] 下载成功")
@@ -2460,8 +2520,17 @@ async function downloadReport() {
 
     // 恢复按钮状态
     const downloadBtn = document.getElementById("download-report-btn")
-    downloadBtn.innerHTML = "📥 下载测试报告"
-    downloadBtn.disabled = false
+    const statusEl = document.getElementById("download-report-status")
+
+    if (downloadProgressInterval) {
+      clearInterval(downloadProgressInterval)
+      downloadProgressInterval = null
+    }
+
+    if (downloadBtn) {
+      downloadBtn.innerHTML = "📥 下载测试报告"
+      downloadBtn.disabled = false
+    }
 
     // 提取错误消息，优先显示服务器返回的具体错误信息
     let errorMessage = "报告下载失败，请稍后重试"
@@ -2469,6 +2538,10 @@ async function downloadReport() {
       errorMessage = error.message || errorMessage
     } else if (error.message) {
       errorMessage = error.message
+    }
+
+    if (statusEl) {
+      statusEl.textContent = `⚠️ ${errorMessage}`
     }
 
     alert(errorMessage)
