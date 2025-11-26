@@ -184,8 +184,6 @@ const enterBtn = document.getElementById("enter-btn")
 const introPreviewImage = document.getElementById("intro-preview-image")
 const previewCanvas = document.querySelector(".test-preview-canvas")
 const previewCtx = previewCanvas ? previewCanvas.getContext("2d") : null
-// 设备检测在 welcome-card 内部渲染后再初始化（见 renderWelcomeText）
-// 这里预先声明引用，供 ensureDeviceCheckCompleted 等函数使用
 let deviceCheckContainer = null
 let deviceCheckTip = null
 
@@ -205,8 +203,6 @@ function handlePreviewImageError(img) {
   if (!img) return
   // 隐藏图片，避免显示破裂图标
   img.style.display = "none"
-  // 或者可以设置一个透明的占位符
-  // img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="100%25" height="100%25" fill="transparent"/%3E%3C/svg%3E';
 }
 
 // 为初始图片添加错误处理
@@ -305,7 +301,6 @@ function initPreviewCanvasInteractions() {
       // 添加错误处理
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
-      // 确保图片可见（如果之前因为错误被隐藏了）
       introPreviewImage.style.display = ""
       introPreviewImage.src = `./images/rorschach-blot-${
         previewState.currentImageIndex + 1
@@ -1230,7 +1225,6 @@ async function prepareIntroExperience({ resume = false } = {}) {
   saveSessionSnapshot("intro_step", { immediate: true })
 
   try {
-    // 关键修复：先主动断开连接，利用用户点击"开始测试"的交互时机
     if (window.dialogClient && window.dialogClient.isConnected) {
       console.log("[介绍页] 主动断开现有连接，准备重新连接")
       window.dialogClient.disconnect()
@@ -1241,7 +1235,6 @@ async function prepareIntroExperience({ resume = false } = {}) {
     // 重新连接并初始化（此时仍在用户交互上下文中）
     await ensureTTSInit("audio")
 
-    // 关键修复：在发送消息前，确保 audioContext 已创建并恢复
     // 此时仍在用户点击"开始测试"的交互上下文中
     if (window.dialogClient) {
       // 如果 audioContext 不存在，提前创建它（使用与 playQueue 相同的配置）
@@ -1582,7 +1575,6 @@ function initTest(restoredSnapshot = null) {
   if (!isRestored && state.currentIndex === 0) {
     disableNextButton()
   } else if (isRestored && state.nextButtonCooldown > 0) {
-    // 恢复时强制设置，确保按钮状态和定时器正确恢复
     disableNextButton(state.nextButtonCooldown, true)
   }
 
@@ -1612,8 +1604,6 @@ function resizeCanvas() {
 }
 
 // 音频和语音检测
-// 优化：降低前端语音检测敏感度，依赖后端豆包VAD进行智能检测
-// 前端仅用于不活动检测，不再用于判断用户是否在说话（避免误判）
 function initAudio(stream) {
   state.mediaRecorder = new MediaRecorder(stream)
   state.mediaRecorder.ondataavailable = (event) =>
@@ -1685,14 +1675,7 @@ function initAudio(stream) {
   checkSpeaking()
 }
 
-/**
- * 播放音频（支持文件路径和实时对话文本）
- * @param {string} src - 音频文件路径（如 'audio/1.mp3'）或文本内容
- * @param {Function} onendedCallback - 播放完成回调
- * @param {Object} options - 可选参数
- */
 async function playAudio(src, onendedCallback = null, options = {}) {
-  // 如果 src 是文件路径（以 './audio/' 或 'audio/' 开头），使用原有方式播放
   if (
     typeof src === "string" &&
     (src.startsWith("./audio/") || src.startsWith("audio/"))
@@ -1713,9 +1696,6 @@ async function playAudio(src, onendedCallback = null, options = {}) {
       if (!window.dialogClient.isConnected) {
         await window.dialogClient.connect()
       }
-
-      // 发送文本查询（已注释）
-      // await window.dialogClient.sendTextQuery(src);
 
       // 由于实时对话是流式播放，无法准确判断播放完成时间
       // 根据文本长度估算播放时间（平均语速约 3-4 字/秒）
@@ -1760,13 +1740,11 @@ function isAIPlaying() {
 }
 
 function playRandomPrompt() {
-  // 优化：如果AI正在播放，不触发提示，避免打断AI
   if (isAIPlaying()) {
     resetInactivityTimer()
     return
   }
 
-  // 优化：如果用户正在说话（由后端VAD检测），也不触发提示
   if (state.isSpeaking) {
     resetInactivityTimer()
     return
@@ -1968,9 +1946,6 @@ function navigate(direction) {
   // 检查是否需要冷却豁免（如果是已浏览过的图片）
   const isVisitedImage = state.visitedImages.has(newIndex)
 
-  // 如果是点击下一张，检查是否在冷却中
-  // 但如果是最后一张图（即将进入选择阶段），允许操作
-  // 或者如果是已浏览过的图片，也允许操作
   if (direction === 1 && state.nextButtonCooldown > 0 && !isVisitedImage) {
     // 如果即将进入选择阶段，允许操作并清除冷却
     if (newIndex === state.totalImages) {
@@ -2450,15 +2425,12 @@ async function downloadReport() {
     downloadBtn.innerHTML = "📄 报告生成中..."
     downloadBtn.disabled = true
 
-    // 调用API模块中的下载报告方法
     const blob = await window.API.downloadReport(userId)
 
-    // 验证返回的是 Blob
     if (!(blob instanceof Blob)) {
       throw new Error("服务器返回的数据格式不正确，期望 PDF 文件")
     }
 
-    // 验证 Blob 大小（PDF 文件通常至少几 KB）
     if (blob.size < 1024) {
       throw new Error("下载的文件大小异常，可能不是有效的 PDF 文件")
     }
