@@ -184,8 +184,10 @@ const enterBtn = document.getElementById("enter-btn")
 const introPreviewImage = document.getElementById("intro-preview-image")
 const previewCanvas = document.querySelector(".test-preview-canvas")
 const previewCtx = previewCanvas ? previewCanvas.getContext("2d") : null
-
 // 设备检测在 welcome-card 内部渲染后再初始化（见 renderWelcomeText）
+// 这里预先声明引用，供 ensureDeviceCheckCompleted 等函数使用
+let deviceCheckContainer = null
+let deviceCheckTip = null
 
 // 预览窗口的独立状态管理（不记录到 interactionTracker）
 const previewState = {
@@ -2862,8 +2864,8 @@ function renderWelcomeText() {
   welcomeTextContainer.style.removeProperty("display")
   welcomeTextContainer.classList.remove("hidden")
   // welcome-card 渲染完成后初始化设备检测
-  const deviceCheckContainer = document.getElementById("device-check-container")
-  const deviceCheckTip = document.getElementById("device-check-tip")
+  deviceCheckContainer = document.getElementById("device-check-container")
+  deviceCheckTip = document.getElementById("device-check-tip")
   if (deviceCheckContainer && deviceCheckTip) {
     initDeviceCheck({
       startButton: startTestBtn,
