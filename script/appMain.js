@@ -1532,6 +1532,7 @@ function fetchUserInfo(validatedValues = null) {
   saveSessionSnapshot("basic_info")
   window.API.setBasicInfo(userInfo.username, basicInfo)
 }
+
 function initTest(restoredSnapshot = null) {
   const trackerSnapshot = restoredSnapshot?.payload?.tracker
   const isRestored = Boolean(restoredSnapshot)
@@ -2803,6 +2804,7 @@ function waitForModules(callback, maxRetries = 50) {
   }
   checkModules()
 }
+
 function stopAllPlayback() {
   try {
     if (

@@ -247,7 +247,7 @@
             
             if (plateIndex >= 0 && plateIndex < 10) {
                 const plateKey = String(plateIndex + 1);
-                
+
                 // 记录图版切换时间戳
                 // 如果还未记录过该图版，则记录首次访问时间
                 // 这确保了每个图版的起始时间准确记录
