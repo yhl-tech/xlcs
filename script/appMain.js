@@ -55,6 +55,55 @@ let nextButtonCooldownTimer = null // "下一张"按钮冷却定时器
 
 let currentQuestionIndex = 0
 
+const REPORT_READY_STATUSES = new Set([
+  "ready",
+  "completed",
+  "done",
+  "available",
+  "finished",
+  "success",
+])
+
+const REPORT_PROCESSING_STATUSES = new Set([
+  "processing",
+  "pending",
+  "waiting",
+  "generating",
+  "in_progress",
+  "queued",
+])
+
+const DEFAULT_REPORT_WAITING_STATUS = {
+  status: "processing",
+  message: "测试后大约 1~3 天会收到测试报告，请耐心等待。",
+}
+
+const SKIP_REPORT_REDIRECT_FLAG = "xlcs_skip_report_redirect"
+
+let latestReportStatus = null
+let retestFlowActive = false
+
+function shouldSkipReportRedirect() {
+  try {
+    return sessionStorage.getItem(SKIP_REPORT_REDIRECT_FLAG) === "1"
+  } catch (error) {
+    console.warn("[Report] 读取重测跳转标记失败:", error)
+    return false
+  }
+}
+
+function setSkipReportRedirectFlag(enabled = false) {
+  try {
+    if (enabled) {
+      sessionStorage.setItem(SKIP_REPORT_REDIRECT_FLAG, "1")
+    } else {
+      sessionStorage.removeItem(SKIP_REPORT_REDIRECT_FLAG)
+    }
+  } catch (error) {
+    console.warn("[Report] 设置重测跳转标记失败:", error)
+  }
+}
+
 if (window.dialogClient) {
   window.dialogClient.onDisconnect = () => {
     TTS.inited = false
@@ -176,6 +225,8 @@ async function sendTextQuery(text, { ensure = true } = {}) {
 const infoScreen = document.getElementById("info-screen")
 const appWindow = document.getElementById("app-window")
 const mainContent = document.getElementById("main-content")
+const testLoadingOverlay = document.getElementById("test-loading-overlay")
+const testLoadingText = document.getElementById("test-loading-text")
 const startTestBtn = document.getElementById("start-test-btn")
 const resumeTestBtn = document.getElementById("resume-test-btn")
 const introOverlay = document.getElementById("intro-overlay")
@@ -763,6 +814,30 @@ function hideImagePlaceholder(options = {}) {
   }
 }
 
+function showTestLoadingOverlay(message = "正在准备测试环境，请稍候...") {
+  if (testLoadingOverlay) {
+    testLoadingOverlay.classList.remove("hidden")
+    testLoadingOverlay.setAttribute("aria-hidden", "false")
+  }
+  if (message && testLoadingText) {
+    testLoadingText.textContent = message
+  }
+  if (mainContent) {
+    mainContent.style.display = "none"
+  }
+}
+
+function hideTestLoadingOverlay(options = {}) {
+  const { keepMainHidden = false } = options
+  if (testLoadingOverlay) {
+    testLoadingOverlay.classList.add("hidden")
+    testLoadingOverlay.setAttribute("aria-hidden", "true")
+  }
+  if (!keepMainHidden && mainContent && state.stage === "test") {
+    mainContent.style.display = "flex"
+  }
+}
+
 function buildSessionSnapshot(reason = "manual") {
   if (!sessionManagerReady || !window.SessionManager) {
     return null
@@ -1100,6 +1175,7 @@ async function resumeTestFromSnapshot(snapshot = null) {
     }
     infoScreen.style.display = "none"
     appWindow.style.display = "flex"
+    showTestLoadingOverlay("正在恢复上一张图版，请稍候...")
     hideWelcomeText()
     introOverlay.style.display = "none"
     enterBtn.style.display = "none"
@@ -1122,6 +1198,7 @@ async function resumeTestFromSnapshot(snapshot = null) {
     }
     alert("恢复测试失败，请重新开始。")
   } finally {
+    hideTestLoadingOverlay({ keepMainHidden: true })
     restoringFromSnapshot = false
   }
 }
@@ -1381,6 +1458,11 @@ async function enterTestExperience({
 } = {}) {
   destroyIntroGuide()
   try {
+    showTestLoadingOverlay(
+      skipOpeningSpeech
+        ? "正在恢复测试进度，请稍候..."
+        : "正在准备测试环境，请稍候..."
+    )
     if (enterBtn) {
       enterBtn.disabled = true
       enterBtn.textContent = skipOpeningSpeech ? "恢复中..." : "连接中..."
@@ -1483,8 +1565,10 @@ async function enterTestExperience({
     }
 
     initTest(restoredSnapshot)
+    hideTestLoadingOverlay()
   } catch (error) {
     console.error("连接 WebSocket 失败:", error)
+    hideTestLoadingOverlay({ keepMainHidden: true })
 
     let errorMessage = "连接语音服务失败。"
     if (error.isTimeout) {
@@ -2136,6 +2220,7 @@ function showPostTestView(options = {}) {
   state.stage = "post"
   stopInactivityMonitoring()
   clearTimeout(inactivityTimer)
+  hideTestLoadingOverlay({ keepMainHidden: true })
   mainContent.style.display = "none"
   controlsBar.style.display = "none"
   postTestView.style.display = "block"
@@ -2353,36 +2438,47 @@ function finishAndSave() {
     })()
   }
 
-  showSummary()
+  showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
 }
 
-function showSummary() {
+function showSummary(options = {}) {
+  const { reportStatus = null } = options || {}
+  if (reportStatus) {
+    latestReportStatus = normalizeReportStatusPayload(reportStatus)
+  }
+  if (!latestReportStatus) {
+    latestReportStatus = { ...DEFAULT_REPORT_WAITING_STATUS }
+  }
+
+  setSkipReportRedirectFlag(false)
   state.stage = "summary"
   state.completed = true
+  hideTestLoadingOverlay({ keepMainHidden: true })
   if (
     window.SessionManager &&
     typeof window.SessionManager.markCompleted === "function"
   ) {
     window.SessionManager.markCompleted()
   }
+  infoScreen.style.display = "none"
+  appWindow.style.display = "flex"
+  mainContent.style.display = "none"
+  controlsBar.style.display = "none"
   postTestView.style.display = "none"
   summaryView.style.display = "block"
   progressText.textContent = "测试已完成！"
 
   const grid = document.getElementById("summary-grid")
-  grid.innerHTML =
-    '<div style="grid-column: 1/-1; text-align: center; padding: 20px; background: var(--primary-lighter); border-radius: 12px; margin-bottom: 20px;">' +
-    '<h3 style="color: var(--primary-color); margin: 0;">✅ 感谢您的参与！</h3>' +
-    '<p style="margin: 8px 0 4px 0; color: var(--text-secondary); font-size: 13px;">您可以将本次测试结果下载为 PDF 报告，保存到本地。</p>' +
-    '<div id="download-report-status" style="margin-top: 4px; font-size: 12px; color: var(--text-secondary); min-height: 18px;"></div>' +
-    '<button id="download-report-btn" style="margin-top: 12px; padding: 10px 20px; background: var(--primary-light); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: var(--shadow-md);">📥 下载测试报告</button>' +
-    "</div>"
-
-  // 为下载按钮添加事件监听器
-  const downloadBtn = document.getElementById("download-report-btn")
-  if (downloadBtn) {
-    downloadBtn.addEventListener("click", downloadReport)
+  if (!grid) {
+    return
   }
+  grid.innerHTML = ""
+  renderSummaryReportSection(grid, latestReportStatus)
+
+  const canvasStates = Array.isArray(state.canvasStates)
+    ? state.canvasStates
+    : new Array(state.totalImages).fill(null)
+  state.canvasStates = canvasStates
 
   for (let i = 0; i < state.totalImages; i++) {
     const item = document.createElement("div")
@@ -2393,9 +2489,9 @@ function showSummary() {
     const baseImage = document.createElement("img")
     baseImage.src = `./images/rorschach-blot-${i + 1}.webp`
     compositeContainer.appendChild(baseImage)
-    if (state.canvasStates[i]) {
+    if (canvasStates[i]) {
       const drawingImage = document.createElement("img")
-      drawingImage.src = state.canvasStates[i]
+      drawingImage.src = canvasStates[i]
       drawingImage.style.position = "absolute"
       drawingImage.style.top = 0
       drawingImage.style.left = 0
@@ -2407,6 +2503,460 @@ function showSummary() {
     grid.appendChild(item)
   }
   saveSessionSnapshot("stage_change", { immediate: true })
+}
+
+function handleRetestClick(event) {
+  if (event) {
+    event.preventDefault()
+  }
+  if (retestFlowActive) {
+    return
+  }
+  const confirmed = window.confirm(
+    "重新测试将清空当前测验的过程数据，需要重新填写信息并开始。是否继续？"
+  )
+  if (!confirmed) {
+    return
+  }
+  retestFlowActive = true
+  ;(async () => {
+    try {
+      setSkipReportRedirectFlag(true)
+      await prepareForRetest()
+      await startRetestFlow()
+    } catch (error) {
+      console.error("[Retest] 初始化失败:", error)
+      setSkipReportRedirectFlag(false)
+      alert("重新测试准备失败，请刷新页面或稍后重试。")
+      showInfoScreenForRetest()
+    } finally {
+      retestFlowActive = false
+    }
+  })()
+}
+
+async function prepareForRetest() {
+  cleanupResourcesForRetest()
+  resetStateToInitialValues({ preserveBasicInfo: true })
+}
+
+async function startRetestFlow() {
+  disableWelcomeMessagePlayback()
+  hideWelcomeText()
+  if (infoScreen) {
+    infoScreen.style.display = "none"
+  }
+  if (appWindow) {
+    appWindow.style.display = "flex"
+    appWindow.classList.remove("intro-mode")
+  }
+  if (mainContent) {
+    mainContent.style.display = "none"
+  }
+  if (summaryView) {
+    summaryView.style.display = "none"
+  }
+  if (postTestView) {
+    postTestView.style.display = "none"
+  }
+  if (introOverlay) {
+    introOverlay.style.display = "none"
+  }
+  if (enterBtn) {
+    enterBtn.style.display = "none"
+  }
+  if (controlsBar) {
+    controlsBar.style.display = "none"
+  }
+  if (progressText) {
+    progressText.textContent = "准备中..."
+  }
+  showTestLoadingOverlay("正在准备重新测试，请稍候...")
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    initAudio(stream)
+  } catch (error) {
+    console.error("[Retest] 获取麦克风失败:", error)
+    alert("需要麦克风权限才能重新开始测试，请检查设备设置。")
+    showInfoScreenForRetest()
+    throw error
+  }
+
+  try {
+    await enterTestExperience({ skipOpeningSpeech: false })
+  } catch (error) {
+    console.error("[Retest] 进入测试失败:", error)
+    alert("重新开始测试失败，请刷新页面后重试。")
+    showInfoScreenForRetest()
+    throw error
+  }
+}
+
+function cleanupResourcesForRetest() {
+  stopInactivityMonitoring()
+  stopAllPlayback()
+  if (downloadProgressInterval) {
+    clearInterval(downloadProgressInterval)
+    downloadProgressInterval = null
+  }
+  if (
+    window.dialogClient &&
+    typeof window.dialogClient.disconnect === "function"
+  ) {
+    try {
+      window.dialogClient.disconnect()
+    } catch (error) {
+      console.warn("[Retest] 断开对话客户端失败:", error)
+    }
+  }
+  if (window.AudioRecorder) {
+    try {
+      window.AudioRecorder.stop()
+    } catch (error) {
+      console.warn("[Retest] 停止音频录制器失败:", error)
+    }
+    try {
+      window.AudioRecorder.reset()
+    } catch (error) {
+      console.warn("[Retest] 重置音频录制器失败:", error)
+    }
+  }
+  if (state.mediaRecorder) {
+    try {
+      if (state.mediaRecorder.state !== "inactive") {
+        state.mediaRecorder.stop()
+      }
+    } catch (error) {
+      console.warn("[Retest] 停止浏览器录音失败:", error)
+    }
+    try {
+      const tracks =
+        state.mediaRecorder.stream &&
+        typeof state.mediaRecorder.stream.getTracks === "function"
+          ? state.mediaRecorder.stream.getTracks()
+          : []
+      tracks.forEach((track) => track.stop())
+    } catch (error) {
+      console.warn("[Retest] 释放录音轨道失败:", error)
+    }
+  }
+  state.mediaRecorder = null
+  state.audioChunks = []
+  state.audioBlob = null
+  if (window.InteractionTracker) {
+    try {
+      window.InteractionTracker.stop()
+      window.InteractionTracker.reset()
+    } catch (error) {
+      console.warn("[Retest] 重置交互追踪失败:", error)
+    }
+  }
+}
+
+function resetStateToInitialValues(options = {}) {
+  const { preserveBasicInfo = false } = options || {}
+  const retainedDraft = preserveBasicInfo
+    ? { ...state.basicInfoDraft }
+    : getEmptyBasicInfoDraft()
+  const retainedBasicInfo = preserveBasicInfo ? { ...state.basicInfo } : null
+  latestReportStatus = null
+  state.currentIndex = 0
+  state.zoom = 1
+  state.rotation = 0
+  state.drawing = false
+  state.tool = "pen"
+  state.color = "#ef4444"
+  state.canvasStates = new Array(state.totalImages).fill(null)
+  state.visitedImages = new Set()
+  state.postTestAnswers = {}
+  state.introStep = INTRO_STEPS.INFO_FORM
+  state.stage = "intro"
+  state.completed = false
+  state.inactivityLevel = 0
+  state.nextButtonCooldown = 0
+  state.isSpeaking = false
+  state.audioChunks = []
+  state.audioBlob = null
+  state.basicInfoDraft = preserveBasicInfo
+    ? { ...getEmptyBasicInfoDraft(), ...retainedDraft }
+    : getEmptyBasicInfoDraft()
+  state.basicInfo = preserveBasicInfo ? retainedBasicInfo : null
+  state.lastSnapshotReason = null
+  state.sessionVersion = 0
+  state.sessionId = null
+  sessionState.sessionId = null
+  sessionState.snapshotVersion = 0
+  sessionState.completed = false
+  sessionState.payload = null
+  sessionState.lastTrigger = null
+  pendingSessionSnapshot = null
+  latestSnapshotVersion = 0
+  restoreSnapshotCache = null
+  currentQuestionIndex = 0
+  applyBasicInfoDraftToInputs()
+  clearBasicInfoValidationState()
+  if (
+    window.SessionManager &&
+    typeof window.SessionManager.clearSnapshot === "function"
+  ) {
+    try {
+      window.SessionManager.clearSnapshot()
+    } catch (error) {
+      console.warn("[Session] 清除历史快照失败:", error)
+    }
+  }
+  ensureSessionId()
+}
+
+function showInfoScreenForRetest() {
+  hideTestLoadingOverlay({ keepMainHidden: true })
+  if (infoScreen) {
+    infoScreen.style.display = "flex"
+  }
+  if (appWindow) {
+    appWindow.style.display = "none"
+    appWindow.classList.remove("intro-mode")
+  }
+  if (mainContent) {
+    mainContent.style.display = "none"
+  }
+  if (controlsBar) {
+    controlsBar.style.display = "none"
+  }
+  if (postTestView) {
+    postTestView.style.display = "none"
+  }
+  if (summaryView) {
+    summaryView.style.display = "none"
+  }
+  if (introOverlay) {
+    introOverlay.style.display = "none"
+  }
+  if (progressText) {
+    progressText.textContent = "准备中..."
+  }
+  if (startTestBtn) {
+    startTestBtn.disabled = false
+    startTestBtn.textContent = "开始测试"
+  }
+  if (resumeTestBtn) {
+    resumeTestBtn.style.display = "none"
+    resumeTestBtn.disabled = false
+    resumeTestBtn.textContent = "恢复未完成测试"
+  }
+  if (rorschachImage) {
+    rorschachImage.src = ""
+  }
+  if (imagePlaceholder) {
+    imagePlaceholder.classList.add("hidden")
+  }
+  clearCanvas()
+  showWelcomeCardContainer()
+  window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+function showWelcomeCardContainer() {
+  const welcomeTextContainer = document.getElementById("welcome-text-container")
+  if (welcomeTextContainer) {
+    welcomeTextContainer.style.removeProperty("display")
+    welcomeTextContainer.classList.remove("hidden")
+  }
+  if (deviceCheckContainer) {
+    deviceCheckContainer.dataset.status = "pending"
+    deviceCheckContainer.classList.remove("device-check-alert")
+  }
+  if (deviceCheckTip) {
+    deviceCheckTip.textContent = "请先测试语音播放和麦克风，确保设备正常。"
+  }
+}
+
+function renderSummaryReportSection(grid, statusInfo) {
+  if (!grid) return
+  const reportCard = document.createElement("div")
+  reportCard.style.gridColumn = "1 / -1"
+  reportCard.style.textAlign = "center"
+  reportCard.style.padding = "28px 20px 20px 20px"
+  reportCard.style.background = "var(--primary-lighter)"
+  reportCard.style.borderRadius = "12px"
+  reportCard.style.marginBottom = "20px"
+  reportCard.style.boxShadow = "var(--shadow-sm)"
+  reportCard.style.position = "relative"
+
+  const retestBtn = document.createElement("button")
+  retestBtn.id = "restart-test-btn"
+  retestBtn.type = "button"
+  retestBtn.textContent = "🔁 重新测试"
+  retestBtn.style.position = "absolute"
+  retestBtn.style.top = "16px"
+  retestBtn.style.right = "16px"
+  retestBtn.style.border = "none"
+  retestBtn.style.background = "rgba(255, 255, 255, 0.25)"
+  retestBtn.style.color = "var(--primary-color, #2563eb)"
+  retestBtn.style.fontWeight = "600"
+  retestBtn.style.fontSize = "13px"
+  retestBtn.style.padding = "6px 16px"
+  retestBtn.style.borderRadius = "999px"
+  retestBtn.style.cursor = "pointer"
+  retestBtn.style.boxShadow = "var(--shadow-sm)"
+  retestBtn.style.transition = "all 0.2s ease"
+  retestBtn.addEventListener("click", handleRetestClick)
+  reportCard.appendChild(retestBtn)
+
+  const title = document.createElement("h3")
+  title.style.color = "var(--primary-color)"
+  title.style.margin = "0"
+  title.textContent = "✅ 感谢您的参与！"
+  reportCard.appendChild(title)
+
+  const message = document.createElement("p")
+  message.style.margin = "8px 0 4px 0"
+  message.style.color = "var(--text-secondary)"
+  message.style.fontSize = "13px"
+  message.textContent = getReportStatusMessage(statusInfo)
+  reportCard.appendChild(message)
+
+  if (statusInfo?.updatedAt) {
+    const updated = document.createElement("div")
+    updated.style.fontSize = "12px"
+    updated.style.color = "var(--text-tertiary, #707070)"
+    updated.textContent = `最近更新：${statusInfo.updatedAt}`
+    reportCard.appendChild(updated)
+  }
+
+  if (isReportReadyStatus(statusInfo)) {
+    const statusEl = document.createElement("div")
+    statusEl.id = "download-report-status"
+    statusEl.style.marginTop = "4px"
+    statusEl.style.fontSize = "12px"
+    statusEl.style.color = "var(--text-secondary)"
+    statusEl.style.minHeight = "18px"
+    reportCard.appendChild(statusEl)
+
+    const downloadBtn = document.createElement("button")
+    downloadBtn.id = "download-report-btn"
+    downloadBtn.style.marginTop = "12px"
+    downloadBtn.style.padding = "10px 20px"
+    downloadBtn.style.background = "var(--primary-light)"
+    downloadBtn.style.color = "white"
+    downloadBtn.style.border = "none"
+    downloadBtn.style.borderRadius = "8px"
+    downloadBtn.style.fontSize = "16px"
+    downloadBtn.style.fontWeight = "600"
+    downloadBtn.style.cursor = "pointer"
+    downloadBtn.style.transition = "all 0.3s ease"
+    downloadBtn.style.boxShadow = "var(--shadow-md)"
+    downloadBtn.textContent = "📥 下载测试报告"
+    downloadBtn.addEventListener("click", downloadReport)
+    reportCard.appendChild(downloadBtn)
+  }
+
+  grid.appendChild(reportCard)
+}
+
+function normalizeReportStatus(value) {
+  if (!value) {
+    return null
+  }
+  return String(value).trim().toLowerCase()
+}
+
+function isReportReadyStatus(statusInfo) {
+  const status = normalizeReportStatus(
+    statusInfo?.status || statusInfo?.rawStatus
+  )
+  return status ? REPORT_READY_STATUSES.has(status) : false
+}
+
+function isReportProcessingStatus(statusInfo) {
+  const status = normalizeReportStatus(
+    statusInfo?.status || statusInfo?.rawStatus
+  )
+  return status ? REPORT_PROCESSING_STATUSES.has(status) : false
+}
+
+function getReportStatusMessage(statusInfo = null) {
+  if (statusInfo?.message) {
+    return statusInfo.message
+  }
+  if (isReportReadyStatus(statusInfo)) {
+    return "报告已生成，可下载查看。"
+  }
+  return DEFAULT_REPORT_WAITING_STATUS.message
+}
+
+function normalizeReportStatusPayload(statusInfo = {}) {
+  if (!statusInfo || typeof statusInfo !== "object") {
+    return { ...DEFAULT_REPORT_WAITING_STATUS }
+  }
+  const normalizedStatus = normalizeReportStatus(
+    statusInfo.status || statusInfo.rawStatus
+  )
+  const normalized = {
+    ...statusInfo,
+    status: normalizedStatus || statusInfo.status || null,
+  }
+  normalized.message = getReportStatusMessage(normalized)
+  return normalized
+}
+
+function buildReportStatusFromResponse(response) {
+  if (!response) {
+    return null
+  }
+  const payload =
+    (response.data && typeof response.data === "object" && response.data) ||
+    (response.result &&
+      typeof response.result === "object" &&
+      response.result) ||
+    (typeof response === "object" ? response : null)
+  if (!payload) {
+    return null
+  }
+
+  const rawStatus =
+    payload.status ||
+    payload.report_status ||
+    payload.reportStatus ||
+    response.status ||
+    response.report_status ||
+    null
+  const normalizedStatus = normalizeReportStatus(rawStatus)
+  const hasReport =
+    payload.has_report ||
+    payload.hasReport ||
+    payload.available ||
+    payload.completed ||
+    payload.reportReady ||
+    false
+
+  if (
+    !hasReport &&
+    !REPORT_READY_STATUSES.has(normalizedStatus || "") &&
+    !REPORT_PROCESSING_STATUSES.has(normalizedStatus || "")
+  ) {
+    return null
+  }
+
+  const statusInfo = {
+    status: normalizedStatus || rawStatus,
+    rawStatus,
+    message: payload.message || response.message || response.msg || "",
+    progress:
+      payload.progress ??
+      payload.percent ??
+      payload.percentage ??
+      payload.progress_percent ??
+      null,
+    updatedAt:
+      payload.updated_at ||
+      payload.update_time ||
+      payload.updatedAt ||
+      payload.updateTime ||
+      null,
+  }
+
+  return normalizeReportStatusPayload(statusInfo)
 }
 
 // 下载报告进度模拟定时器
@@ -2431,6 +2981,10 @@ async function downloadReport() {
     // 更新按钮状态与提示
     const downloadBtn = document.getElementById("download-report-btn")
     const statusEl = document.getElementById("download-report-status")
+    if (!downloadBtn) {
+      alert("报告尚未生成，当前无法下载。")
+      return
+    }
     const originalText = downloadBtn.innerHTML
     downloadBtn.innerHTML = "📄 报告生成中..."
     downloadBtn.disabled = true
@@ -3010,8 +3564,27 @@ function setupAuthControls() {
   }
 }
 
+async function routeToReportSummaryIfAvailable() {
+  if (!window.API || typeof window.API.getReportStatus !== "function") {
+    return false
+  }
+  try {
+    const response = await window.API.getReportStatus()
+    const statusInfo = buildReportStatusFromResponse(response)
+    if (!statusInfo) {
+      return false
+    }
+    latestReportStatus = statusInfo
+    showSummary({ reportStatus: statusInfo })
+    return true
+  } catch (error) {
+    console.warn("[Report] 获取报告状态失败:", error)
+    return false
+  }
+}
+
 // 登录检查和初始化
-function checkLoginAndInit() {
+async function checkLoginAndInit() {
   // 先更新UI（无论是否登录）
   updateAuthUI()
 
@@ -3021,7 +3594,16 @@ function checkLoginAndInit() {
     return
   }
 
-  // 已登录：继续初始化
+  // 已登录：优先尝试跳转报告页（除非正在准备重新测试）
+  let routedToSummary = false
+  if (!shouldSkipReportRedirect()) {
+    routedToSummary = await routeToReportSummaryIfAvailable()
+  }
+  if (routedToSummary) {
+    return
+  }
+
+  // 继续初始化测试流程
   configureSessionPersistence()
   ensureSessionId()
   setupEventListeners()
@@ -3042,7 +3624,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // 先更新UI（即使未登录也显示登录按钮）
     updateAuthUI()
     // 然后执行原有的初始化逻辑
-    checkLoginAndInit()
+    checkLoginAndInit().catch((error) => {
+      console.error("[Init] 初始化失败:", error)
+    })
   })
   welcomeMessageTimer = setTimeout(() => {
     if (shouldPlayWelcomeMessage) {
