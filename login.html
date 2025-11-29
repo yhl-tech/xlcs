@@ -1,474 +1,946 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>登录 - 罗夏墨迹测试</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 20px;
+      }
 
-        .login-container {
-            background: white;
-            border-radius: 20px;
-            padding: 50px 40px;
-            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
-            max-width: 450px;
-            width: 100%;
-            animation: slideUp 0.5s ease-out;
-        }
+      .login-container {
+        background: white;
+        border-radius: 20px;
+        padding: 50px 40px;
+        box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+        max-width: 450px;
+        width: 100%;
+        animation: slideUp 0.5s ease-out;
+      }
 
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
         }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
-        .login-container h1 {
-            color: #1e3a8a;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
-            font-weight: 700;
-        }
+      .login-container h1 {
+        color: #1e3a8a;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 28px;
+        font-weight: 700;
+      }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
+      .form-group {
+        margin-bottom: 20px;
+      }
 
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 8px;
-        }
+      .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 8px;
+      }
 
-        .form-group input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            background: #f9fafb;
-        }
+      .form-group input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background: #f9fafb;
+      }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            background: white;
-            box-shadow: 0 0 0 3px #dbeafe;
-        }
+      .form-group input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: white;
+        box-shadow: 0 0 0 3px #dbeafe;
+      }
 
-        .error-message {
-            color: #ef4444;
-            font-size: 13px;
-            margin-top: 8px;
-            display: none;
-        }
+      .error-message {
+        color: #ef4444;
+        font-size: 13px;
+        margin-top: 8px;
+        display: none;
+      }
 
-        .error-message.show {
-            display: block;
-        }
+      .error-message.show {
+        display: block;
+      }
 
-        .success-message {
-            color: #10b981;
-            font-size: 13px;
-            margin-top: 8px;
-            display: none;
-            text-align: center;
-            padding: 10px;
-            background: #d1fae5;
-            border-radius: 8px;
-            border: 1px solid #10b981;
-        }
+      .success-message {
+        color: #10b981;
+        font-size: 13px;
+        margin-top: 8px;
+        display: none;
+        text-align: center;
+        padding: 10px;
+        background: #d1fae5;
+        border-radius: 8px;
+        border: 1px solid #10b981;
+      }
 
-        .success-message.show {
-            display: block;
-        }
+      .success-message.show {
+        display: block;
+      }
 
-        #login-btn, #register-btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 30px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+      #login-btn,
+      #register-btn,
+      #phone-login-btn {
+        width: 100%;
+        padding: 14px;
+        margin-top: 30px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
 
-        #login-btn:hover, #register-btn:hover {
-            background: #1e3a8a;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-        }
+      #login-btn:hover,
+      #register-btn:hover,
+      #phone-login-btn:hover {
+        background: #1e3a8a;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+      }
 
-        #login-btn:active, #register-btn:active {
-            transform: translateY(0);
-        }
+      #login-btn:active,
+      #register-btn:active,
+      #phone-login-btn:active {
+        transform: translateY(0);
+      }
 
-        #login-btn:disabled, #register-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
+      #login-btn:disabled,
+      #register-btn:disabled,
+      #phone-login-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
 
-        .loading {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
+      .loading {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.8s linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
+      }
 
-        .switch-form {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #6b7280;
-        }
+      .switch-form {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 14px;
+        color: #6b7280;
+      }
 
-        .switch-form a {
-            color: #3b82f6;
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
-        }
+      .switch-form a {
+        color: #3b82f6;
+        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+      }
 
-        .switch-form a:hover {
-            text-decoration: underline;
-        }
+      .switch-form a:hover {
+        text-decoration: underline;
+      }
 
-        #register-form {
-            display: none;
-        }
+      #register-form {
+        display: none;
+      }
+
+      /* 登录方式切换标签 */
+      .login-tabs {
+        display: flex;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+
+      .login-tab {
+        flex: 1;
+        padding: 12px 20px;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 600;
+        color: #6b7280;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+      }
+
+      .login-tab:hover {
+        color: #3b82f6;
+      }
+
+      .login-tab.active {
+        color: #3b82f6;
+        border-bottom-color: #3b82f6;
+      }
+
+      /* 手机号登录表单 */
+      #phone-login-form {
+        display: none;
+      }
+
+      /* 验证码输入组 */
+      .verification-code-group {
+        display: flex;
+        gap: 10px;
+      }
+
+      .verification-code-group .form-group {
+        flex: 1;
+        margin-bottom: 0;
+      }
+
+      .verification-code-group .form-group input {
+        margin-bottom: 0;
+      }
+
+      #send-code-btn {
+        padding: 12px 20px;
+        background: #f3f4f6;
+        color: #1f2937;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        min-width: 120px;
+      }
+
+      #send-code-btn:hover:not(:disabled) {
+        background: #e5e7eb;
+        border-color: #d1d5db;
+      }
+
+      #send-code-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      #send-code-btn.countdown {
+        background: #f9fafb;
+        color: #9ca3af;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="login-container">
-        <h1>🔐 用户登录</h1>
-        <form id="login-form">
-            <div class="form-group">
-                <label for="login-username">用户名</label>
-                <input type="text" id="login-username" name="username" required autocomplete="username" placeholder="请输入用户名">
-            </div>
-            <div class="form-group">
-                <label for="login-password">密码</label>
-                <input type="password" id="login-password" name="password" required autocomplete="current-password" placeholder="请输入密码">
-            </div>
-            <div class="error-message" id="login-error-message"></div>
-            <div class="success-message" id="login-success-message"></div>
-            <button type="submit" id="login-btn">登录</button>
-        </form>
+      <h1>🔐 用户登录</h1>
 
-        <form id="register-form">
-            <div class="form-group">
-                <label for="register-username">用户名</label>
-                <input type="text" id="register-username" name="username" required autocomplete="username" placeholder="请输入用户名">
-            </div>
-            <div class="form-group">
-                <label for="register-password">密码</label>
-                <input type="password" id="register-password" name="password" required autocomplete="new-password" placeholder="请输入密码">
-            </div>
-            <div class="form-group">
-                <label for="register-confirm-password">确认密码</label>
-                <input type="password" id="register-confirm-password" name="confirm-password" required autocomplete="new-password" placeholder="请再次输入密码">
-            </div>
-            <div class="error-message" id="register-error-message"></div>
-            <div class="success-message" id="register-success-message"></div>
-            <button type="submit" id="register-btn">注册</button>
-        </form>
+      <!-- 登录方式切换标签 -->
+      <div class="login-tabs">
+        <button
+          class="login-tab active"
+          id="username-tab"
+          data-form="username-login"
+        >
+          用户名登录
+        </button>
+        <button class="login-tab" id="phone-tab" data-form="phone-login">
+          手机号登录
+        </button>
+      </div>
 
-        <div class="switch-form">
-            <span id="switch-text">没有账户？</span>
-            <a id="switch-link">立即注册</a>
+      <!-- 用户名登录表单 -->
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-username">用户名</label>
+          <input
+            type="text"
+            id="login-username"
+            name="username"
+            required
+            autocomplete="username"
+            placeholder="请输入用户名"
+          />
         </div>
+        <div class="form-group">
+          <label for="login-password">密码</label>
+          <input
+            type="password"
+            id="login-password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="请输入密码"
+          />
+        </div>
+        <div class="error-message" id="login-error-message"></div>
+        <div class="success-message" id="login-success-message"></div>
+        <button type="submit" id="login-btn">登录</button>
+      </form>
+
+      <!-- 手机号登录表单 -->
+      <form id="phone-login-form">
+        <div class="form-group">
+          <label for="phone-number">手机号</label>
+          <input
+            type="tel"
+            id="phone-number"
+            name="phone"
+            required
+            autocomplete="tel"
+            placeholder="请输入手机号"
+            maxlength="11"
+          />
+        </div>
+        <div class="form-group">
+          <label for="verification-code">验证码</label>
+          <div class="verification-code-group">
+            <div class="form-group">
+              <input
+                type="text"
+                id="verification-code"
+                name="verification_code"
+                required
+                autocomplete="off"
+                placeholder="请输入验证码"
+                maxlength="6"
+              />
+            </div>
+            <button type="button" id="send-code-btn">发送验证码</button>
+          </div>
+        </div>
+        <div class="error-message" id="phone-login-error-message"></div>
+        <div class="success-message" id="phone-login-success-message"></div>
+        <button type="submit" id="phone-login-btn">登录</button>
+      </form>
+
+      <form id="register-form">
+        <div class="form-group">
+          <label for="register-username">用户名</label>
+          <input
+            type="text"
+            id="register-username"
+            name="username"
+            required
+            autocomplete="username"
+            placeholder="请输入用户名"
+          />
+        </div>
+        <div class="form-group">
+          <label for="register-password">密码</label>
+          <input
+            type="password"
+            id="register-password"
+            name="password"
+            required
+            autocomplete="new-password"
+            placeholder="请输入密码"
+          />
+        </div>
+        <div class="form-group">
+          <label for="register-confirm-password">确认密码</label>
+          <input
+            type="password"
+            id="register-confirm-password"
+            name="confirm-password"
+            required
+            autocomplete="new-password"
+            placeholder="请再次输入密码"
+          />
+        </div>
+        <div class="error-message" id="register-error-message"></div>
+        <div class="success-message" id="register-success-message"></div>
+        <button type="submit" id="register-btn">注册</button>
+      </form>
+
+      <div class="switch-form">
+        <span id="switch-text">没有账户？</span>
+        <a id="switch-link">立即注册</a>
+      </div>
     </div>
 
     <!-- Axios 库 -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    
+
     <!-- 配置文件 -->
     <script type="module" src="./script/config.js"></script>
-    
+
     <!-- API 接口模块 -->
     <script type="module" src="./script/api.js"></script>
-    
+
     <!-- 认证模块 -->
     <script type="module" src="./script/auth.js"></script>
 
     <script>
-        // 等待模块加载完成
-        function waitForModules(callback, maxRetries = 50) {
-            let retries = 0;
-            const checkModules = () => {
-                if (window.auth && window.apiClient) {
-                    callback();
-                } else if (retries < maxRetries) {
-                    retries++;
-                    setTimeout(checkModules, 100);
-                } else {
-                    console.error('模块加载超时');
-                    const errorMsg = document.getElementById('login-error-message');
-                    if (errorMsg) {
-                        errorMsg.textContent = '系统初始化失败，请刷新页面重试';
-                        errorMsg.classList.add('show');
-                    }
-                }
-            };
-            checkModules();
+      // 等待模块加载完成
+      function waitForModules(callback, maxRetries = 50) {
+        let retries = 0
+        const checkModules = () => {
+          if (window.auth && window.apiClient) {
+            callback()
+          } else if (retries < maxRetries) {
+            retries++
+            setTimeout(checkModules, 100)
+          } else {
+            console.error("模块加载超时")
+            const errorMsg = document.getElementById("login-error-message")
+            if (errorMsg) {
+              errorMsg.textContent = "系统初始化失败，请刷新页面重试"
+              errorMsg.classList.add("show")
+            }
+          }
+        }
+        checkModules()
+      }
+
+      // 初始化登录页面
+      function initLoginPage() {
+        // 检查是否已登录
+        if (window.auth && window.auth.isLoggedIn()) {
+          // 已登录，直接跳转到主页
+          window.location.href = "./index.html"
+          return
         }
 
-        // 初始化登录页面
-        function initLoginPage() {
-            // 检查是否已登录
-            if (window.auth && window.auth.isLoggedIn()) {
-                // 已登录，直接跳转到主页
-                window.location.href = './index.html';
-                return;
-            }
+        const loginForm = document.getElementById("login-form")
+        const phoneLoginForm = document.getElementById("phone-login-form")
+        const registerForm = document.getElementById("register-form")
+        const switchLink = document.getElementById("switch-link")
+        const switchText = document.getElementById("switch-text")
+        const loginBtn = document.getElementById("login-btn")
+        const phoneLoginBtn = document.getElementById("phone-login-btn")
+        const registerBtn = document.getElementById("register-btn")
+        const loginErrorMessage = document.getElementById("login-error-message")
+        const phoneLoginErrorMessage = document.getElementById(
+          "phone-login-error-message"
+        )
+        const registerErrorMessage = document.getElementById(
+          "register-error-message"
+        )
+        const loginSuccessMessage = document.getElementById(
+          "login-success-message"
+        )
+        const phoneLoginSuccessMessage = document.getElementById(
+          "phone-login-success-message"
+        )
+        const registerSuccessMessage = document.getElementById(
+          "register-success-message"
+        )
 
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const switchLink = document.getElementById('switch-link');
-            const switchText = document.getElementById('switch-text');
-            const loginBtn = document.getElementById('login-btn');
-            const registerBtn = document.getElementById('register-btn');
-            const loginErrorMessage = document.getElementById('login-error-message');
-            const registerErrorMessage = document.getElementById('register-error-message');
-            const loginSuccessMessage = document.getElementById('login-success-message');
-            const registerSuccessMessage = document.getElementById('register-success-message');
+        // 登录方式切换标签
+        const usernameTab = document.getElementById("username-tab")
+        const phoneTab = document.getElementById("phone-tab")
+        const loginTabs = document.querySelector(".login-tabs")
+        const sendCodeBtn = document.getElementById("send-code-btn")
+        const phoneNumberInput = document.getElementById("phone-number")
+        const verificationCodeInput =
+          document.getElementById("verification-code")
 
-            // 切换表单
-            switchLink.addEventListener('click', () => {
-                if (loginForm.style.display !== 'none') {
-                    // 切换到注册表单
-                    loginForm.style.display = 'none';
-                    registerForm.style.display = 'block';
-                    switchText.innerHTML = '已有账户？';
-                    switchLink.textContent = '立即登录';
-                    document.querySelector('.login-container h1').textContent = '📝 用户注册';
-                    hideRegisterMessages();
-                } else {
-                    // 切换到登录表单
-                    registerForm.style.display = 'none';
-                    loginForm.style.display = 'block';
-                    switchText.innerHTML = '没有账户？';
-                    switchLink.textContent = '立即注册';
-                    document.querySelector('.login-container h1').textContent = '🔐 用户登录';
-                    hideLoginMessages();
-                }
-            });
+        // 验证码倒计时相关
+        let countdownTimer = null
+        let countdownSeconds = 0
 
-            // 登录表单提交
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const username = document.getElementById('login-username').value.trim();
-                const password = document.getElementById('login-password').value;
+        // 记录当前登录方式（用于从注册表单切换回登录表单时恢复）
+        let currentLoginType = "username" // 'username' 或 'phone'
 
-                if (!username || !password) {
-                    showLoginError('请输入用户名和密码');
-                    return;
-                }
-
-                // 禁用按钮，显示加载状态
-                loginBtn.disabled = true;
-                loginBtn.innerHTML = '<span class="loading"></span>登录中...';
-                hideLoginError();
-
-                try {
-                    const result = await window.auth.login(username, password);
-                    
-                    if (result.success) {
-                        // 跳转到主页
-                        window.location.href = './index.html';
-                    } else {
-                        // 登录失败，显示错误信息
-                        showLoginError(result.message || '登录失败，请检查用户名和密码');
-                        loginBtn.disabled = false;
-                        loginBtn.textContent = '登录';
-                    }
-                } catch (error) {
-                    console.error('登录错误:', error);
-                    showLoginError(error.message || '登录失败，请稍后重试');
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = '登录';
-                }
-            });
-
-            // 注册表单提交
-            registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const username = document.getElementById('register-username').value.trim();
-                const password = document.getElementById('register-password').value;
-                const confirmPassword = document.getElementById('register-confirm-password').value;
-
-                // 验证输入
-                if (!username || !password || !confirmPassword) {
-                    showRegisterError('请填写所有字段');
-                    return;
-                }
-
-                if (password !== confirmPassword) {
-                    showRegisterError('两次输入的密码不一致');
-                    return;
-                }
-
-                if (password.length < 6) {
-                    showRegisterError('密码长度至少为6位');
-                    return;
-                }
-
-                // 禁用按钮，显示加载状态
-                registerBtn.disabled = true;
-                registerBtn.innerHTML = '<span class="loading"></span>注册中...';
-                hideRegisterError();
-
-                try {
-                    // 调用API模块中的注册方法
-                    const response = await window.API.register(username, password);
-
-                    if (response.code === 0) {
-                        // 注册成功，自动登录
-                        showRegisterSuccess('注册成功！正在登录...');
-                        registerBtn.disabled = false;
-                        registerBtn.textContent = '注册成功';
-                        
-                        // 如果返回了access_token，直接登录
-                        if (response.data?.access_token) {
-                            // 保存 token 和用户信息
-                            window.auth.setToken(response.data.access_token);
-                            window.auth.setUserInfo({ username: username });
-                            
-                            // 注册成功后，执行租户登录以刷新 analyzeApiKey
-                            try {
-                                if (window.API && typeof window.API.tenantLogin === 'function') {
-                                    const tenantResult = await window.API.tenantLogin();
-                                    if (!tenantResult?.success) {
-                                        console.warn('[注册] 租户登录失败:', tenantResult?.message);
-                                        // 租户登录失败不影响注册成功，但会记录警告
-                                    }
-                                }
-                            } catch (error) {
-                                console.warn('[注册] 租户登录异常:', error);
-                                // 租户登录异常不影响注册成功，但会记录警告
-                            }
-                            
-                            // 延迟1秒后跳转到主页
-                            setTimeout(() => {
-                                window.location.href = './index.html';
-                            }, 1000);
-                        } else {
-                            // 如果没有返回token，切换到登录表单
-                            setTimeout(() => {
-                                registerForm.style.display = 'none';
-                                loginForm.style.display = 'block';
-                                switchText.innerHTML = '没有账户？';
-                                switchLink.textContent = '立即注册';
-                                document.querySelector('.login-container h1').textContent = '🔐 用户登录';
-                                hideRegisterMessages();
-                                
-                                // 自动填充用户名
-                                document.getElementById('login-username').value = username;
-                                registerBtn.textContent = '注册';
-                            }, 3000);
-                        }
-                    } else {
-                        // 注册失败，优先使用 exception 字段，如果没有则使用 msg 字段
-                        showRegisterError(response.exception || response.msg || '注册失败，请稍后重试');
-                        registerBtn.disabled = false;
-                        registerBtn.textContent = '注册';
-                    }
-                } catch (error) {
-                    console.error('注册错误:', error);
-                    showRegisterError(error.message || '注册失败，请稍后重试');
-                    registerBtn.disabled = false;
-                    registerBtn.textContent = '注册';
-                }
-            });
-
-            function showLoginError(message) {
-                loginErrorMessage.textContent = message;
-                loginErrorMessage.classList.add('show');
-            }
-
-            function hideLoginError() {
-                loginErrorMessage.classList.remove('show');
-            }
-
-            function showLoginSuccess(message) {
-                loginSuccessMessage.textContent = message;
-                loginSuccessMessage.classList.add('show');
-            }
-
-            function hideLoginMessages() {
-                loginErrorMessage.classList.remove('show');
-                loginSuccessMessage.classList.remove('show');
-            }
-
-            function showRegisterError(message) {
-                registerErrorMessage.textContent = message;
-                registerErrorMessage.classList.add('show');
-            }
-
-            function hideRegisterError() {
-                registerErrorMessage.classList.remove('show');
-            }
-
-            function showRegisterSuccess(message) {
-                registerSuccessMessage.textContent = message;
-                registerSuccessMessage.classList.add('show');
-            }
-
-            function hideRegisterMessages() {
-                registerErrorMessage.classList.remove('show');
-                registerSuccessMessage.classList.remove('show');
-            }
-
-            // 输入时清除错误信息
-            document.getElementById('login-username').addEventListener('input', hideLoginError);
-            document.getElementById('login-password').addEventListener('input', hideLoginError);
-            document.getElementById('register-username').addEventListener('input', hideRegisterError);
-            document.getElementById('register-password').addEventListener('input', hideRegisterError);
-            document.getElementById('register-confirm-password').addEventListener('input', hideRegisterError);
+        // 手机号格式验证
+        function validatePhone(phone) {
+          return /^1[3-9]\d{9}$/.test(phone)
         }
 
-        // 等待模块加载完成后初始化
-        waitForModules(initLoginPage);
+        // 启动验证码倒计时
+        function startCountdown(seconds = 60) {
+          countdownSeconds = seconds
+          sendCodeBtn.disabled = true
+          sendCodeBtn.classList.add("countdown")
+
+          countdownTimer = setInterval(() => {
+            countdownSeconds--
+            sendCodeBtn.textContent = `${countdownSeconds}秒后重试`
+
+            if (countdownSeconds <= 0) {
+              clearInterval(countdownTimer)
+              countdownTimer = null
+              sendCodeBtn.disabled = false
+              sendCodeBtn.classList.remove("countdown")
+              sendCodeBtn.textContent = "发送验证码"
+            }
+          }, 1000)
+        }
+
+        // 停止倒计时
+        function stopCountdown() {
+          if (countdownTimer) {
+            clearInterval(countdownTimer)
+            countdownTimer = null
+          }
+          sendCodeBtn.disabled = false
+          sendCodeBtn.classList.remove("countdown")
+          sendCodeBtn.textContent = "发送验证码"
+        }
+
+        // 登录方式切换
+        usernameTab.addEventListener("click", () => {
+          currentLoginType = "username"
+          usernameTab.classList.add("active")
+          phoneTab.classList.remove("active")
+          loginForm.style.display = "block"
+          phoneLoginForm.style.display = "none"
+          hideLoginMessages()
+          hidePhoneLoginMessages()
+        })
+
+        phoneTab.addEventListener("click", () => {
+          currentLoginType = "phone"
+          phoneTab.classList.add("active")
+          usernameTab.classList.remove("active")
+          loginForm.style.display = "none"
+          phoneLoginForm.style.display = "block"
+          hideLoginMessages()
+          hidePhoneLoginMessages()
+        })
+
+        // 发送验证码
+        sendCodeBtn.addEventListener("click", async () => {
+          const phone = phoneNumberInput.value.trim()
+
+          if (!phone) {
+            showPhoneLoginError("请输入手机号")
+            return
+          }
+
+          if (!validatePhone(phone)) {
+            showPhoneLoginError("请输入正确的手机号格式")
+            return
+          }
+
+          // 禁用按钮，显示加载状态
+          sendCodeBtn.disabled = true
+          const originalText = sendCodeBtn.textContent
+          sendCodeBtn.textContent = "发送中..."
+          hidePhoneLoginError()
+
+          try {
+            if (
+              window.API &&
+              typeof window.API.sendVerificationCode === "function"
+            ) {
+              const response = await window.API.sendVerificationCode(phone)
+
+              if (response.code === 0) {
+                // 发送成功，启动倒计时
+                startCountdown(60)
+                showPhoneLoginSuccess("验证码已发送，请查收短信")
+              } else {
+                showPhoneLoginError(
+                  response.exception ||
+                    response.msg ||
+                    "验证码发送失败，请稍后重试"
+                )
+                sendCodeBtn.disabled = false
+                sendCodeBtn.textContent = originalText
+              }
+            } else {
+              throw new Error("发送验证码接口未初始化")
+            }
+          } catch (error) {
+            console.error("发送验证码错误:", error)
+            showPhoneLoginError(error.message || "验证码发送失败，请稍后重试")
+            sendCodeBtn.disabled = false
+            sendCodeBtn.textContent = originalText
+          }
+        })
+
+        // 手机号输入限制（只允许数字）
+        phoneNumberInput.addEventListener("input", (e) => {
+          e.target.value = e.target.value.replace(/\D/g, "")
+          hidePhoneLoginError()
+        })
+
+        // 验证码输入限制（只允许数字）
+        verificationCodeInput.addEventListener("input", (e) => {
+          e.target.value = e.target.value.replace(/\D/g, "")
+          hidePhoneLoginError()
+        })
+
+        // 手机号登录表单提交
+        phoneLoginForm.addEventListener("submit", async (e) => {
+          e.preventDefault()
+
+          const phone = phoneNumberInput.value.trim()
+          const verificationCode = verificationCodeInput.value.trim()
+
+          if (!phone) {
+            showPhoneLoginError("请输入手机号")
+            return
+          }
+
+          if (!validatePhone(phone)) {
+            showPhoneLoginError("请输入正确的手机号格式")
+            return
+          }
+
+          if (!verificationCode) {
+            showPhoneLoginError("请输入验证码")
+            return
+          }
+
+          if (verificationCode.length !== 6) {
+            showPhoneLoginError("验证码为6位数字")
+            return
+          }
+
+          // 禁用按钮，显示加载状态
+          phoneLoginBtn.disabled = true
+          phoneLoginBtn.innerHTML = '<span class="loading"></span>登录中...'
+          hidePhoneLoginError()
+
+          try {
+            if (
+              window.auth &&
+              typeof window.auth.loginWithPhone === "function"
+            ) {
+              const result = await window.auth.loginWithPhone(
+                phone,
+                verificationCode
+              )
+
+              if (result.success) {
+                // 跳转到主页
+                window.location.href = "./index.html"
+              } else {
+                // 登录失败，显示错误信息
+                showPhoneLoginError(
+                  result.message || "登录失败，请检查手机号和验证码"
+                )
+                phoneLoginBtn.disabled = false
+                phoneLoginBtn.textContent = "登录"
+              }
+            } else {
+              throw new Error("手机号登录功能未初始化")
+            }
+          } catch (error) {
+            console.error("手机号登录错误:", error)
+            showPhoneLoginError(error.message || "登录失败，请稍后重试")
+            phoneLoginBtn.disabled = false
+            phoneLoginBtn.textContent = "登录"
+          }
+        })
+
+        // 切换表单
+        switchLink.addEventListener("click", () => {
+          if (
+            loginForm.style.display !== "none" ||
+            phoneLoginForm.style.display !== "none"
+          ) {
+            // 切换到注册表单
+            loginForm.style.display = "none"
+            phoneLoginForm.style.display = "none"
+            registerForm.style.display = "block"
+            loginTabs.style.display = "none" // 隐藏登录方式标签
+            switchText.innerHTML = "已有账户？"
+            switchLink.textContent = "立即登录"
+            document.querySelector(".login-container h1").textContent =
+              "📝 用户注册"
+            hideRegisterMessages()
+            hideLoginMessages()
+            hidePhoneLoginMessages()
+          } else {
+            // 切换到登录表单，恢复之前选择的登录方式
+            registerForm.style.display = "none"
+            loginTabs.style.display = "flex" // 显示登录方式标签
+            switchText.innerHTML = "没有账户？"
+            switchLink.textContent = "立即注册"
+            document.querySelector(".login-container h1").textContent =
+              "🔐 用户登录"
+            hideRegisterMessages()
+
+            // 根据记录的登录方式显示对应的表单
+            if (currentLoginType === "phone") {
+              phoneTab.classList.add("active")
+              usernameTab.classList.remove("active")
+              loginForm.style.display = "none"
+              phoneLoginForm.style.display = "block"
+            } else {
+              usernameTab.classList.add("active")
+              phoneTab.classList.remove("active")
+              loginForm.style.display = "block"
+              phoneLoginForm.style.display = "none"
+            }
+          }
+        })
+
+        // 登录表单提交
+        loginForm.addEventListener("submit", async (e) => {
+          e.preventDefault()
+
+          const username = document
+            .getElementById("login-username")
+            .value.trim()
+          const password = document.getElementById("login-password").value
+
+          if (!username || !password) {
+            showLoginError("请输入用户名和密码")
+            return
+          }
+
+          // 禁用按钮，显示加载状态
+          loginBtn.disabled = true
+          loginBtn.innerHTML = '<span class="loading"></span>登录中...'
+          hideLoginError()
+
+          try {
+            const result = await window.auth.login(username, password)
+
+            if (result.success) {
+              // 跳转到主页
+              window.location.href = "./index.html"
+            } else {
+              // 登录失败，显示错误信息
+              showLoginError(result.message || "登录失败，请检查用户名和密码")
+              loginBtn.disabled = false
+              loginBtn.textContent = "登录"
+            }
+          } catch (error) {
+            console.error("登录错误:", error)
+            showLoginError(error.message || "登录失败，请稍后重试")
+            loginBtn.disabled = false
+            loginBtn.textContent = "登录"
+          }
+        })
+
+        // 注册表单提交
+        registerForm.addEventListener("submit", async (e) => {
+          e.preventDefault()
+
+          const username = document
+            .getElementById("register-username")
+            .value.trim()
+          const password = document.getElementById("register-password").value
+          const confirmPassword = document.getElementById(
+            "register-confirm-password"
+          ).value
+
+          // 验证输入
+          if (!username || !password || !confirmPassword) {
+            showRegisterError("请填写所有字段")
+            return
+          }
+
+          if (password !== confirmPassword) {
+            showRegisterError("两次输入的密码不一致")
+            return
+          }
+
+          if (password.length < 6) {
+            showRegisterError("密码长度至少为6位")
+            return
+          }
+
+          // 禁用按钮，显示加载状态
+          registerBtn.disabled = true
+          registerBtn.innerHTML = '<span class="loading"></span>注册中...'
+          hideRegisterError()
+
+          try {
+            // 调用API模块中的注册方法
+            const response = await window.API.register(username, password)
+
+            if (response.code === 0) {
+              // 注册成功，自动登录
+              showRegisterSuccess("注册成功！正在登录...")
+              registerBtn.disabled = false
+              registerBtn.textContent = "注册成功"
+
+              // 如果返回了access_token，直接登录
+              if (response.data?.access_token) {
+                // 保存 token 和用户信息
+                window.auth.setToken(response.data.access_token)
+                window.auth.setUserInfo({ username: username })
+
+                // 注册成功后，执行租户登录以刷新 analyzeApiKey
+                try {
+                  if (
+                    window.API &&
+                    typeof window.API.tenantLogin === "function"
+                  ) {
+                    const tenantResult = await window.API.tenantLogin()
+                    if (!tenantResult?.success) {
+                      console.warn(
+                        "[注册] 租户登录失败:",
+                        tenantResult?.message
+                      )
+                      // 租户登录失败不影响注册成功，但会记录警告
+                    }
+                  }
+                } catch (error) {
+                  console.warn("[注册] 租户登录异常:", error)
+                  // 租户登录异常不影响注册成功，但会记录警告
+                }
+
+                // 延迟1秒后跳转到主页
+                setTimeout(() => {
+                  window.location.href = "./index.html"
+                }, 1000)
+              } else {
+                // 如果没有返回token，切换到登录表单
+                setTimeout(() => {
+                  registerForm.style.display = "none"
+                  loginForm.style.display = "block"
+                  switchText.innerHTML = "没有账户？"
+                  switchLink.textContent = "立即注册"
+                  document.querySelector(".login-container h1").textContent =
+                    "🔐 用户登录"
+                  hideRegisterMessages()
+
+                  // 自动填充用户名
+                  document.getElementById("login-username").value = username
+                  registerBtn.textContent = "注册"
+                }, 3000)
+              }
+            } else {
+              // 注册失败，优先使用 exception 字段，如果没有则使用 msg 字段
+              showRegisterError(
+                response.exception || response.msg || "注册失败，请稍后重试"
+              )
+              registerBtn.disabled = false
+              registerBtn.textContent = "注册"
+            }
+          } catch (error) {
+            console.error("注册错误:", error)
+            showRegisterError(error.message || "注册失败，请稍后重试")
+            registerBtn.disabled = false
+            registerBtn.textContent = "注册"
+          }
+        })
+
+        function showLoginError(message) {
+          loginErrorMessage.textContent = message
+          loginErrorMessage.classList.add("show")
+        }
+
+        function hideLoginError() {
+          loginErrorMessage.classList.remove("show")
+        }
+
+        function showLoginSuccess(message) {
+          loginSuccessMessage.textContent = message
+          loginSuccessMessage.classList.add("show")
+        }
+
+        function hideLoginMessages() {
+          loginErrorMessage.classList.remove("show")
+          loginSuccessMessage.classList.remove("show")
+        }
+
+        function showPhoneLoginError(message) {
+          phoneLoginErrorMessage.textContent = message
+          phoneLoginErrorMessage.classList.add("show")
+        }
+
+        function hidePhoneLoginError() {
+          phoneLoginErrorMessage.classList.remove("show")
+        }
+
+        function showPhoneLoginSuccess(message) {
+          phoneLoginSuccessMessage.textContent = message
+          phoneLoginSuccessMessage.classList.add("show")
+          // 3秒后自动隐藏
+          setTimeout(() => {
+            hidePhoneLoginSuccess()
+          }, 3000)
+        }
+
+        function hidePhoneLoginSuccess() {
+          phoneLoginSuccessMessage.classList.remove("show")
+        }
+
+        function hidePhoneLoginMessages() {
+          phoneLoginErrorMessage.classList.remove("show")
+          phoneLoginSuccessMessage.classList.remove("show")
+        }
+
+        function showRegisterError(message) {
+          registerErrorMessage.textContent = message
+          registerErrorMessage.classList.add("show")
+        }
+
+        function hideRegisterError() {
+          registerErrorMessage.classList.remove("show")
+        }
+
+        function showRegisterSuccess(message) {
+          registerSuccessMessage.textContent = message
+          registerSuccessMessage.classList.add("show")
+        }
+
+        function hideRegisterMessages() {
+          registerErrorMessage.classList.remove("show")
+          registerSuccessMessage.classList.remove("show")
+        }
+
+        // 输入时清除错误信息
+        document
+          .getElementById("login-username")
+          .addEventListener("input", hideLoginError)
+        document
+          .getElementById("login-password")
+          .addEventListener("input", hideLoginError)
+        document
+          .getElementById("register-username")
+          .addEventListener("input", hideRegisterError)
+        document
+          .getElementById("register-password")
+          .addEventListener("input", hideRegisterError)
+        document
+          .getElementById("register-confirm-password")
+          .addEventListener("input", hideRegisterError)
+
+        // 页面卸载时清除倒计时
+        window.addEventListener("beforeunload", () => {
+          stopCountdown()
+        })
+      }
+
+      // 等待模块加载完成后初始化
+      waitForModules(initLoginPage)
     </script>
-</body>
+  </body>
 </html>

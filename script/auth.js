@@ -73,6 +73,107 @@
         }
 
         /**
+         * 手机号登录
+         * @param {string} phone - 手机号
+         * @param {string} verificationCode - 验证码
+         * @returns {Promise<Object>}
+         */
+        async loginWithPhone(phone, verificationCode) {
+            try {
+                // 等待 API 客户端加载
+                let retries = 0;
+                while (!window.apiClient && retries < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    retries++;
+                }
+
+                if (!window.apiClient) {
+                    throw new Error('API客户端未初始化，请刷新页面重试');
+                }
+
+                // 登录请求不携带认证头
+                // 先清除可能存在的 Authorization header
+                if (window.apiClient) {
+                    window.apiClient.clearAuthToken();
+                }
+                
+                const response = await window.apiClient.post('/rorschach/user_login', {
+                    phone: phone,
+                    verification_code: verificationCode
+                });
+
+                if (response.code === 0 && response.data?.access_token) {
+                    // 登录成功，保存 token 和用户信息
+                    this.setToken(response.data.access_token);
+                    this.setUserInfo({ phone: phone });
+                    
+                    // 用户登录成功后，执行租户登录以刷新 analyzeApiKey
+                    if (window.API && typeof window.API.tenantLogin === 'function') {
+                        const tenantResult = await window.API.tenantLogin();
+                        if (!tenantResult?.success) {
+                            const tenantMessage = tenantResult?.message || '租户登录失败，请稍后重试';
+                            this.clearToken();
+                            if (window.apiClient && typeof window.apiClient.clearAuthToken === 'function') {
+                                window.apiClient.clearAuthToken();
+                            }
+                            return {
+                                success: false,
+                                message: tenantMessage,
+                                data: response
+                            };
+                        }
+                    }
+                    
+                    return {
+                        success: true,
+                        data: response
+                    };
+                } else {
+                    // 登录失败，优先使用 exception 字段，如果没有则使用 msg 字段
+                    return {
+                        success: false,
+                        message: response.exception || response.msg || '登录失败，请检查手机号和验证码',
+                        data: response
+                    };
+                }
+            } catch (error) {
+                console.error('手机号登录请求失败:', error);
+                let errorMessage = '网络请求失败，请检查网络连接';
+                
+                // 处理不同类型的错误
+                if (error instanceof Error) {
+                    errorMessage = error.message || errorMessage;
+                } else if (typeof error === 'string') {
+                    errorMessage = error;
+                } else if (error && typeof error === 'object') {
+                    // 如果是 APIError，尝试获取详细信息，优先使用 exception 字段
+                    if (error.data && error.data.exception) {
+                        errorMessage = error.data.exception;
+                    } else if (error.data && error.data.msg) {
+                        errorMessage = error.data.msg;
+                    } else if (error.data && error.data.message) {
+                        errorMessage = error.data.message;
+                    } else if (error.exception) {
+                        errorMessage = String(error.exception);
+                    } else if (error.message) {
+                        errorMessage = String(error.message);
+                    } else if (error.msg) {
+                        errorMessage = String(error.msg);
+                    } else {
+                        errorMessage = '登录失败，请检查手机号和验证码';
+                    }
+                } else if (error.status) {
+                    errorMessage = `请求失败: ${error.status}`;
+                }
+                
+                return {
+                    success: false,
+                    message: errorMessage
+                };
+            }
+        }
+
+        /**
          * 登录
          * @param {string} username - 用户名
          * @param {string} password - 密码

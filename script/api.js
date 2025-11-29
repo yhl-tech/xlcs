@@ -1205,6 +1205,39 @@
     },
 
     /**
+     * 发送验证码
+     * @param {string} phone - 手机号
+     * @returns {Promise} 请求Promise
+     */
+    async sendVerificationCode(phone) {
+      if (!phone) {
+        throw new Error("手机号不能为空")
+      }
+
+      // 验证手机号格式
+      const phoneRegex = /^1[3-9]\d{9}$/
+      if (!phoneRegex.test(phone)) {
+        throw new Error("请输入正确的手机号格式")
+      }
+
+      try {
+        // 发送验证码请求不携带认证头
+        if (window.apiClient) {
+          window.apiClient.clearAuthToken()
+        }
+
+        const response = await apiClient.post("/rorschach/send_verification_code", {
+          phone: phone,
+        })
+
+        return response
+      } catch (error) {
+        console.error("[API] 发送验证码失败:", error)
+        throw error
+      }
+    },
+
+    /**
      * 设置用户基本信息
      * @param {string} userId - 用户ID
      * @param {Object} basicInfo - 基本信息对象
