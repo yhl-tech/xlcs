@@ -215,12 +215,16 @@ function waitForUserAction(step) {
       checkDrawing()
 
       // 设置超时（避免无限等待）
+      // 注意：超时后不自动 resolve，需要用户完成操作才能继续
       setTimeout(() => {
-        if (testState.drawingDetected) {
-          testState.drawingDetected = false
-          resolve()
+        if (!testState.drawingDetected) {
+          console.warn(
+            `[操作反应测试] 步骤 ${step.id} 超时（30秒），但继续等待用户操作`
+          )
+          // 不调用 resolve()，继续等待用户操作
+          // 可以在这里添加提示，但不自动跳过
         }
-      }, 30000) // 30秒超时
+      }, 30000) // 30秒超时（仅用于日志记录，不自动跳过）
     } else {
       // 普通按钮操作：监听点击事件
       const handleClick = (e) => {
@@ -247,14 +251,16 @@ function waitForUserAction(step) {
       testState.buttonClickListeners.set(step.id, handleClick)
 
       // 设置超时（避免无限等待）
+      // 注意：超时后不自动 resolve，需要用户完成操作才能继续
       setTimeout(() => {
         if (testState.buttonClickListeners.has(step.id)) {
-          button.removeEventListener("click", handleClick)
-          testState.buttonClickListeners.delete(step.id)
-          console.warn(`[操作反应测试] 步骤 ${step.id} 超时（30秒）`)
-          resolve()
+          console.warn(
+            `[操作反应测试] 步骤 ${step.id} 超时（30秒），但继续等待用户操作`
+          )
+          // 不调用 resolve()，继续等待用户操作
+          // 可以在这里添加提示，但不自动跳过
         }
-      }, 30000) // 30秒超时
+      }, 30000) // 30秒超时（仅用于日志记录，不自动跳过）
     }
   })
 }
