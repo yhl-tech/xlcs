@@ -1547,8 +1547,19 @@ async function prepareIntroExperience({ resume = false } = {}) {
     console.warn("[启动页介绍] 初始化失败，已忽略：", e)
   }
 
-  // 隐藏"进入"按钮，因为操作反应测试会自动开始
-  enterBtn.style.display = "none"
+  // 显示"进入"按钮，但在操作反应测试完成前禁用
+  enterBtn.style.display = "block"
+  enterBtn.disabled = true
+  enterBtn.textContent = "进入"
+
+  // 设置"进入"按钮的点击事件（只在操作反应测试完成后才可点击）
+  const handleEnterClick = () => {
+    if (!enterBtn.disabled) {
+      enterBtn.removeEventListener("click", handleEnterClick)
+      enterTestExperience()
+    }
+  }
+  enterBtn.addEventListener("click", handleEnterClick)
 
   // 先初始化预览窗口交互，确保画布和previewActions已初始化
   initPreviewCanvasInteractions()
@@ -1565,14 +1576,24 @@ async function prepareIntroExperience({ resume = false } = {}) {
     await startOperationReactionTest(() => {
       // 测试完成后，重新初始化预览窗口按钮（确保按钮状态正确）
       initPreviewControlButtons()
-      // 然后进入测试体验
-      enterTestExperience()
+      // 第二段播报完成后，启用"进入"按钮，等待用户点击
+      // 使用 requestAnimationFrame 确保 DOM 更新
+      requestAnimationFrame(() => {
+        if (enterBtn) {
+          enterBtn.disabled = false
+          enterBtn.textContent = "进入"
+          console.log("[操作反应测试] 第二段播报完成，进入按钮已启用")
+        } else {
+          console.error("[操作反应测试] enterBtn 未找到")
+        }
+      })
     })
   } catch (error) {
     console.error("[进入测试] 操作反应测试失败:", error)
     // 即使测试失败，也重新初始化按钮并允许进入测试
     initPreviewControlButtons()
-    enterTestExperience()
+    enterBtn.disabled = false
+    enterBtn.textContent = "进入"
   }
 }
 

@@ -196,7 +196,7 @@ const FULL_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方�
 
 const DEV_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法`
 
-export const INTRO_TEXT = !isProduction ? FULL_INTRO_TEXT : DEV_INTRO_TEXT
+export const INTRO_TEXT = isProduction ? FULL_INTRO_TEXT : DEV_INTRO_TEXT
 
 export function getEmptyBasicInfoDraft() {
   return {
