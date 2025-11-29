@@ -406,9 +406,9 @@ function initPreviewCanvasInteractions() {
   // 旋转
   function rotatePreview(direction) {
     if (direction === "left") {
-      previewState.rotation -= 90
+      previewState.rotation -= 30
     } else {
-      previewState.rotation += 90
+      previewState.rotation += 30
     }
     applyPreviewTransform()
   }
