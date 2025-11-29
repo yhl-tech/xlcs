@@ -17,7 +17,15 @@ import {
   TTS,
   buildTTSQuery,
   getRandomPromptText,
+  isWhyQuestion,
+  findWhyQuestion,
+  shouldDisplayQuestion,
 } from "./appState.js"
+
+// 判断是否为生产环境（从 appState.js 导入或本地定义）
+const isProduction =
+  typeof import.meta !== "undefined" &&
+  (import.meta.env?.PROD === true || import.meta.env?.MODE === "production")
 import { initDeviceCheck, isDeviceCheckReady } from "./deviceCheck.js"
 import { startIntroGuide, destroyIntroGuide } from "./driverGuide.js"
 import {
@@ -80,7 +88,7 @@ const REPORT_PROCESSING_STATUSES = new Set([
 
 const DEFAULT_REPORT_WAITING_STATUS = {
   status: "processing",
-  message: "测试后大约 1~3 天会收到测试报告，请耐心等待。",
+  message: "测试后大约 1~2 天会收到测试报告，请耐心等待。",
 }
 
 const SKIP_REPORT_REDIRECT_FLAG = "xlcs_skip_report_redirect"
@@ -1275,16 +1283,65 @@ function disableWelcomeMessagePlayback() {
   stopAllPlayback()
 }
 
+// 开发环境：自动填充默认基本信息并启动测试
+async function autoStartTestInDev() {
+  console.log("[开发环境] 自动填充默认基本信息并启动测试")
+
+  // 填充默认基本信息
+  const defaultDraft = {
+    sex: "男",
+    age: "25",
+    education: "本科",
+    occupation: "开发",
+    mood: "平静",
+  }
+  state.basicInfoDraft = { ...getEmptyBasicInfoDraft(), ...defaultDraft }
+  applyBasicInfoDraftToInputs()
+
+  // 验证并获取用户信息
+  const validation = validateBasicInfoForm()
+  if (!validation.valid) {
+    console.warn("[开发环境] 基本信息验证失败:", validation.errors)
+    return
+  }
+  fetchUserInfo(validation.values)
+
+  // 隐藏信息表单，显示测试窗口
+  infoScreen.style.display = "none"
+  appWindow.style.display = "flex"
+  appWindow.classList.remove("intro-mode")
+  hideWelcomeText()
+
+  // 直接进入测试
+  try {
+    await prepareIntroExperience()
+  } catch (err) {
+    console.error("[开发环境] 自动启动测试失败:", err)
+  }
+}
+
 function showResumeOptionIfAvailable(autoResume = false) {
   const snapshot = loadSessionSnapshot()
   if (!resumeTestBtn) {
     applyBasicInfoDraftToInputs()
+    // 开发环境：如果没有快照，自动跳过信息表单页面
+    if (!snapshot && !isProduction) {
+      setTimeout(() => {
+        autoStartTestInDev()
+      }, 100)
+    }
     return
   }
   if (!snapshot) {
     resumeTestBtn.style.display = "none"
     resumeTestBtn.disabled = false
     applyBasicInfoDraftToInputs()
+    // 开发环境：如果没有快照，自动跳过信息表单页面
+    if (!isProduction) {
+      setTimeout(() => {
+        autoStartTestInDev()
+      }, 100)
+    }
     return
   }
 
@@ -1484,6 +1541,35 @@ async function prepareIntroExperience({ resume = false } = {}) {
     throw err
   }
 
+  // 开发环境：直接跳过介绍页面和预览窗口，进入测试
+  if (!isProduction) {
+    console.log("[开发环境] 跳过介绍页面和预览窗口，直接进入测试")
+    infoScreen.style.display = "none"
+    appWindow.style.display = "flex"
+    appWindow.classList.remove("intro-mode")
+    hideWelcomeText()
+
+    // 初始化 TTS（必要的）
+    try {
+      if (window.dialogClient && window.dialogClient.isConnected) {
+        window.dialogClient.disconnect()
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      }
+      await ensureTTSInit("audio")
+    } catch (e) {
+      console.warn("[开发环境] TTS 初始化失败，已忽略：", e)
+    }
+
+    // 设置状态并直接进入测试
+    state.introStep = INTRO_STEPS.TEST
+    saveSessionSnapshot("intro_step", { immediate: true })
+
+    // 直接进入测试体验
+    await enterTestExperience({ skipOpeningSpeech: true })
+    return
+  }
+
+  // 生产环境：正常显示介绍页面和预览窗口
   infoScreen.style.display = "none"
   appWindow.style.display = "flex"
   appWindow.classList.add("intro-mode")
@@ -2476,7 +2562,7 @@ function showPostTestView(options = {}) {
   grid.innerHTML = ""
   grid.style.display = "" // 重置显示状态
   finishBtn.style.display = "none" // 确保完成按钮隐藏
-  finishBtn.textContent = "✅ 完成测试并查看汇总" // 重置按钮文本为初始状态
+  finishBtn.textContent = "提交" //
   finishBtn.style.backgroundColor = "" // 重置按钮背景色
   finishBtn.disabled = false // 重置按钮禁用状态
   questionText.textContent = "" // 清空问题文本
@@ -2501,22 +2587,69 @@ async function askNextQuestion() {
     .querySelectorAll(".grid-item.selected")
     .forEach((el) => el.classList.remove("selected"))
 
-  if (currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
-    questionText.textContent = "所有问题已回答完毕。感谢您的参与！"
+  // 跳过 why 问题，找到下一个应该显示的问题
+  let question = null
+  while (currentQuestionIndex < POST_TEST_QUESTIONS.length) {
+    const candidate = POST_TEST_QUESTIONS[currentQuestionIndex]
+    if (shouldDisplayQuestion(candidate)) {
+      question = candidate
+      break
+    }
+    currentQuestionIndex++
+  }
+
+  // 如果没有找到可显示的问题，说明所有问题都已处理完毕
+  if (!question || currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
+    const finishText =
+      "好的，再次感谢您的时间，你可以点击按钮，结束测试，测试报告的分析将会交给 AI 进行分析，为时大约1～2天，报告会以通知形式告知您。"
+
+    // 不显示文案，移除背景色
+    questionText.textContent = ""
+    questionText.style.background = "none"
     document.getElementById("post-test-grid").style.display = "none"
+
+    // 确保按钮元素存在
+    if (!finishBtn) {
+      console.error("[askNextQuestion] finishBtn 元素未找到")
+      return
+    }
+
+    // 先设置按钮为禁用状态，再显示按钮
+    finishBtn.setAttribute("disabled", "disabled")
     finishBtn.style.display = "inline-block"
+    // 禁用时设置灰色背景，避免绿色影响体验
+    finishBtn.style.backgroundColor = "#9ca3af"
+    finishBtn.style.cursor = "not-allowed"
+    console.log("[askNextQuestion] 按钮已设置为禁用状态，开始播报")
+
+    // 播报结束文案
+    try {
+      const ttsQuery = buildTTSQuery(finishText)
+      await sendTextQuery(ttsQuery, { ensure: false })
+
+      // 估算 TTS 播放时间（每字约 300ms）
+      const estimatedDuration = Math.max(2000, finishText.length * 280)
+      await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
+    } catch (error) {
+      console.warn("[askNextQuestion] 结束文案 TTS 播报失败:", error)
+    }
+
+    // 播报完成后启用完成按钮，恢复绿色背景
+    finishBtn.removeAttribute("disabled")
+    finishBtn.style.backgroundColor = "" // 恢复 CSS 中定义的绿色背景
+    finishBtn.style.cursor = "pointer"
+    console.log("[askNextQuestion] 播报完成，按钮已启用")
     return
   }
 
-  const question = POST_TEST_QUESTIONS[currentQuestionIndex]
+  // 显示主问题的文本
   questionText.textContent = question.text
   const gridContainer = document.getElementById("post-test-grid")
 
   gridContainer.style.pointerEvents = "none"
 
-  // 直接使用 text 进行 TTS 播报
+  // 播报主问题的文本
   try {
-    // 使用 sendTextQuery 进行 TTS 播报，格式与其他地方保持一致
     const ttsQuery = buildTTSQuery(question.text)
     await sendTextQuery(ttsQuery, { ensure: false })
 
@@ -2524,17 +2657,26 @@ async function askNextQuestion() {
     const estimatedDuration = Math.max(2000, question.text.length * 300)
     await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
   } catch (error) {
-    console.warn("[askNextQuestion] TTS 播报失败:", error)
+    console.warn("[askNextQuestion] 主问题 TTS 播报失败:", error)
   }
 
-  // 播放完成后，根据问题类型处理
-  if (question.key !== "mood") {
-    gridContainer.style.pointerEvents = "auto"
-  } else {
-    currentQuestionIndex++
-    saveSessionSnapshot("post_test_progress")
-    setTimeout(askNextQuestion, 1500)
+  // 查找并播报对应的 why 问题（如果存在）
+  const whyQuestion = findWhyQuestion(question.key)
+  if (whyQuestion) {
+    try {
+      const whyTtsQuery = buildTTSQuery(whyQuestion.text)
+      await sendTextQuery(whyTtsQuery, { ensure: false })
+
+      // 估算 why 问题的 TTS 播放时间
+      const whyEstimatedDuration = Math.max(2000, whyQuestion.text.length * 300)
+      await new Promise((resolve) => setTimeout(resolve, whyEstimatedDuration))
+    } catch (error) {
+      console.warn("[askNextQuestion] Why 问题 TTS 播报失败:", error)
+    }
   }
+
+  // 播报完成后，启用图片选择（所有问题包括 mood 都需要选择图片）
+  gridContainer.style.pointerEvents = "auto"
 }
 
 function handleImageSelection(event) {
@@ -2547,7 +2689,15 @@ function handleImageSelection(event) {
     .forEach((el) => el.classList.remove("selected"))
   event.currentTarget.classList.add("selected")
 
+  // 递增到下一个问题，如果下一个是 why 问题则继续跳过
   currentQuestionIndex++
+  while (
+    currentQuestionIndex < POST_TEST_QUESTIONS.length &&
+    !shouldDisplayQuestion(POST_TEST_QUESTIONS[currentQuestionIndex])
+  ) {
+    currentQuestionIndex++
+  }
+
   saveSessionSnapshot("post_test")
 
   document.getElementById("post-test-grid").style.pointerEvents = "none"
@@ -2556,6 +2706,11 @@ function handleImageSelection(event) {
 
 // 完成和汇总
 function finishAndSave() {
+  // 如果按钮被禁用，直接返回（防止在播报期间点击）
+  if (finishBtn && finishBtn.disabled) {
+    return
+  }
+
   // 断开TTS连接
   if (window.dialogClient) {
     window.dialogClient.disconnect()

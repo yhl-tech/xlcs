@@ -127,67 +127,78 @@ export const POST_TEST_QUESTIONS = [
   {
     key: "represent",
     text: "好了，到此为止，十张墨迹图片就已经全部看完了，你现在可以看到所有的十张图片。还有几个问题需要你回答一下，第一个问题是，十张图片里，选择一张最能代表你自己的，最能代表你本人的，是哪一张？你可以鼠标点击图版按钮告诉我。",
-    audio: "./audio/q_represent.wav",
   },
+
   {
     key: "represent_why",
     text: "请解释一下为什么，图片中哪些地方，哪些特点最能代表你自己。",
-    audio: "./audio/q_represent_why.wav",
   },
   {
     key: "father",
     text: "好的，下一个问题是，十张图片里，选择一张最能代表你父亲的，是哪一张？请鼠标点击图版告诉我。",
-    audio: "./audio/q_father.wav",
   },
   {
     key: "father_why",
     text: "请解释一下图片中哪些地方，哪些特点最能代表你的父亲。",
-    audio: "./audio/q_father_why.wav",
   },
   {
     key: "mother",
     text: "好的，下一个问题是，十张图片里，选择一张最能代表你母亲的，是哪一张？鼠标点击一下图版。",
-    audio: "./audio/q_mother.wav",
   },
   {
     key: "mother_why",
     text: "请解释一下原因。",
-    audio: "./audio/q_mother_why.wav",
   },
 
   {
     key: "like",
     text: "好的，下一个问题是，十张图片里，你最喜欢哪一张？",
-    audio: "./audio/q_like.wav",
   },
   {
     key: "like_why",
     text: "为什么呢？",
-    audio: "./audio/q_like_why.wav",
   },
   {
     key: "dislike",
     text: "好的，下一个问题是，十张图片里，你最讨厌哪一张？",
-    audio: "./audio/q_dislike.wav",
   },
   {
     key: "dislike_why",
     text: "请解释一下原因",
-    audio: "./audio/q_dislike_why.wav",
   },
-
   {
     key: "mood",
     text: "测试到此就完全结束了，请问，测完之后，相比刚开始测试时，你现在心情如何？",
-    audio: "./audio/q_mood.wav",
-  },
-
-  {
-    key: "bye",
-    text: "好的，再次感谢您的时间，你可以点击结束按钮，结束测试，测试报告的分析将会交给 AI 进行分析，为时大约1～2天，报告会以通知形式告知您。",
-    audio: "./audio/q_bye.wav",
   },
 ]
+
+/**
+ * 判断问题是否为 why 类型的问题
+ * @param {string} key - 问题的 key
+ * @returns {boolean} 是否为 why 问题
+ */
+export function isWhyQuestion(key) {
+  return key.endsWith("_why")
+}
+
+/**
+ * 根据主问题的 key 查找对应的 why 问题
+ * @param {string} mainKey - 主问题的 key（如 "represent"）
+ * @returns {object|null} 对应的 why 问题对象，如果不存在则返回 null
+ */
+export function findWhyQuestion(mainKey) {
+  const whyKey = `${mainKey}_why`
+  return POST_TEST_QUESTIONS.find((q) => q.key === whyKey) || null
+}
+
+/**
+ * 判断问题是否应该在页面上显示（过滤掉 why 问题）
+ * @param {object} question - 问题对象
+ * @returns {boolean} 是否应该显示
+ */
+export function shouldDisplayQuestion(question) {
+  return !isWhyQuestion(question.key)
+}
 
 // 根据环境决定显示的介绍文本
 const FULL_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法，通过你的操作、反应、回答等数据融合计算出结果。现在开始测试，首先是操作反应测试。请先观察左边测试界面上的各种按钮，并根据我的提示进行操作。
