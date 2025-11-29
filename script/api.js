@@ -37,7 +37,7 @@
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      USER_ID: getUserInfoFromStorage(),
+      "User-Id": getUserInfoFromStorage(),
     },
     analyzeApiKey: "",
   }
@@ -156,10 +156,10 @@
 
           // 处理 USER_ID：如果接口header传参中有USER_ID，则使用接口header传参中的USER_ID
           // 如果没有，则取API_CONFIG中的headers.USER_ID（从localStorage动态读取）
-          if (!config.headers["USER_ID"]) {
+          if (!config.headers["User-Id"]) {
             const userIdFromStorage = getUserInfoFromStorage()
             if (userIdFromStorage) {
-              config.headers["USER_ID"] = userIdFromStorage
+              config.headers["User-Id"] = userIdFromStorage
             }
           }
 
@@ -821,10 +821,10 @@
         fileSize: file.size,
       })
 
-      // 修正 URL 拼写错误，并在 headers 中设置 USER_ID
+      // 修正 URL 拼写image.png错误，并在 headers 中设置 User-Id
       return apiClient.post("/rorschach/analyze/upload_mouse_track", formData, {
         headers: {
-          USER_ID: userId,
+          "User-Id": userId,
         },
       })
     },

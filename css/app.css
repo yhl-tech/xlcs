@@ -1567,9 +1567,14 @@ body {
   box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
 }
 
+.finish {
+  display: flex;
+  justify-content: center;
+}
 #finish-btn {
   padding: 12px 28px;
-  margin-top: 25px;
+  margin: 25px auto 0;
+  display: block;
   background: var(--success-color);
   color: white;
   border: none;

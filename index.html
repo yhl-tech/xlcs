@@ -1,185 +1,287 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>罗夏墨迹测试-图版</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.2/dist/driver.min.css">
-    <link rel="stylesheet" href="./css/app.css">
-</head>
-<body>
-
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/driver.js@1.3.2/dist/driver.min.css"
+    />
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
     <!-- 信息输入屏幕 -->
     <div id="info-screen" class="screen">
-        <div class="info-card">
-            <h1>🎨 罗夏墨迹测试</h1>
-            <div class="info-form-group">
-                <label for="sex">性别</label>
-                <select id="sex" required>
-                    <option value="男" selected>男</option>
-                    <option value="女">女</option>
-                </select>
-                <div id="sex-error" class="input-error-message" role="status" aria-live="polite"></div>
-            </div>
-            <div class="info-form-group">
-                <label for="age">年龄</label>
-                <input type="number" id="age" placeholder="例如：25" min="0" step="1" inputmode="numeric" required>
-                <div id="age-error" class="input-error-message" role="status" aria-live="polite"></div>
-            </div>
-            <div class="info-form-group">
-                <label for="education">学历</label>
-                <select id="education" required>
-                    <option value="小学">小学</option>
-                    <option value="初中">初中</option>
-                    <option value="高中">高中</option>
-                    <option value="中专">中专</option>
-                    <option value="大专">大专</option>
-                    <option value="本科">本科</option>
-                    <option value="硕士">硕士</option>
-                    <option value="博士">博士</option>
-                </select>
-                <div id="education-error" class="input-error-message" role="status" aria-live="polite"></div>
-            </div>
-            <div class="info-form-group">
-                <label for="occupation">职业</label>
-                <input type="text" id="occupation" placeholder="例如：工程师" required>
-                <div id="occupation-error" class="input-error-message" role="status" aria-live="polite"></div>
-            </div>
-            <div class="info-form-group">
-                <label for="mood">当前心情</label>
-                <input type="text" id="mood" placeholder="例如：平静" required>
-                <div id="mood-error" class="input-error-message" role="status" aria-live="polite"></div>
-            </div>
-            <button id="start-test-btn">开始测试</button>
-            <button id="resume-test-btn" style="display: none; margin-top: 12px; background: #0ea5e9;">恢复未完成测试</button>
+      <div class="info-card">
+        <h1>🎨 罗夏墨迹测试</h1>
+        <div class="info-form-group">
+          <label for="sex">性别</label>
+          <select id="sex" required>
+            <option value="男" selected>男</option>
+            <option value="女">女</option>
+          </select>
+          <div
+            id="sex-error"
+            class="input-error-message"
+            role="status"
+            aria-live="polite"
+          ></div>
         </div>
+        <div class="info-form-group">
+          <label for="age">年龄</label>
+          <input
+            type="number"
+            id="age"
+            placeholder="例如：25"
+            min="0"
+            step="1"
+            inputmode="numeric"
+            required
+          />
+          <div
+            id="age-error"
+            class="input-error-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
+        <div class="info-form-group">
+          <label for="education">学历</label>
+          <select id="education" required>
+            <option value="小学">小学</option>
+            <option value="初中">初中</option>
+            <option value="高中">高中</option>
+            <option value="中专">中专</option>
+            <option value="大专">大专</option>
+            <option value="本科">本科</option>
+            <option value="硕士">硕士</option>
+            <option value="博士">博士</option>
+          </select>
+          <div
+            id="education-error"
+            class="input-error-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
+        <div class="info-form-group">
+          <label for="occupation">职业</label>
+          <input
+            type="text"
+            id="occupation"
+            placeholder="例如：工程师"
+            required
+          />
+          <div
+            id="occupation-error"
+            class="input-error-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
+        <div class="info-form-group">
+          <label for="mood">当前心情</label>
+          <input type="text" id="mood" placeholder="例如：平静" required />
+          <div
+            id="mood-error"
+            class="input-error-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
+        <button id="start-test-btn">开始测试</button>
+        <button
+          id="resume-test-btn"
+          style="display: none; margin-top: 12px; background: #0ea5e9"
+        >
+          恢复未完成测试
+        </button>
+      </div>
     </div>
 
     <!-- 主应用窗口 -->
     <div id="app-window" class="app-window screen">
-        <div class="title-bar">
-            <span>🎨 罗夏墨迹测试</span>
-            <div class="title-bar-right">
-                <span class="progress-info" id="progress-text">准备中...</span>
-                <div class="auth-controls" id="auth-controls" style="display: none;">
-                    <span class="username" id="username-display"></span>
-                    <button class="logout-btn" id="logout-btn">退出</button>
-                </div>
-                <button class="login-btn" id="login-btn" style="display: none;">登录</button>
-            </div>
+      <div class="title-bar">
+        <span>🎨 罗夏墨迹测试</span>
+        <div class="title-bar-right">
+          <span class="progress-info" id="progress-text">准备中...</span>
+          <div class="auth-controls" id="auth-controls" style="display: none">
+            <span class="username" id="username-display"></span>
+            <button class="logout-btn" id="logout-btn">退出</button>
+          </div>
+          <button class="login-btn" id="login-btn" style="display: none">
+            登录
+          </button>
         </div>
+      </div>
 
-        <div id="test-loading-overlay" class="test-loading-overlay hidden" role="status" aria-live="polite" aria-hidden="true">
-            <div class="test-loading-content">
-                <div class="test-loading-spinner" aria-hidden="true"></div>
-                <p id="test-loading-text" class="test-loading-text">正在准备测试环境，请稍候...</p>
-                <p class="test-loading-subtext">图版加载完成后会自动恢复，请保持页面打开。</p>
-            </div>
+      <div
+        id="test-loading-overlay"
+        class="test-loading-overlay hidden"
+        role="status"
+        aria-live="polite"
+        aria-hidden="true"
+      >
+        <div class="test-loading-content">
+          <div class="test-loading-spinner" aria-hidden="true"></div>
+          <p id="test-loading-text" class="test-loading-text">
+            正在准备测试环境，请稍候...
+          </p>
+          <p class="test-loading-subtext">
+            图版加载完成后会自动恢复，请保持页面打开。
+          </p>
         </div>
+      </div>
 
-        <div class="main-content" id="main-content">
-            <div id="welcome-text-container"></div>
-            <div id="intro-overlay" style="display: none;">
-                <div class="intro-preview-layout">
-                    <div class="intro-preview-panel test-preview-panel">
-                        <div class="test-preview-window">
-                            <div class="test-preview-body">
-                                <div class="test-preview-image-area">
-                                    <div class="test-preview-image-frame">
-                                        <img id="intro-preview-image" src="./images/rorschach-blot-1.webp" alt="">
-                                        <canvas class="test-preview-canvas"></canvas>
-                                    </div>
-                                </div>
-                                <div class="test-preview-controls">
-                                    <div class="control-group">
-                                        <button disabled data-action="prev">◀ 上一张</button>
-                                    </div>
-                                    <div class="control-group">
-                                        <button disabled data-action="zoom-in">🔍+ 放大</button>
-                                        <button disabled data-action="zoom-out">🔍- 缩小</button>
-                                        <button disabled data-action="rotate-left">↶ 左转</button>
-                                        <button disabled data-action="rotate-right">↷ 右转</button>
-                                    </div>
-                                    <div class="control-group">
-                                        <button disabled class="selected" data-action="pen">✏️ 画笔</button>
-                                        <div class="color-selector">
-                                            <div class="color-option selected" data-color="red" style="background-color: #ef4444;"></div>
-                                            <div class="color-option" data-color="green" style="background-color: #10b981;"></div>
-                                            <div class="color-option" data-color="blue" style="background-color: #3b82f6;"></div>
-                                        </div>
-                                        <button disabled data-action="erase">🗑️ 擦除</button>
-                                        <button disabled data-action="clear">🧹 一键擦除</button>
-                                    </div>
-                                    <div class="control-group">
-                                        <button disabled data-action="next">下一张 ▶</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+      <div class="main-content" id="main-content">
+        <div id="welcome-text-container"></div>
+        <div id="intro-overlay" style="display: none">
+          <div class="intro-preview-layout">
+            <div class="intro-preview-panel test-preview-panel">
+              <div class="test-preview-window">
+                <div class="test-preview-body">
+                  <div class="test-preview-image-area">
+                    <div class="test-preview-image-frame">
+                      <img
+                        id="intro-preview-image"
+                        src="./images/rorschach-blot-1.webp"
+                        alt=""
+                      />
+                      <canvas class="test-preview-canvas"></canvas>
                     </div>
-                    <div class="intro-info-panel">
-                        <div class="intro-info-header">
-                            <div class="intro-info-icon">🎧</div>
-                            <div>
-                                <p class="intro-info-label">测试说明</p>
-                            </div>
-                        </div>
-                        <div id="intro-text" class="intro-info-text"></div>
-                        <button id="enter-btn" class="intro-enter-btn" style="display: none;">进入</button>
+                  </div>
+                  <div class="test-preview-controls">
+                    <div class="control-group">
+                      <button disabled data-action="prev">◀ 上一张</button>
                     </div>
+                    <div class="control-group">
+                      <button disabled data-action="zoom-in">🔍+ 放大</button>
+                      <button disabled data-action="zoom-out">🔍- 缩小</button>
+                      <button disabled data-action="rotate-left">↶ 左转</button>
+                      <button disabled data-action="rotate-right">
+                        ↷ 右转
+                      </button>
+                    </div>
+                    <div class="control-group">
+                      <button disabled class="selected" data-action="pen">
+                        ✏️ 画笔
+                      </button>
+                      <div class="color-selector">
+                        <div
+                          class="color-option selected"
+                          data-color="red"
+                          style="background-color: #ef4444"
+                        ></div>
+                        <div
+                          class="color-option"
+                          data-color="green"
+                          style="background-color: #10b981"
+                        ></div>
+                        <div
+                          class="color-option"
+                          data-color="blue"
+                          style="background-color: #3b82f6"
+                        ></div>
+                      </div>
+                      <button disabled data-action="erase">🗑️ 擦除</button>
+                      <button disabled data-action="clear">🧹 一键擦除</button>
+                    </div>
+                    <div class="control-group">
+                      <button disabled data-action="next">下一张 ▶</button>
+                    </div>
+                  </div>
                 </div>
+              </div>
             </div>
-            <div id="image-container">
-                <div id="image-placeholder" class="image-placeholder hidden">
-                    <div class="placeholder-spinner" aria-hidden="true"></div>
-                    <p id="image-placeholder-text" class="placeholder-message">
-                        刷新后正在准备图版...
-                    </p>
-                    <p class="placeholder-subtext">
-                        图像将显示在这里，请保持页面打开。如果刷新后未自动恢复，可点击下方按钮重新进入。
-                    </p>
+            <div class="intro-info-panel">
+              <div class="intro-info-header">
+                <div class="intro-info-icon">🎧</div>
+                <div>
+                  <p class="intro-info-label">测试说明</p>
                 </div>
-                <img id="rorschach-image" src="" alt="">
-                <canvas id="drawing-canvas"></canvas>
+              </div>
+              <div id="intro-text" class="intro-info-text"></div>
+              <button
+                id="enter-btn"
+                class="intro-enter-btn"
+                style="display: none"
+              >
+                进入
+              </button>
             </div>
+          </div>
         </div>
+        <div id="image-container">
+          <div id="image-placeholder" class="image-placeholder hidden">
+            <div class="placeholder-spinner" aria-hidden="true"></div>
+            <p id="image-placeholder-text" class="placeholder-message">
+              刷新后正在准备图版...
+            </p>
+            <p class="placeholder-subtext">
+              图像将显示在这里，请保持页面打开。如果刷新后未自动恢复，可点击下方按钮重新进入。
+            </p>
+          </div>
+          <img id="rorschach-image" src="" alt="" />
+          <canvas id="drawing-canvas"></canvas>
+        </div>
+      </div>
 
-        <div id="post-test-view" style="display: none;">
-            <h2>📊 测试总结与反思</h2>
-            <p id="question-text"></p>
-            <div id="post-test-grid" class="image-grid"></div>
-            <button id="finish-btn" style="display: none;">✅ 完成测试并查看汇总</button>
+      <div id="post-test-view" style="display: none">
+        <h2>📊 测试总结与反思</h2>
+        <p id="question-text"></p>
+        <div id="post-test-grid" class="image-grid"></div>
+        <div class="finish">
+          <button id="finish-btn" style="display: none">
+            ✅ 完成测试并查看汇总
+          </button>
         </div>
+      </div>
 
-        <div id="summary-view" style="display: none;">
-            <h2>📈 完整测试汇总</h2>
-            <div id="summary-grid" class="image-grid"></div>
-        </div>
+      <div id="summary-view" style="display: none">
+        <h2>📈 完整测试汇总</h2>
+        <div id="summary-grid" class="image-grid"></div>
+      </div>
 
-        <div class="controls-bar" id="controls-bar" style="display: none;">
-            <div class="control-group">
-                <button id="prev-btn">◀ 上一张</button>
-            </div>
-            <div class="control-group">
-                <button id="zoom-in-btn">🔍+ 放大</button>
-                <button id="zoom-out-btn">🔍- 缩小</button>
-                <button id="rotate-left-btn">↶ 左转</button>
-                <button id="rotate-right-btn">↷ 右转</button>
-            </div>
-            <div class="control-group">
-                <button id="pen-tool" class="selected">✏️ 画笔</button>
-                <div class="color-selector">
-                    <div class="color-option selected" data-color="red" style="background-color: #ef4444;"></div>
-                    <div class="color-option" data-color="green" style="background-color: #10b981;"></div>
-                    <div class="color-option" data-color="blue" style="background-color: #3b82f6;"></div>
-                </div>
-                <button id="eraser-tool">🗑️ 擦除</button>
-                <button id="clear-all-tool">🧹 一键擦除</button>
-            </div>
-            <div class="control-group">
-                <button id="next-btn">下一张 ▶</button>
-            </div>
+      <div class="controls-bar" id="controls-bar" style="display: none">
+        <div class="control-group">
+          <button id="prev-btn">◀ 上一张</button>
         </div>
+        <div class="control-group">
+          <button id="zoom-in-btn">🔍+ 放大</button>
+          <button id="zoom-out-btn">🔍- 缩小</button>
+          <button id="rotate-left-btn">↶ 左转</button>
+          <button id="rotate-right-btn">↷ 右转</button>
+        </div>
+        <div class="control-group">
+          <button id="pen-tool" class="selected">✏️ 画笔</button>
+          <div class="color-selector">
+            <div
+              class="color-option selected"
+              data-color="red"
+              style="background-color: #ef4444"
+            ></div>
+            <div
+              class="color-option"
+              data-color="green"
+              style="background-color: #10b981"
+            ></div>
+            <div
+              class="color-option"
+              data-color="blue"
+              style="background-color: #3b82f6"
+            ></div>
+          </div>
+          <button id="eraser-tool">🗑️ 擦除</button>
+          <button id="clear-all-tool">🧹 一键擦除</button>
+        </div>
+        <div class="control-group">
+          <button id="next-btn">下一张 ▶</button>
+        </div>
+      </div>
     </div>
 
     <audio id="audio-player"></audio>
@@ -187,59 +289,62 @@
     <!-- 移动端调试工具 vConsole -->
     <script src="https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
-         // 自动检测移动端并启用 vConsole（仅在非生产环境启用）
-        // 通过检查域名来判断是否为生产环境
-        const isProduction = window.location.hostname !== 'localhost' && 
-                           window.location.hostname !== '127.0.0.1' && 
-                           !window.location.hostname.startsWith('192.168.') &&
-                           window.location.protocol === 'https:';
-        
-        // 仅在非生产环境且满足条件时启用 vConsole
-        if (!isProduction) {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (isMobile || window.location.search.includes('debug=true')) {
-                if (typeof VConsole !== 'undefined') {
-                    window.vConsole = new VConsole({
-                        theme: 'dark',
-                        maxLogNumber: 1000,
-                        onReady: function() {
-                            console.log('[vConsole] 移动端调试工具已启用');
-                        }
-                    });
-                }
-            }
+      // 自动检测移动端并启用 vConsole（仅在非生产环境启用）
+      // 通过检查域名来判断是否为生产环境
+      const isProduction =
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1" &&
+        !window.location.hostname.startsWith("192.168.") &&
+        window.location.protocol === "https:"
+
+      // 仅在非生产环境且满足条件时启用 vConsole
+      if (!isProduction) {
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          )
+        if (isMobile || window.location.search.includes("debug=true")) {
+          if (typeof VConsole !== "undefined") {
+            window.vConsole = new VConsole({
+              theme: "dark",
+              maxLogNumber: 1000,
+              onReady: function () {
+                console.log("[vConsole] 移动端调试工具已启用")
+              },
+            })
+          }
         }
+      }
     </script>
 
     <!-- Axios 库 -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    
+
     <!-- 配置文件 -->
     <script type="module" src="./script/config.js"></script>
-    
+
     <!-- API 接口模块 -->
     <script type="module" src="./script/api.js"></script>
-    
+
     <!-- 认证模块 -->
     <script type="module" src="./script/auth.js"></script>
-    
+
     <!-- 交互追踪系统 -->
     <script type="module" src="./script/interactionTracker.js"></script>
 
     <!-- 会话持久化模块 -->
     <script type="module" src="./script/sessionManager.js"></script>
-    
+
     <!-- lamejs MP3编码库 -->
     <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-    
+
     <!-- 音频录制器 -->
     <script type="module" src="./script/audioRecorder.js"></script>
-    
+
     <!-- TTS 语音合成客户端 -->
     <script type="module" src="./script/ttsClient.js"></script>
 
     <!-- Main workflow script (modularized) -->
     <script type="module" src="./script/appMain.js"></script>
-
-</body>
+  </body>
 </html>

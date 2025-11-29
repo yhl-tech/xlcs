@@ -2234,8 +2234,16 @@ function showPostTestView(options = {}) {
     window.InteractionTracker.recordSelectPhase()
   }
 
+  // 重置所有相关元素到初始状态，确保重新测试时与第一次测试一致
   const grid = document.getElementById("post-test-grid")
   grid.innerHTML = ""
+  grid.style.display = "" // 重置显示状态
+  finishBtn.style.display = "none" // 确保完成按钮隐藏
+  finishBtn.textContent = "✅ 完成测试并查看汇总" // 重置按钮文本为初始状态
+  finishBtn.style.backgroundColor = "" // 重置按钮背景色
+  finishBtn.disabled = false // 重置按钮禁用状态
+  questionText.textContent = "" // 清空问题文本
+
   for (let i = 0; i < state.totalImages; i++) {
     const item = document.createElement("div")
     item.className = "grid-item"
