@@ -425,8 +425,24 @@ function initPreviewCanvasInteractions() {
   // 清除画布
   function clearPreviewCanvas() {
     if (previewCtx && previewCanvas) {
+      // 停止当前绘制（如果有）
+      previewState.drawing = false
+
+      // 清除画布
       previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
+
+      // 重置画布上下文状态，确保画笔可以正常使用
+      previewCtx.globalCompositeOperation = "source-over"
+      previewCtx.strokeStyle = previewState.color
+      previewCtx.lineWidth = 3
+      previewCtx.lineCap = "round"
+      previewCtx.beginPath()
+
+      // 保存画布状态
       savePreviewCanvasState()
+
+      // 清除后自动切换到画笔工具，方便继续绘画
+      setPreviewTool("pen")
     }
   }
 
@@ -2169,13 +2185,10 @@ function setupEventListeners() {
   })
   document.getElementById("clear-all-tool").addEventListener("click", () => {
     clearAllDrawing()
-    // 只选中一键擦除按钮本身，不影响其他工具按钮
-    selectClearAllTool(true)
-    // 清除其他工具的选中状态
-    document.getElementById("pen-tool").classList.remove("selected")
-    document.getElementById("eraser-tool").classList.remove("selected")
-    // 重置工具状态
-    state.tool = null
+    // 清除后自动切换到画笔工具，方便继续绘画
+    selectTool("pen")
+    // 确保一键擦除按钮不被选中
+    document.getElementById("clear-all-tool").classList.remove("selected")
     resetInactivityTimer()
   })
   document.querySelectorAll(".color-option").forEach((opt) => {
@@ -3566,7 +3579,19 @@ function clearCanvas() {
 
 // 一键清除所有绘图
 function clearAllDrawing() {
+  // 停止当前绘制（如果有）
+  state.drawing = false
+
   clearCanvas()
+
+  // 重置画布上下文状态，确保画笔可以正常使用
+  ctx.globalCompositeOperation = "source-over"
+  ctx.strokeStyle = state.color || "#ef4444"
+  ctx.lineWidth = 5
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
+  ctx.beginPath()
+
   // 保存空的画布状态
   saveCanvasState(state.currentIndex)
 
