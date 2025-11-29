@@ -1,3 +1,8 @@
+// 判断是否为生产环境
+const isProduction =
+  typeof import.meta !== "undefined" &&
+  (import.meta.env?.PROD === true || import.meta.env?.MODE === "production")
+
 export const INTRO_STEPS = {
   INFO_FORM: "info_form",
   INTRO_OVERLAY: "intro_overlay",
@@ -15,36 +20,106 @@ export const INACTIVITY_THRESHOLD_1 = 10000
 export const INACTIVITY_THRESHOLD_2 = 20000
 export const NEXT_BUTTON_COOLDOWN = 1 //冷却时间
 
-export const PROMPT_TEXTS = [
-
-  // 图版初始提示语
-  "好的，这是第一张墨迹图片，你可以看到一些什么？",  // 第一张的初始提示语
-  "这张图片可以看到些什么？",  // 后面张图片的提示语，不要提示过多，把时间留给用户，当切换图片后，立即说出这句语音。
-
+// 测试过程中的提示语配置
+export const PROMPT_TEXTS = {
   // 下一个反应提示语
-  "这张图片里，除了这个，您还能看到些什么吗？",  // 前 2 张图片里详细提示下一个目标
-  "还能看到什么？",  // 后面图版直接提示
-  
+  nextReaction: {
+    detailed: "这张图片里，除了这个，您还能看到些什么吗？", // 前 2 张图片里详细提示下一个目标
+    simple: "还能看到什么？", // 后面图版直接提示
+  },
+
   // 无反应，切换图片提示语
-  "如果这张图片实在看不到别的了，您可以自行决定切换下一张图片，点击右下方下一张按钮即可。", // 前 3 张可以这么提示。
-  "如果看不到别的内容了，可以切换下一张图片",  // 后面图版简略提示。
+  noReactionSwitch: {
+    detailed:
+      "如果这张图片实在看不到别的了，您可以自行决定切换下一张图片，点击右下方下一张按钮即可。", // 前 3 张可以这么提示
+    simple: "如果看不到别的内容了，可以切换下一张图片", // 后面图版简略提示
+  },
 
   // 观察位置，画笔勾画提示语
-  "是在图版的哪个位置看到的呢？您可以用画笔张图版上圈一下，并向我描述一下你所看到的东西",  // 前 2 张图版可以提示用户详细一些，解释图版位置区域
-  "麻烦用画笔圈一下目标",  // 后面图版直接提示
+  locationDrawing: {
+    detailed:
+      "是在图版的哪个位置看到的呢？您可以用画笔在图版上圈一下，并向我描述一下你所看到的东西", // 前 2 张图版可以提示用户详细一些，解释图版位置区域
+    simple: "麻烦用画笔圈一下目标", // 后面图版直接提示
+  },
 
   // 决定因素提示语
-  "您感觉哪里像（看到的东西）呢？是形状像？颜色像？还是别的什么因素？",  // 前 2 张图版可以提示用户解释一下原因
-  "从哪看出来的呢？",  // 后面的图版不需要这么细，直接告诉用户解释一下就可以了。
-  
+  decisionFactor: {
+    detailed:
+      "您感觉哪里像（看到的东西）呢？是形状像？颜色像？还是别的什么因素？", // 前 2 张图版可以提示用户解释一下原因
+    simple: "从哪看出来的呢？", // 后面的图版不需要这么细，直接告诉用户解释一下就可以了
+  },
+
   // 追问描述提示语，捕获更多信息
-  "可以具体描述一下吗？",  // 后面的图版，不需要过细的指导，直接提示用户即可。
-  "请具体描述一下你所看到的这个东西",
-  
-  // 人 反应追问提示语
-  "这个人（这两个人，这两只敬酒的猴子）给你一种什么感觉",  // 如果是描述的人，或者类人，拟人，大概率需要提问这个，询问情绪与人际关系
-  
-]
+  descriptionFollowUp: [
+    "可以具体描述一下吗？", // 后面的图版，不需要过细的指导，直接提示用户即可
+    "请具体描述一下你所看到的这个东西",
+  ],
+
+  // 人反应追问提示语
+  humanReaction: "这个人（这两个人，这两只敬酒的猴子）给你一种什么感觉", // 如果是描述的人，或者类人，拟人，大概率需要提问这个，询问情绪与人际关系
+}
+
+/**
+ * 根据图片索引判断是否使用详细提示语
+ * @param {number} imageIndex - 图片索引（0-9）
+ * @param {number} threshold - 阈值，小于此值使用详细提示语
+ * @returns {boolean} 是否使用详细提示语
+ */
+export function shouldUseDetailedPrompt(imageIndex, threshold = 2) {
+  return imageIndex < threshold
+}
+
+/**
+ * 根据图片索引和提示类型获取合适的提示语
+ * @param {string} promptType - 提示类型：'nextReaction' | 'noReactionSwitch' | 'locationDrawing' | 'decisionFactor'
+ * @param {number} imageIndex - 图片索引（0-9）
+ * @returns {string} 提示语文本
+ */
+export function getPromptText(promptType, imageIndex) {
+  const prompts = PROMPT_TEXTS[promptType]
+  if (!prompts) {
+    console.warn(`[getPromptText] 未知的提示类型: ${promptType}`)
+    return ""
+  }
+
+  // 对于有 detailed/simple 结构的提示语
+  if (prompts.detailed && prompts.simple) {
+    const threshold = promptType === "noReactionSwitch" ? 3 : 2 // 无反应切换提示语前3张，其他前2张
+    return shouldUseDetailedPrompt(imageIndex, threshold)
+      ? prompts.detailed
+      : prompts.simple
+  }
+
+  // 对于数组类型的提示语（如 descriptionFollowUp），随机选择一个
+  if (Array.isArray(prompts)) {
+    return prompts[Math.floor(Math.random() * prompts.length)]
+  }
+
+  // 对于字符串类型的提示语
+  return prompts
+}
+
+/**
+ * 获取随机提示语（用于不活动检测）
+ * @param {number} imageIndex - 当前图片索引（0-9）
+ * @returns {string} 随机选择的提示语
+ */
+export function getRandomPromptText(imageIndex = 0) {
+  // 可用的提示类型（排除 humanReaction，因为它需要特定场景）
+  const availableTypes = [
+    "nextReaction",
+    "noReactionSwitch",
+    "locationDrawing",
+    "decisionFactor",
+    "descriptionFollowUp",
+  ]
+
+  // 随机选择一个类型
+  const randomType =
+    availableTypes[Math.floor(Math.random() * availableTypes.length)]
+
+  return getPromptText(randomType, imageIndex)
+}
 
 export const FINAL_PROMPT_TEXT = "提示：请点击下一张图片继续..."
 
@@ -114,17 +189,14 @@ export const POST_TEST_QUESTIONS = [
   },
 ]
 
-export const INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法，通过你的操作、反应、回答等数据融合计算出结果。现在开始测试，首先是操作反应测试。请先观察左边测试界面上的各种按钮，并根据我的提示进行操作。
-
-1.请点击放大按钮（此时放大按钮上面有个一闪一闪的点击提示；检测到用户操作完成后，我会说“好的，操作完成”）。
-2.请点击缩小按钮（同上）。
-3.请点击左转按钮（同上）。
-4.请点击右转按钮（同上）。
-5.请点击绿色画笔，跟随图中的轨迹进行画画（同上）。
-6.请点击擦除按钮（同上）。
-
+// 根据环境决定显示的介绍文本
+const FULL_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法，通过你的操作、反应、回答等数据融合计算出结果。现在开始测试，首先是操作反应测试。请先观察左边测试界面上的各种按钮，并根据我的提示进行操作。
 现在开始第二项测试，测试时我会依次给你展示 10 张图片，你只需要告诉我在图片中看到了什么，并描述你看到的东西、联想到的东西。不管看见什么，都可以直接描述，没有正确与错误。在一张图片中你可能会看到多个物体和场景，描述得越详细越好。
 测试过程中，你可以旋转调整图像画面，观察不同的角度，用画笔标记出你看到的物体或场景。`
+
+const DEV_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法`
+
+export const INTRO_TEXT = !isProduction ? FULL_INTRO_TEXT : DEV_INTRO_TEXT
 
 export function getEmptyBasicInfoDraft() {
   return {

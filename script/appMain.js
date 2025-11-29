@@ -16,9 +16,14 @@ import {
   sessionState,
   TTS,
   buildTTSQuery,
+  getRandomPromptText,
 } from "./appState.js"
 import { initDeviceCheck, isDeviceCheckReady } from "./deviceCheck.js"
 import { startIntroGuide, destroyIntroGuide } from "./driverGuide.js"
+import {
+  startOperationReactionTest,
+  detectDrawingAction,
+} from "./operationReactionTest.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -221,6 +226,10 @@ async function sendTextQuery(text, { ensure = true } = {}) {
   }
 }
 
+// 暴露 sendTextQuery 和 buildTTSQuery 到全局，供其他模块使用
+window.sendTextQuery = sendTextQuery
+window.buildTTSQuery = buildTTSQuery
+
 // DOM Elements
 const infoScreen = document.getElementById("info-screen")
 const appWindow = document.getElementById("app-window")
@@ -248,6 +257,9 @@ const previewState = {
   currentImageIndex: 0, // 预览窗口显示的图片索引（0-9）
   canvasStates: new Array(10).fill(null), // 每张图片的画布状态
 }
+
+// 暴露到全局，供其他模块使用
+window.previewState = previewState
 
 // 预览图片错误处理函数
 function handlePreviewImageError(img) {
@@ -418,6 +430,29 @@ function initPreviewCanvasInteractions() {
     }
   }
 
+  // 设置颜色
+  function setPreviewColor(color) {
+    previewState.color = color
+    // 更新颜色选择器的选中状态
+    const colorMap = {
+      "#ef4444": "red",
+      "#10b981": "green",
+      "#3b82f6": "blue",
+    }
+    const colorName = colorMap[color]
+    if (colorName) {
+      const colorOptions = document.querySelectorAll(
+        ".color-selector .color-option"
+      )
+      colorOptions.forEach((opt) => {
+        opt.classList.remove("selected")
+        if (opt.getAttribute("data-color") === colorName) {
+          opt.classList.add("selected")
+        }
+      })
+    }
+  }
+
   // 暴露函数供按钮使用
   window.previewActions = {
     prev: () => switchPreviewImage("prev"),
@@ -429,6 +464,7 @@ function initPreviewCanvasInteractions() {
     pen: () => setPreviewTool("pen"),
     erase: () => setPreviewTool("erase"),
     clear: clearPreviewCanvas,
+    setColor: setPreviewColor,
   }
 
   // 绘制函数
@@ -504,6 +540,8 @@ function initPreviewCanvasInteractions() {
     if (previewState.drawing) {
       previewState.drawing = false
       savePreviewCanvasState()
+      // 检测绘画操作（用于操作反应测试）
+      detectDrawingAction()
     }
   })
 
@@ -542,9 +580,157 @@ function initPreviewCanvasInteractions() {
     if (previewState.drawing) {
       previewState.drawing = false
       savePreviewCanvasState()
+      // 检测绘画操作（用于操作反应测试）
+      detectDrawingAction()
     }
   })
 }
+
+// 初始化预览窗口控制按钮
+function initPreviewControlButtons() {
+  // 确保 previewActions 已初始化
+  if (!window.previewActions) {
+    console.warn("[预览窗口] previewActions 未初始化，先初始化画布交互")
+    initPreviewCanvasInteractions()
+  }
+
+  // 启用预览窗口控制按钮并添加事件监听
+  const previewControlButtons = document.querySelectorAll(
+    ".test-preview-controls button"
+  )
+
+  if (previewControlButtons.length === 0) {
+    console.warn("[预览窗口] 未找到预览窗口按钮")
+    return
+  }
+
+  // 存储已绑定的事件监听器，避免重复绑定
+  if (!window._previewButtonHandlers) {
+    window._previewButtonHandlers = new Map()
+  }
+
+  previewControlButtons.forEach((btn) => {
+    // 强制启用按钮（无论之前是什么状态）
+    btn.disabled = false
+
+    const action = btn.getAttribute("data-action")
+    if (!action) {
+      console.warn("[预览窗口] 按钮缺少 data-action 属性:", btn)
+      return
+    }
+
+    if (!window.previewActions) {
+      console.error("[预览窗口] previewActions 未初始化，无法绑定按钮事件")
+      return
+    }
+
+    // 移除旧的事件监听器（如果存在）
+    const oldHandler = window._previewButtonHandlers.get(btn)
+    if (oldHandler) {
+      btn.removeEventListener("click", oldHandler)
+    }
+
+    // 创建新的事件处理器
+    const handler = (e) => {
+      // 防止按钮被禁用时触发
+      if (btn.disabled) {
+        console.warn(`[预览窗口] 按钮 ${action} 被禁用，忽略点击`)
+        return
+      }
+
+      console.log(`[预览窗口] 点击按钮: ${action}`)
+
+      try {
+        switch (action) {
+          case "prev":
+            if (window.previewActions.prev) window.previewActions.prev()
+            break
+          case "next":
+            if (window.previewActions.next) window.previewActions.next()
+            break
+          case "zoom-in":
+            if (window.previewActions.zoomIn) window.previewActions.zoomIn()
+            break
+          case "zoom-out":
+            if (window.previewActions.zoomOut) window.previewActions.zoomOut()
+            break
+          case "rotate-left":
+            if (window.previewActions.rotateLeft)
+              window.previewActions.rotateLeft()
+            break
+          case "rotate-right":
+            if (window.previewActions.rotateRight)
+              window.previewActions.rotateRight()
+            break
+          case "pen":
+            if (window.previewActions.pen) window.previewActions.pen()
+            break
+          case "erase":
+            if (window.previewActions.erase) window.previewActions.erase()
+            break
+          case "clear":
+            if (window.previewActions.clear) window.previewActions.clear()
+            break
+          default:
+            console.warn(`[预览窗口] 未知的按钮操作: ${action}`)
+        }
+      } catch (error) {
+        console.error(`[预览窗口] 执行按钮操作 ${action} 时出错:`, error)
+      }
+    }
+
+    // 绑定新的事件监听器
+    btn.addEventListener("click", handler)
+    window._previewButtonHandlers.set(btn, handler)
+  })
+
+  // 颜色选择器
+  const colorOptions = document.querySelectorAll(
+    ".color-selector .color-option"
+  )
+
+  // 存储颜色选择器的事件监听器
+  if (!window._colorOptionHandlers) {
+    window._colorOptionHandlers = new Map()
+  }
+
+  colorOptions.forEach((option) => {
+    // 移除旧的事件监听器（如果存在）
+    const oldHandler = window._colorOptionHandlers.get(option)
+    if (oldHandler) {
+      option.removeEventListener("click", oldHandler)
+    }
+
+    // 创建新的事件处理器
+    const handler = () => {
+      colorOptions.forEach((opt) => opt.classList.remove("selected"))
+      option.classList.add("selected")
+      const color = option.getAttribute("data-color")
+      const colorMap = {
+        red: "#ef4444",
+        green: "#10b981",
+        blue: "#3b82f6",
+      }
+      if (window.previewState && colorMap[color]) {
+        window.previewState.color = colorMap[color]
+        // 如果 previewActions 有 setColor 方法，也调用它
+        if (window.previewActions && window.previewActions.setColor) {
+          window.previewActions.setColor(colorMap[color])
+        }
+        console.log(`[预览窗口] 选择颜色: ${color} (${colorMap[color]})`)
+      }
+    }
+
+    // 绑定新的事件监听器
+    option.addEventListener("click", handler)
+    window._colorOptionHandlers.set(option, handler)
+  })
+
+  console.log("[预览窗口] 按钮和颜色选择器已初始化")
+}
+
+// 暴露到全局，供其他模块使用
+window.initPreviewControlButtons = initPreviewControlButtons
 
 const audioPlayer = document.getElementById("audio-player")
 const controlsBar = document.getElementById("controls-bar")
@@ -1293,9 +1479,6 @@ async function prepareIntroExperience({ resume = false } = {}) {
     .join("")
   introText.innerHTML = formattedText
   introOverlay.style.display = "flex"
-  enterBtn.style.display = "block"
-  enterBtn.disabled = true
-  enterBtn.textContent = "语音播报中..."
   showIntroImage()
 
   state.introStep = INTRO_STEPS.INTRO_OVERLAY
@@ -1346,12 +1529,6 @@ async function prepareIntroExperience({ resume = false } = {}) {
       }
     }
 
-    // 开始播报时，更新按钮文字为"语音播报中..."
-    enterBtn.textContent = "语音播报中..."
-    const introQuery = buildTTSQuery(INTRO_TEXT)
-    // 使用 ensure: true 确保连接正确初始化
-    await sendTextQuery(introQuery, { ensure: true })
-
     // 发送消息后，再次检查并恢复音频上下文（防止在发送过程中状态变化）
     // 使用 setTimeout 确保在音频数据开始到达时检查
     setTimeout(async () => {
@@ -1367,89 +1544,36 @@ async function prepareIntroExperience({ resume = false } = {}) {
       }
     }, 300)
   } catch (e) {
-    console.warn("[启动页介绍] 播报失败，已忽略：", e)
-    enterBtn.disabled = false
-    enterBtn.textContent = "进入"
+    console.warn("[启动页介绍] 初始化失败，已忽略：", e)
   }
 
-  const estimatedIntroDuration = Math.min(
-    65000,
-    Math.max(3000, Math.floor(INTRO_TEXT.length * 215))
-  )
+  // 隐藏"进入"按钮，因为操作反应测试会自动开始
+  enterBtn.style.display = "none"
 
-  setTimeout(() => {
-    enterBtn.disabled = false
-    enterBtn.textContent = "进入"
-  }, estimatedIntroDuration)
-
-  enterBtn.onclick = () => enterTestExperience()
-
-  // 初始化预览窗口交互
+  // 先初始化预览窗口交互，确保画布和previewActions已初始化
   initPreviewCanvasInteractions()
 
-  // 启用预览窗口控制按钮并添加事件监听
-  const previewControlButtons = document.querySelectorAll(
-    ".test-preview-controls button"
-  )
-  previewControlButtons.forEach((btn) => {
-    btn.disabled = false
-    const action = btn.getAttribute("data-action")
-    if (action && window.previewActions) {
-      btn.addEventListener("click", () => {
-        switch (action) {
-          case "prev":
-            window.previewActions.prev()
-            break
-          case "next":
-            window.previewActions.next()
-            break
-          case "zoom-in":
-            window.previewActions.zoomIn()
-            break
-          case "zoom-out":
-            window.previewActions.zoomOut()
-            break
-          case "rotate-left":
-            window.previewActions.rotateLeft()
-            break
-          case "rotate-right":
-            window.previewActions.rotateRight()
-            break
-          case "pen":
-            window.previewActions.pen()
-            break
-          case "erase":
-            window.previewActions.erase()
-            break
-          case "clear":
-            window.previewActions.clear()
-            break
-        }
-      })
-    }
-  })
+  // 立即初始化预览窗口按钮，确保按钮在操作反应测试期间可用
+  initPreviewControlButtons()
 
-  // 颜色选择器
-  const colorOptions = document.querySelectorAll(
-    ".color-selector .color-option"
-  )
-  colorOptions.forEach((option) => {
-    option.addEventListener("click", () => {
-      colorOptions.forEach((opt) => opt.classList.remove("selected"))
-      option.classList.add("selected")
-      const color = option.getAttribute("data-color")
-      const colorMap = {
-        red: "#ef4444",
-        green: "#10b981",
-        blue: "#3b82f6",
-      }
-      if (previewState && colorMap[color]) {
-        previewState.color = colorMap[color]
-      }
-    })
-  })
-
+  // 等待一小段时间，确保按钮已完全初始化
+  await new Promise((resolve) => setTimeout(resolve, 100))
   startIntroGuide()
+  // 自动开始操作反应测试（包含第一段播报、6个操作步骤、第二段播报）
+  try {
+    // 执行操作反应测试
+    await startOperationReactionTest(() => {
+      // 测试完成后，重新初始化预览窗口按钮（确保按钮状态正确）
+      initPreviewControlButtons()
+      // 然后进入测试体验
+      enterTestExperience()
+    })
+  } catch (error) {
+    console.error("[进入测试] 操作反应测试失败:", error)
+    // 即使测试失败，也重新初始化按钮并允许进入测试
+    initPreviewControlButtons()
+    enterTestExperience()
+  }
 }
 
 async function enterTestExperience({
@@ -1528,7 +1652,7 @@ async function enterTestExperience({
       if (!skipOpeningSpeech) {
         try {
           console.log("[进入测试页] 发送开场白")
-          const openingText = "现在开始测试，请描述你看到的第一张图片。"
+          const openingText = "这是第一张墨迹图片，你可以看到一些什么？"
           const introQuery = buildTTSQuery(openingText)
           await sendTextQuery(introQuery, { ensure: false })
           console.log("[进入测试页] 开场白已发送")
@@ -1782,6 +1906,11 @@ async function playAudio(src, onendedCallback = null, options = {}) {
         await window.dialogClient.connect()
       }
 
+      // 实际发送 TTS 文本进行播报
+      const ttsQuery = buildTTSQuery(src)
+      await sendTextQuery(ttsQuery, { ensure: false })
+      console.log("[播放音频] TTS 文本已发送:", src)
+
       // 由于实时对话是流式播放，无法准确判断播放完成时间
       // 根据文本长度估算播放时间（平均语速约 3-4 字/秒）
       if (onendedCallback) {
@@ -1810,6 +1939,9 @@ async function playAudio(src, onendedCallback = null, options = {}) {
   }
 }
 
+// 暴露 playAudio 到全局，供其他模块使用
+window.playAudio = playAudio
+
 // 优化的不活动逻辑
 // 优化：添加AI播放状态检测，避免在AI说话时触发提示
 function isAIPlaying() {
@@ -1826,59 +1958,130 @@ function isAIPlaying() {
 
 function playRandomPrompt() {
   if (isAIPlaying()) {
+    console.log("[不活动提示] AI正在播放，延迟重试")
     resetInactivityTimer()
     return
   }
 
   if (state.isSpeaking) {
+    console.log("[不活动提示] 用户正在说话，延迟重试")
     resetInactivityTimer()
     return
   }
 
   if (state.inactivityLevel === 0) {
-    // 第一次提示：使用TTS播放随机提示文本
-    const randomIndex = Math.floor(Math.random() * PROMPT_TEXTS.length)
-    const promptText = PROMPT_TEXTS[randomIndex]
+    // 第一次提示：使用TTS播放智能选择的提示文本（根据当前图片索引）
+    const promptText = getRandomPromptText(state.currentIndex)
+    console.log(
+      "[不活动提示] 播放第一次提示，图片索引:",
+      state.currentIndex,
+      "提示文本:",
+      promptText
+    )
     showPromptIndicator(promptText)
-    playAudio(promptText, () => {
-      state.inactivityLevel = 1
-      resetInactivityTimer()
-    })
+    playAudio(
+      promptText,
+      () => {
+        console.log("[不活动提示] 第一次提示播放完成")
+        state.inactivityLevel = 1
+        resetInactivityTimer()
+      },
+      {
+        onError: (error) => {
+          console.error("[不活动提示] 第一次提示播放失败:", error)
+          // 即使播放失败，也更新状态，避免卡住
+          state.inactivityLevel = 1
+          resetInactivityTimer()
+        },
+      }
+    )
   } else if (state.inactivityLevel === 1) {
     // 第二次提示：使用TTS播放最终提示文本
+    console.log("[不活动提示] 播放第二次提示，提示文本:", FINAL_PROMPT_TEXT)
     showPromptIndicator(FINAL_PROMPT_TEXT)
-    playAudio(FINAL_PROMPT_TEXT, () => {
-      state.inactivityLevel = 0
-      resetInactivityTimer()
-    })
+    playAudio(
+      FINAL_PROMPT_TEXT,
+      () => {
+        console.log("[不活动提示] 第二次提示播放完成")
+        state.inactivityLevel = 0
+        resetInactivityTimer()
+      },
+      {
+        onError: (error) => {
+          console.error("[不活动提示] 第二次提示播放失败:", error)
+          // 即使播放失败，也重置状态
+          state.inactivityLevel = 0
+          resetInactivityTimer()
+        },
+      }
+    )
   }
 }
 
 function resetInactivityTimer() {
   if (!inactivityActive) {
+    console.log("[不活动检测] 未启用，跳过定时器设置")
     return
   }
   clearTimeout(inactivityTimer)
   state.inactivityLevel = 0
 
-  // 优化：检查AI是否正在播放，如果正在播放则不启动不活动检测
+  // 优化：检查AI是否正在播放，如果正在播放则延迟启动不活动检测
   if (isAIPlaying()) {
+    console.log("[不活动检测] AI正在播放，延迟启动检测")
+    // 延迟一小段时间后重试
+    setTimeout(() => {
+      if (inactivityActive && !isAIPlaying() && !state.isSpeaking) {
+        resetInactivityTimer()
+      }
+    }, 1000)
     return
   }
 
-  // 第一次提示：4秒
+  console.log(
+    `[不活动检测] 启动定时器，${INACTIVITY_THRESHOLD_1}ms 后触发第一次提示`
+  )
+
+  // 第一次提示：10秒（INACTIVITY_THRESHOLD_1）
   inactivityTimer = setTimeout(() => {
     // 双重检查：确保AI不在播放且用户不在说话
-    if (!isAIPlaying() && !state.isSpeaking) {
+    if (!isAIPlaying() && !state.isSpeaking && inactivityActive) {
+      console.log("[不活动检测] 触发第一次提示")
       playRandomPrompt()
+    } else {
+      console.log(
+        "[不活动检测] 第一次提示被跳过，AI播放:",
+        isAIPlaying(),
+        "用户说话:",
+        state.isSpeaking,
+        "检测激活:",
+        inactivityActive
+      )
     }
   }, INACTIVITY_THRESHOLD_1)
 
-  // 第二次提示：8秒（在第一次基础上再4秒）
+  // 第二次提示：20秒（INACTIVITY_THRESHOLD_2，从重置时开始计算）
   setTimeout(() => {
-    // 双重检查：确保AI不在播放且用户不在说话
-    if (state.inactivityLevel === 1 && !isAIPlaying() && !state.isSpeaking) {
+    // 双重检查：确保AI不在播放且用户不在说话，且已经触发过第一次提示
+    if (
+      state.inactivityLevel === 1 &&
+      !isAIPlaying() &&
+      !state.isSpeaking &&
+      inactivityActive
+    ) {
+      console.log("[不活动检测] 触发第二次提示")
       playRandomPrompt()
+    } else {
+      console.log(
+        "[不活动检测] 第二次提示被跳过，inactivityLevel:",
+        state.inactivityLevel,
+        "AI播放:",
+        isAIPlaying(),
+        "用户说话:",
+        state.isSpeaking,
+        "检测激活:",
+        inactivityActive
+      )
     }
   }, INACTIVITY_THRESHOLD_2)
 }
@@ -2128,7 +2331,7 @@ function navigate(direction) {
       ;(async () => {
         try {
           const imageNumber = state.currentIndex + 1 // 图片编号从1开始
-          const promptText = `请描述你看到的第${imageNumber}张图片。`
+          const promptText = `这张图你可以看到什么？`
           console.log("[切换图片] 播报提示:", promptText)
           const introQuery = buildTTSQuery(promptText)
           await sendTextQuery(introQuery, { ensure: false })
@@ -3115,11 +3318,13 @@ async function downloadReport() {
 window.downloadReport = downloadReport
 
 function startInactivityMonitoring() {
+  console.log("[不活动检测] 启用不活动检测")
   inactivityActive = true
   resetInactivityTimer()
 }
 
 function stopInactivityMonitoring() {
+  console.log("[不活动检测] 停用不活动检测")
   inactivityActive = false
   clearTimeout(inactivityTimer)
   state.inactivityLevel = 0
