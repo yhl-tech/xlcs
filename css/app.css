@@ -1384,6 +1384,30 @@ body {
   box-sizing: border-box;
 }
 
+/* 隐藏 post-test-view 的滚动条 */
+#post-test-view {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+#post-test-view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 隐藏 summary-view 的滚动条 */
+#summary-view {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+#summary-view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 #post-test-view h2,
 #summary-view h2 {
   text-align: center;
@@ -1399,7 +1423,6 @@ body {
   color: var(--text-primary);
   text-align: center;
   min-height: 40px;
-  margin-bottom: 30px;
   padding: 15px;
   background: var(--primary-lighter);
   border-radius: 10px;

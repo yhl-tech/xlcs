@@ -2348,6 +2348,11 @@ function navigate(direction) {
     newIndex: state.currentIndex + direction,
   })
 
+  // 如果正在绘制，先结束绘制状态和轨迹记录
+  if (state.drawing) {
+    stopDrawing()
+  }
+
   saveCanvasState(state.currentIndex)
   const newIndex = state.currentIndex + direction
 
@@ -2370,6 +2375,16 @@ function navigate(direction) {
   }
 
   if (direction === 1 && newIndex === state.totalImages) {
+    // 确保结束最后一张图的未完成轨迹（进入选择阶段前）
+    if (
+      window.InteractionTracker &&
+      window.InteractionTracker._updateCurrentPlate
+    ) {
+      // 调用 updateCurrentPlate 会结束未完成的轨迹
+      // 传入当前索引，确保最后一张图的轨迹被正确保存
+      window.InteractionTracker._updateCurrentPlate(state.currentIndex)
+    }
+
     // 记录最后一张图的导航操作（进入选择阶段）
     if (
       window.InteractionTracker &&
@@ -2628,7 +2643,7 @@ async function askNextQuestion() {
       await sendTextQuery(ttsQuery, { ensure: false })
 
       // 估算 TTS 播放时间（每字约 300ms）
-      const estimatedDuration = Math.max(2000, finishText.length * 280)
+      const estimatedDuration = Math.max(2000, finishText.length * 250)
       await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
     } catch (error) {
       console.warn("[askNextQuestion] 结束文案 TTS 播报失败:", error)
@@ -2724,6 +2739,11 @@ function finishAndSave() {
   // 导出交互追踪数据
   if (window.InteractionTracker) {
     try {
+      // 在停止追踪前，确保结束所有未完成的轨迹
+      // 如果当前还在某个图版上，确保该图版的轨迹被正确保存
+      if (state.currentIndex >= 0 && state.currentIndex < state.totalImages) {
+        window.InteractionTracker._updateCurrentPlate(state.currentIndex)
+      }
       window.InteractionTracker.stop()
 
       // 输出所有版图的统计信息（完整数据）
@@ -3734,8 +3754,10 @@ function clearCanvas() {
 
 // 一键清除所有绘图
 function clearAllDrawing() {
-  // 停止当前绘制（如果有）
-  state.drawing = false
+  // 停止当前绘制（如果有），并结束轨迹记录
+  if (state.drawing) {
+    stopDrawing()
+  }
 
   clearCanvas()
 

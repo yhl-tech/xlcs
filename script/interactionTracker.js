@@ -22,6 +22,7 @@
             // 当前绘制的轨迹状态
             this.currentTrack = null; // 当前轨迹的点数组
             this.currentTrackStartTime = null; // 当前轨迹开始时间
+            this.currentTrackPlateKey = null; // 当前轨迹所属的图版键（用于确保轨迹记录到正确的图版）
 
             // 配置选项
             this.config = {
@@ -241,6 +242,7 @@
          */
         updateCurrentPlate(plateIndex) {
             // 切换图版时，如果有未完成的轨迹，先结束它
+            // 注意：trackDrawingEnd() 会使用保存的 currentTrackPlateKey，确保轨迹记录到正确的图版
             if (this.currentTrack) {
                 this.trackDrawingEnd();
             }
@@ -256,6 +258,9 @@
                 }
                 
                 this.currentPlateIndex = plateIndex;
+            } else {
+                // 如果 plateIndex 不在有效范围内（比如进入选择阶段），只结束轨迹，不更新索引
+                // 这样可以确保最后一张图的轨迹被正确保存
             }
         }
 
@@ -308,6 +313,10 @@
          * 停止追踪
          */
         stop() {
+            // 在停止追踪前，确保结束所有未完成的轨迹
+            if (this.currentTrack) {
+                this.trackDrawingEnd();
+            }
             this.status = 'stopped';
             this.timestamps.stop = Date.now();
             this._emit('stopped');
@@ -323,6 +332,7 @@
             this.currentPlateIndex = null;
             this.currentTrack = null;
             this.currentTrackStartTime = null;
+            this.currentTrackPlateKey = null;
             this._eventsBound = false; // 重置事件绑定标记
             this.timestamps = {
                 start: null,
@@ -347,6 +357,7 @@
                 timestamps: JSON.parse(JSON.stringify(this.timestamps)),
                 currentTrack: this.currentTrack ? JSON.parse(JSON.stringify(this.currentTrack)) : null,
                 currentTrackStartTime: this.currentTrackStartTime,
+                currentTrackPlateKey: this.currentTrackPlateKey,
                 eventsBound: this._eventsBound
             };
         }
@@ -371,6 +382,7 @@
                 timestamps,
                 currentTrack,
                 currentTrackStartTime,
+                currentTrackPlateKey,
                 eventsBound
             } = snapshot;
 
@@ -426,6 +438,10 @@
             this.currentTrackStartTime = typeof currentTrackStartTime === 'number'
                 ? currentTrackStartTime
                 : null;
+            // 恢复图版键，如果没有则使用当前图版键作为后备（向后兼容）
+            this.currentTrackPlateKey = typeof currentTrackPlateKey === 'string' 
+                ? currentTrackPlateKey 
+                : (this.currentTrack ? this._getCurrentPlateKey() : null);
             this._eventsBound = Boolean(eventsBound);
 
             if (this.currentTrack && this.status !== 'active') {
@@ -544,9 +560,10 @@
 
             const plateKey = this._getCurrentPlateKey();
             
-            // 初始化当前轨迹
+            // 初始化当前轨迹，并保存图版键（确保轨迹记录到正确的图版）
             this.currentTrack = [[x, y]];
             this.currentTrackStartTime = Date.now();
+            this.currentTrackPlateKey = plateKey; // 保存开始绘制时的图版键
         }
 
         /**
@@ -571,7 +588,8 @@
                 return;
             }
 
-            const plateKey = this._getCurrentPlateKey();
+            // 使用保存的图版键，而不是重新获取（确保轨迹记录到开始绘制时的图版）
+            const plateKey = this.currentTrackPlateKey || this._getCurrentPlateKey();
             const timeKey = this._formatTime(this.currentTrackStartTime);
             
             // 如果当前图版的轨迹数据是0，初始化为对象
@@ -590,6 +608,7 @@
             // 清空当前轨迹
             this.currentTrack = null;
             this.currentTrackStartTime = null;
+            this.currentTrackPlateKey = null;
         }
 
         /**
