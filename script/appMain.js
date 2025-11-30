@@ -2951,7 +2951,7 @@ function showSummary(options = {}) {
     return
   }
   grid.innerHTML = ""
-  renderSummaryReportSection(grid, latestReportStatus)
+  renderSummaryReportSection(summaryView, grid, latestReportStatus)
 
   const canvasStates = Array.isArray(state.canvasStates)
     ? state.canvasStates
@@ -3249,25 +3249,26 @@ function showWelcomeCardContainer() {
   }
 }
 
-function renderSummaryReportSection(grid, statusInfo) {
-  if (!grid) return
+function renderSummaryReportSection(container, grid, statusInfo) {
+  if (!container || !grid) return
   const reportCard = document.createElement("div")
-  reportCard.style.gridColumn = "1 / -1"
   reportCard.style.textAlign = "center"
-  reportCard.style.padding = "28px 20px 20px 20px"
+  reportCard.style.padding = "16px 20px 16px 20px"
   reportCard.style.background = "var(--primary-lighter)"
   reportCard.style.borderRadius = "12px"
   reportCard.style.marginBottom = "20px"
   reportCard.style.boxShadow = "var(--shadow-sm)"
   reportCard.style.position = "relative"
+  reportCard.style.width = "100%"
+  reportCard.style.boxSizing = "border-box"
 
   const retestBtn = document.createElement("button")
   retestBtn.id = "restart-test-btn"
   retestBtn.type = "button"
   retestBtn.textContent = "🔁 重新测试"
   retestBtn.style.position = "absolute"
-  retestBtn.style.top = "16px"
-  retestBtn.style.right = "16px"
+  retestBtn.style.top = "12px"
+  retestBtn.style.right = "12px"
   retestBtn.style.border = "none"
   retestBtn.style.background = "rgba(255, 255, 255, 0.25)"
   retestBtn.style.color = "var(--primary-color, #2563eb)"
@@ -3283,12 +3284,13 @@ function renderSummaryReportSection(grid, statusInfo) {
 
   const title = document.createElement("h3")
   title.style.color = "var(--primary-color)"
-  title.style.margin = "0"
+  title.style.margin = "0 0 6px 0"
+  title.style.fontSize = "18px"
   title.textContent = "✅ 感谢您的参与！"
   reportCard.appendChild(title)
 
   const message = document.createElement("p")
-  message.style.margin = "8px 0 4px 0"
+  message.style.margin = "0 0 4px 0"
   message.style.color = "var(--text-secondary)"
   message.style.fontSize = "13px"
   message.textContent = getReportStatusMessage(statusInfo)
@@ -3298,6 +3300,7 @@ function renderSummaryReportSection(grid, statusInfo) {
     const updated = document.createElement("div")
     updated.style.fontSize = "12px"
     updated.style.color = "var(--text-tertiary, #707070)"
+    updated.style.marginTop = "2px"
     updated.textContent = `最近更新：${statusInfo.updatedAt}`
     reportCard.appendChild(updated)
   }
@@ -3313,8 +3316,8 @@ function renderSummaryReportSection(grid, statusInfo) {
 
     const downloadBtn = document.createElement("button")
     downloadBtn.id = "download-report-btn"
-    downloadBtn.style.marginTop = "12px"
-    downloadBtn.style.padding = "10px 20px"
+    downloadBtn.style.marginTop = "8px"
+    downloadBtn.style.padding = "8px 18px"
     downloadBtn.style.background = "var(--primary-light)"
     downloadBtn.style.color = "white"
     downloadBtn.style.border = "none"
@@ -3329,7 +3332,8 @@ function renderSummaryReportSection(grid, statusInfo) {
     reportCard.appendChild(downloadBtn)
   }
 
-  grid.appendChild(reportCard)
+  // 将 reportCard 插入到 summary-view 中，在 grid 之前
+  container.insertBefore(reportCard, grid)
 }
 
 function normalizeReportStatus(value) {
