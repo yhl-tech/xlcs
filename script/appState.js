@@ -1,8 +1,3 @@
-// 判断是否为生产环境
-const isProduction =
-  typeof import.meta !== "undefined" &&
-  (import.meta.env?.PROD === true || import.meta.env?.MODE === "production")
-
 export const INTRO_STEPS = {
   INFO_FORM: "info_form",
   INTRO_OVERLAY: "intro_overlay",
@@ -18,7 +13,7 @@ export const SESSION_SAVE_DEBOUNCE = 600
 
 export const INACTIVITY_THRESHOLD_1 = 10000
 export const INACTIVITY_THRESHOLD_2 = 20000
-export const NEXT_BUTTON_COOLDOWN = 1 //冷却时间
+export const NEXT_BUTTON_COOLDOWN = 30 //冷却时间
 
 // 测试过程中的提示语配置
 export const PROMPT_TEXTS = {
@@ -204,10 +199,7 @@ export function shouldDisplayQuestion(question) {
 const FULL_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法，通过你的操作、反应、回答等数据融合计算出结果。现在开始测试，首先是操作反应测试。请先观察左边测试界面上的各种按钮，并根据我的提示进行操作。
 现在开始第二项测试，测试时我会依次给你展示 10 张图片，你只需要告诉我在图片中看到了什么，并描述你看到的东西、联想到的东西。不管看见什么，都可以直接描述，没有正确与错误。在一张图片中你可能会看到多个物体和场景，描述得越详细越好。
 测试过程中，你可以旋转调整图像画面，观察不同的角度，用画笔标记出你看到的物体或场景。`
-
-const DEV_INTRO_TEXT = `知己心探（InnerScan）是一种多模态测试方法`
-
-export const INTRO_TEXT = isProduction ? FULL_INTRO_TEXT : DEV_INTRO_TEXT
+export const INTRO_TEXT = FULL_INTRO_TEXT
 
 export function getEmptyBasicInfoDraft() {
   return {

@@ -26,6 +26,7 @@ import {
 const isProduction =
   typeof import.meta !== "undefined" &&
   (import.meta.env?.PROD === true || import.meta.env?.MODE === "production")
+import { DEV_CONFIG } from "./config.js"
 import { initDeviceCheck, isDeviceCheckReady } from "./deviceCheck.js"
 import { startIntroGuide, destroyIntroGuide } from "./driverGuide.js"
 import {
@@ -1285,14 +1286,20 @@ function disableWelcomeMessagePlayback() {
 
 // 开发环境：自动填充默认基本信息并启动测试
 async function autoStartTestInDev() {
+  // 检查是否应该自动启动（仅在开发环境且配置为跳过介绍页时）
+  if (isProduction || !DEV_CONFIG?.skipIntroInDev) {
+    console.log("[开发环境] 自动启动已禁用（skipIntroInDev = false）")
+    return
+  }
+
   console.log("[开发环境] 自动填充默认基本信息并启动测试")
 
-  // 填充默认基本信息
-  const defaultDraft = {
+  // 填充默认基本信息（使用 DEV_CONFIG 中的配置）
+  const defaultDraft = DEV_CONFIG?.defaultBasicInfo || {
     sex: "男",
     age: "25",
     education: "本科",
-    occupation: "开发",
+    occupation: "工程师",
     mood: "平静",
   }
   state.basicInfoDraft = { ...getEmptyBasicInfoDraft(), ...defaultDraft }
@@ -1307,12 +1314,13 @@ async function autoStartTestInDev() {
   fetchUserInfo(validation.values)
 
   // 隐藏信息表单，显示测试窗口
+  // 注意：不要提前移除 intro-mode 类，让 prepareIntroExperience() 根据配置来控制
   infoScreen.style.display = "none"
   appWindow.style.display = "flex"
-  appWindow.classList.remove("intro-mode")
+  // 不在这里移除 intro-mode，让 prepareIntroExperience() 根据配置决定
   hideWelcomeText()
 
-  // 直接进入测试
+  // 调用 prepareIntroExperience，它会根据配置决定是否跳过介绍页面
   try {
     await prepareIntroExperience()
   } catch (err) {
@@ -1324,8 +1332,8 @@ function showResumeOptionIfAvailable(autoResume = false) {
   const snapshot = loadSessionSnapshot()
   if (!resumeTestBtn) {
     applyBasicInfoDraftToInputs()
-    // 开发环境：如果没有快照，自动跳过信息表单页面
-    if (!snapshot && !isProduction) {
+    // 开发环境：如果没有快照，且配置为跳过介绍页，自动跳过信息表单页面
+    if (!snapshot && !isProduction && DEV_CONFIG?.skipIntroInDev) {
       setTimeout(() => {
         autoStartTestInDev()
       }, 100)
@@ -1336,8 +1344,8 @@ function showResumeOptionIfAvailable(autoResume = false) {
     resumeTestBtn.style.display = "none"
     resumeTestBtn.disabled = false
     applyBasicInfoDraftToInputs()
-    // 开发环境：如果没有快照，自动跳过信息表单页面
-    if (!isProduction) {
+    // 开发环境：如果没有快照，且配置为跳过介绍页，自动跳过信息表单页面
+    if (!isProduction && DEV_CONFIG?.skipIntroInDev) {
       setTimeout(() => {
         autoStartTestInDev()
       }, 100)
@@ -1347,9 +1355,24 @@ function showResumeOptionIfAvailable(autoResume = false) {
 
   restoreSnapshotCache = snapshot
   const payload = snapshot.payload || {}
-  const restoredIntroStep = INTRO_STEP_VALUES.includes(payload.introStep)
+
+  // 如果配置为不跳过介绍页，且快照中的 introStep 是 TEST，则重置为 INFO_FORM
+  // 这样可以强制重新显示介绍页
+  let restoredIntroStep = INTRO_STEP_VALUES.includes(payload.introStep)
     ? payload.introStep
     : INTRO_STEPS.INFO_FORM
+
+  if (
+    !isProduction &&
+    !DEV_CONFIG.skipIntroInDev &&
+    restoredIntroStep === INTRO_STEPS.TEST
+  ) {
+    console.log(
+      "[配置检查] 检测到快照中 introStep 为 TEST，但配置为不跳过，重置为 INFO_FORM"
+    )
+    restoredIntroStep = INTRO_STEPS.INFO_FORM
+  }
+
   state.introStep = restoredIntroStep
 
   state.basicInfoDraft = {
@@ -1530,6 +1553,18 @@ async function startTest() {
 }
 
 async function prepareIntroExperience({ resume = false } = {}) {
+  console.log("[prepareIntroExperience] 开始执行，resume:", resume)
+  console.log(
+    "[prepareIntroExperience] DEV_CONFIG 是否存在:",
+    typeof DEV_CONFIG !== "undefined"
+  )
+  console.log("[prepareIntroExperience] DEV_CONFIG 内容:", DEV_CONFIG)
+  console.log("[prepareIntroExperience] isProduction:", isProduction)
+  console.log(
+    "[prepareIntroExperience] skipIntroInDev 值:",
+    DEV_CONFIG?.skipIntroInDev
+  )
+
   disableWelcomeMessagePlayback()
   stopAllPlayback()
   let stream
@@ -1541,9 +1576,22 @@ async function prepareIntroExperience({ resume = false } = {}) {
     throw err
   }
 
-  // 开发环境：直接跳过介绍页面和预览窗口，进入测试
-  if (!isProduction) {
+  // 根据配置决定是否跳过介绍页面和预览窗口（仅在开发环境生效）
+  const shouldSkip =
+    !isProduction && DEV_CONFIG && DEV_CONFIG.skipIntroInDev === true
+  console.log(
+    "[配置检查] 判断条件: !isProduction =",
+    !isProduction,
+    ", DEV_CONFIG =",
+    DEV_CONFIG,
+    ", skipIntroInDev =",
+    DEV_CONFIG?.skipIntroInDev,
+    ", shouldSkip =",
+    shouldSkip
+  )
+  if (shouldSkip) {
     console.log("[开发环境] 跳过介绍页面和预览窗口，直接进入测试")
+    // 确保窗口已显示
     infoScreen.style.display = "none"
     appWindow.style.display = "flex"
     appWindow.classList.remove("intro-mode")
@@ -1569,10 +1617,21 @@ async function prepareIntroExperience({ resume = false } = {}) {
     return
   }
 
-  // 生产环境：正常显示介绍页面和预览窗口
-  infoScreen.style.display = "none"
-  appWindow.style.display = "flex"
+  // 正常显示介绍页面和预览窗口（生产环境或开发环境配置为不跳过时）
+  console.log("[正常流程] 显示介绍页面和预览窗口")
+  console.log("[正常流程] introOverlay 元素:", introOverlay)
+  // 确保窗口已显示（可能已经在 autoStartTestInDev 中设置了）
+  if (infoScreen.style.display !== "none") {
+    infoScreen.style.display = "none"
+  }
+  if (appWindow.style.display !== "flex") {
+    appWindow.style.display = "flex"
+  }
   appWindow.classList.add("intro-mode")
+  console.log(
+    "[正常流程] 已添加 intro-mode 类，appWindow.classList:",
+    appWindow.classList.toString()
+  )
   hideWelcomeText()
   // 格式化文字为段落，添加样式
   const formattedText = INTRO_TEXT.split(/\n+/)
@@ -1580,7 +1639,16 @@ async function prepareIntroExperience({ resume = false } = {}) {
     .map((line) => `<p>${line.trim()}</p>`)
     .join("")
   introText.innerHTML = formattedText
-  introOverlay.style.display = "flex"
+  if (introOverlay) {
+    introOverlay.style.display = "flex"
+    console.log("[正常流程] 已设置 introOverlay.style.display = 'flex'")
+    console.log(
+      "[正常流程] introOverlay.style.display 实际值:",
+      introOverlay.style.display
+    )
+  } else {
+    console.error("[正常流程] 错误：introOverlay 元素不存在！")
+  }
   showIntroImage()
 
   state.introStep = INTRO_STEPS.INTRO_OVERLAY
