@@ -2643,7 +2643,7 @@ async function askNextQuestion() {
       await sendTextQuery(ttsQuery, { ensure: false })
 
       // 估算 TTS 播放时间（每字约 300ms）
-      const estimatedDuration = Math.max(2000, finishText.length * 250)
+      const estimatedDuration = Math.max(2000, finishText.length * 220)
       await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
     } catch (error) {
       console.warn("[askNextQuestion] 结束文案 TTS 播报失败:", error)
@@ -2662,6 +2662,7 @@ async function askNextQuestion() {
   const gridContainer = document.getElementById("post-test-grid")
 
   gridContainer.style.pointerEvents = "none"
+  gridContainer.style.marginTop = "10px"
 
   // 播报主问题的文本
   try {
@@ -2669,7 +2670,7 @@ async function askNextQuestion() {
     await sendTextQuery(ttsQuery, { ensure: false })
 
     // 估算 TTS 播放时间（每字约 300ms）
-    const estimatedDuration = Math.max(2000, question.text.length * 300)
+    const estimatedDuration = Math.max(2000, question.text.length * 250)
     await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
   } catch (error) {
     console.warn("[askNextQuestion] 主问题 TTS 播报失败:", error)
@@ -2679,7 +2680,64 @@ async function askNextQuestion() {
   const whyQuestion = findWhyQuestion(question.key)
   if (whyQuestion) {
     try {
+      // 优化：在 why 问题播报前，确保连接状态良好，避免连接检查延迟
+      // 提前确保 TTS 连接就绪，避免 why 问题播报时的连接检查耗时
+      if (window.dialogClient) {
+        // 检查连接状态，如果连接正常且已初始化，则无需重新初始化
+        if (
+          !window.dialogClient.isConnected ||
+          !window.dialogClient.ws ||
+          window.dialogClient.ws.readyState !== WebSocket.OPEN
+        ) {
+          console.log(
+            "[askNextQuestion] Why 问题播报前，检测到连接异常，重新初始化"
+          )
+          await ensureTTSInit("audio")
+        } else if (!TTS.inited || TTS.currentMode !== "audio") {
+          // 连接正常但未初始化，快速初始化
+          console.log("[askNextQuestion] Why 问题播报前，快速初始化 TTS")
+          try {
+            const initMsg = JSON.stringify({
+              type: "init",
+              speaker: TTS.speaker,
+              mode: "audio",
+            })
+            window.dialogClient.ws && window.dialogClient.ws.send(initMsg)
+            TTS.inited = true
+            TTS.currentMode = "audio"
+          } catch (e) {
+            console.warn(
+              "[askNextQuestion] Why 问题播报前初始化失败，尝试完整初始化:",
+              e
+            )
+            await ensureTTSInit("audio")
+          }
+        }
+      }
+
+      // 等待主问题的音频播放完成，避免 why 问题在队列中等待
+      // 检查音频队列和播放状态
+      if (window.dialogClient) {
+        const maxWaitTime = Math.max(3000, question.text.length * 300) // 最大等待时间
+        const startTime = Date.now()
+        const checkInterval = 100 // 每 100ms 检查一次
+
+        while (
+          (window.dialogClient.isPlaying ||
+            (window.dialogClient.audioQueue &&
+              window.dialogClient.audioQueue.length > 0)) &&
+          Date.now() - startTime < maxWaitTime
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, checkInterval))
+        }
+
+        // 额外等待一小段时间，确保音频完全播放完成
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      }
+
+      // 播报 why 问题，此时连接已就绪，无需额外检查
       const whyTtsQuery = buildTTSQuery(whyQuestion.text)
+      // 使用 ensure: false，因为我们已经提前确保了连接状态
       await sendTextQuery(whyTtsQuery, { ensure: false })
 
       // 估算 why 问题的 TTS 播放时间

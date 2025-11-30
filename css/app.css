@@ -1595,8 +1595,7 @@ body {
   justify-content: center;
 }
 #finish-btn {
-  padding: 12px 28px;
-  margin: 25px auto 0;
+  padding: 9px 28px;
   display: block;
   background: var(--success-color);
   color: white;
