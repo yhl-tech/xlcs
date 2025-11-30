@@ -1268,7 +1268,8 @@ function applySnapshotToState(snapshot) {
     payload.currentQuestionIndex ?? payload.questionIndex ?? 0
   state.inactivityLevel = payload.inactivityLevel || 0
   state.nextButtonCooldown = payload.nextButtonCooldown || 0
-  state.isSpeaking = Boolean(payload.isSpeaking)
+  // isSpeaking 是实时状态，不应该从快照恢复，应该重置为 false
+  state.isSpeaking = false
   state.sessionVersion = latestSnapshotVersion
   state.completed = Boolean(snapshot.completed)
 
@@ -1293,6 +1294,10 @@ async function autoStartTestInDev() {
   }
 
   console.log("[开发环境] 自动填充默认基本信息并启动测试")
+
+  // 重置实时状态，确保不会因为之前的状态影响新测试
+  state.isSpeaking = false
+  state.inactivityLevel = 0
 
   // 填充默认基本信息（使用 DEV_CONFIG 中的配置）
   const defaultDraft = DEV_CONFIG?.defaultBasicInfo || {
@@ -1607,6 +1612,10 @@ async function prepareIntroExperience({ resume = false } = {}) {
     } catch (e) {
       console.warn("[开发环境] TTS 初始化失败，已忽略：", e)
     }
+
+    // 重置实时状态，确保不会因为之前的状态影响新测试
+    state.isSpeaking = false
+    state.inactivityLevel = 0
 
     // 设置状态并直接进入测试
     state.introStep = INTRO_STEPS.TEST
