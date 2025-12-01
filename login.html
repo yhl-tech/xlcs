@@ -218,8 +218,8 @@
         border-bottom-color: #3b82f6;
       }
 
-      /* 手机号登录表单 */
-      #phone-login-form {
+      /* 用户名登录表单默认隐藏，手机号登录默认显示 */
+      #login-form {
         display: none;
       }
 
@@ -274,46 +274,13 @@
 
       <!-- 登录方式切换标签 -->
       <div class="login-tabs">
-        <button
-          class="login-tab active"
-          id="username-tab"
-          data-form="username-login"
-        >
-          用户名登录
-        </button>
-        <button class="login-tab" id="phone-tab" data-form="phone-login">
+        <button class="login-tab active" id="phone-tab" data-form="phone-login">
           手机号登录
         </button>
+        <button class="login-tab" id="username-tab" data-form="username-login">
+          用户名登录
+        </button>
       </div>
-
-      <!-- 用户名登录表单 -->
-      <form id="login-form">
-        <div class="form-group">
-          <label for="login-username">用户名</label>
-          <input
-            type="text"
-            id="login-username"
-            name="username"
-            required
-            autocomplete="username"
-            placeholder="请输入用户名"
-          />
-        </div>
-        <div class="form-group">
-          <label for="login-password">密码</label>
-          <input
-            type="password"
-            id="login-password"
-            name="password"
-            required
-            autocomplete="current-password"
-            placeholder="请输入密码"
-          />
-        </div>
-        <div class="error-message" id="login-error-message"></div>
-        <div class="success-message" id="login-success-message"></div>
-        <button type="submit" id="login-btn">登录</button>
-      </form>
 
       <!-- 手机号登录表单 -->
       <form id="phone-login-form">
@@ -349,6 +316,35 @@
         <div class="error-message" id="phone-login-error-message"></div>
         <div class="success-message" id="phone-login-success-message"></div>
         <button type="submit" id="phone-login-btn">登录</button>
+      </form>
+
+      <!-- 用户名登录表单 -->
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-username">用户名</label>
+          <input
+            type="text"
+            id="login-username"
+            name="username"
+            required
+            autocomplete="username"
+            placeholder="请输入用户名"
+          />
+        </div>
+        <div class="form-group">
+          <label for="login-password">密码</label>
+          <input
+            type="password"
+            id="login-password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="请输入密码"
+          />
+        </div>
+        <div class="error-message" id="login-error-message"></div>
+        <div class="success-message" id="login-success-message"></div>
+        <button type="submit" id="login-btn">登录</button>
       </form>
 
       <form id="register-form">
@@ -444,6 +440,7 @@
         const registerForm = document.getElementById("register-form")
         const switchLink = document.getElementById("switch-link")
         const switchText = document.getElementById("switch-text")
+        const switchForm = document.querySelector(".switch-form")
         const loginBtn = document.getElementById("login-btn")
         const phoneLoginBtn = document.getElementById("phone-login-btn")
         const registerBtn = document.getElementById("register-btn")
@@ -478,7 +475,13 @@
         let countdownSeconds = 0
 
         // 记录当前登录方式（用于从注册表单切换回登录表单时恢复）
-        let currentLoginType = "username" // 'username' 或 'phone'
+        let currentLoginType = "phone" // 'username' 或 'phone'
+
+        // 根据当前登录方式控制底部切换区域显示（手机号登录不显示）
+        if (switchForm) {
+          switchForm.style.display =
+            currentLoginType === "phone" ? "none" : "block"
+        }
 
         // 手机号格式验证
         function validatePhone(phone) {
@@ -525,6 +528,9 @@
           phoneLoginForm.style.display = "none"
           hideLoginMessages()
           hidePhoneLoginMessages()
+          if (switchForm) {
+            switchForm.style.display = "block"
+          }
         })
 
         phoneTab.addEventListener("click", () => {
@@ -535,6 +541,9 @@
           phoneLoginForm.style.display = "block"
           hideLoginMessages()
           hidePhoneLoginMessages()
+          if (switchForm) {
+            switchForm.style.display = "none"
+          }
         })
 
         // 发送验证码
@@ -698,11 +707,17 @@
               usernameTab.classList.remove("active")
               loginForm.style.display = "none"
               phoneLoginForm.style.display = "block"
+              if (switchForm) {
+                switchForm.style.display = "none"
+              }
             } else {
               usernameTab.classList.add("active")
               phoneTab.classList.remove("active")
               loginForm.style.display = "block"
               phoneLoginForm.style.display = "none"
+              if (switchForm) {
+                switchForm.style.display = "block"
+              }
             }
           }
         })

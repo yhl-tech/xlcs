@@ -1147,34 +1147,6 @@
     },
 
     /**
-     * 查询报告状态
-     * @param {string} userId - 用户ID（可选，默认使用当前登录用户）
-     * @returns {Promise<{status: string, message?: string, progress?: number}>}
-     */
-    async getReportStatus(userId = null) {
-      try {
-        let targetUserId = userId
-        if (!targetUserId) {
-          const userInfo = window.auth ? window.auth.getUserInfo() : null
-          targetUserId = userInfo?.userId || userInfo?.username || ""
-        }
-
-        if (!targetUserId) {
-          throw new Error("用户ID不存在，请重新登录")
-        }
-
-        const payload = { user_id: targetUserId }
-        return await apiClient.post(
-          "/rorschach/user/get_report_status",
-          payload
-        )
-      } catch (error) {
-        console.error("[API] 查询报告状态失败:", error)
-        throw error
-      }
-    },
-
-    /**
      * 用户注册
      * @param {string} username - 用户名
      * @param {string} password - 密码
@@ -1226,9 +1198,12 @@
           window.apiClient.clearAuthToken()
         }
 
-        const response = await apiClient.post("/rorschach/send_verification_code", {
-          phone: phone,
-        })
+        const response = await apiClient.post(
+          "/rorschach/send_verification_code",
+          {
+            phone: phone,
+          }
+        )
 
         return response
       } catch (error) {

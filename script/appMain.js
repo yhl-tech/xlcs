@@ -62,6 +62,7 @@ let restoreSnapshotCache = null
 let restoringFromSnapshot = false
 let shouldPlayWelcomeMessage = true
 let welcomeMessageTimer = null
+let isCheckingReportStatus = false
 let introResumeInProgress = false
 let inactivityTimer = null
 let inactivityActive = false
@@ -1044,8 +1045,59 @@ function hideTestLoadingOverlay(options = {}) {
     testLoadingOverlay.classList.add("hidden")
     testLoadingOverlay.setAttribute("aria-hidden", "true")
   }
-  if (!keepMainHidden && mainContent && state.stage === "test") {
+  // 报告检查或其它场景结束后，只要不要求保持隐藏，就恢复 main-content 显示
+  if (!keepMainHidden && mainContent) {
     mainContent.style.display = "flex"
+  }
+}
+
+// 登录后检查报告状态时使用的全屏 Loading 控制
+function showReportCheckLoading() {
+  isCheckingReportStatus = true
+
+  // 如果欢迎语定时器还没触发，先取消，避免检查期间自动播报
+  if (welcomeMessageTimer) {
+    clearTimeout(welcomeMessageTimer)
+    welcomeMessageTimer = null
+  }
+  // 如果已经开始播报欢迎语或其他音频，立即停止
+  stopAllPlayback()
+
+  // 隐藏左侧信息表单，展示应用窗口，然后显示全屏 loading
+  if (infoScreen) {
+    infoScreen.style.display = "none"
+  }
+  if (appWindow) {
+    appWindow.style.display = "flex"
+  }
+  showTestLoadingOverlay("正在检查您的测试报告状态，请稍候...")
+}
+
+function hideReportCheckLoading() {
+  // 结束检查阶段
+  isCheckingReportStatus = false
+
+  // 如果已经进入测试或报告汇总阶段，交由现有逻辑处理主内容区域
+  const inMainFlow = state.stage === "test" || state.stage === "summary"
+  hideTestLoadingOverlay({ keepMainHidden: inMainFlow })
+
+  // 仍在登录后初始阶段：恢复介绍页布局
+  if (!inMainFlow) {
+    if (infoScreen) {
+      infoScreen.style.display = "flex"
+    }
+    if (appWindow) {
+      // 这里保持 app-window 可见，用于在右侧展示欢迎内容和语音检测
+      appWindow.style.display = "flex"
+    }
+
+    // 此时介绍页已经可见，如果允许播报欢迎语，则在检查结束后再播
+    if (shouldPlayWelcomeMessage) {
+      // 异步调用，避免阻塞 UI
+      playWelcomeMessage().catch((error) => {
+        console.warn("[欢迎页] 播放欢迎语失败:", error)
+      })
+    }
   }
 }
 
@@ -3326,6 +3378,17 @@ function showWelcomeCardContainer() {
   }
 }
 
+function getCurrentUserId() {
+  const userInfo = window.auth ? window.auth.getUserInfo() : null
+  if (userInfo?.userId) {
+    return String(userInfo.userId)
+  }
+  if (userInfo?.username) {
+    return userInfo.username
+  }
+  return ""
+}
+
 function renderSummaryReportSection(container, grid, statusInfo) {
   if (!container || !grid) return
   const reportCard = document.createElement("div")
@@ -3463,6 +3526,14 @@ function buildReportStatusFromResponse(response) {
   if (!response) {
     return null
   }
+  if (response instanceof Blob) {
+    return normalizeReportStatusPayload({
+      status: "ready",
+      rawStatus: "ready",
+      message: "报告已生成，可下载查看。",
+      updatedAt: new Date().toLocaleString(),
+    })
+  }
   const payload =
     (response.data && typeof response.data === "object" && response.data) ||
     (response.result &&
@@ -3520,19 +3591,14 @@ function buildReportStatusFromResponse(response) {
 
 // 下载报告进度模拟定时器
 let downloadProgressInterval = null
+let prefetchedReportBlob = null
 
 // 下载报告功能
 async function downloadReport() {
   try {
     // 获取用户ID
-    let userId = "unknown"
-    const userInfo = window.auth ? window.auth.getUserInfo() : null
-
-    if (userInfo?.userId) {
-      userId = String(userInfo.userId)
-    } else if (userInfo?.username) {
-      userId = userInfo.username
-    } else {
+    const userId = getCurrentUserId()
+    if (!userId) {
       alert("用户信息不存在，请重新登录")
       return
     }
@@ -3545,51 +3611,71 @@ async function downloadReport() {
       return
     }
     const originalText = downloadBtn.innerHTML
-    downloadBtn.innerHTML = "📄 报告生成中..."
-    downloadBtn.disabled = true
+    const estimatedMinSeconds = 10
+    const estimatedMaxSeconds = 30
+    let blob = null
+    let usedPrefetchedBlob = false
 
-    // 清理旧的进度定时器
+    if (prefetchedReportBlob instanceof Blob) {
+      blob = prefetchedReportBlob
+      prefetchedReportBlob = null
+      usedPrefetchedBlob = true
+      downloadBtn.innerHTML = "📄 正在准备下载..."
+      downloadBtn.disabled = true
+      if (statusEl) {
+        statusEl.textContent = "✅ 报告已生成，正在准备下载..."
+      }
+    } else {
+      downloadBtn.innerHTML = "📄 报告生成中..."
+      downloadBtn.disabled = true
+
+      // 清理旧的进度定时器
+      if (downloadProgressInterval) {
+        clearInterval(downloadProgressInterval)
+        downloadProgressInterval = null
+      }
+
+      const startTime = Date.now()
+
+      if (statusEl) {
+        statusEl.textContent = `⏳ 正在生成报告，预计约 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒完成，请耐心等待...`
+      }
+
+      // 模拟进度：前 60% 较快，后面缓慢接近 90%
+      let fakeProgress = 0
+      downloadProgressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime
+        if (elapsed < 5000) {
+          // 0-5 秒：0% → 60%
+          fakeProgress = Math.min(60, (elapsed / 5000) * 60)
+        } else if (elapsed < 20000) {
+          // 5-20 秒：60% → 90%
+          const t = (elapsed - 5000) / 15000
+          fakeProgress = 60 + t * 30
+        } else {
+          // 20 秒后保持在 90%，等待真实完成
+          fakeProgress = 90
+        }
+
+        const usedSeconds = Math.floor(elapsed / 1000)
+        const textParts = [
+          `⏳ 正在生成报告（模拟进度 ${Math.round(fakeProgress)}%）`,
+          `已用时约 ${usedSeconds} 秒，通常需要 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒`,
+        ]
+
+        if (statusEl) {
+          statusEl.textContent = textParts.join("，")
+        }
+      }, 800)
+
+      blob = await window.API.downloadReport(userId)
+    }
+
+    // 清理进度定时器并更新提示
     if (downloadProgressInterval) {
       clearInterval(downloadProgressInterval)
       downloadProgressInterval = null
     }
-
-    const startTime = Date.now()
-    const estimatedMinSeconds = 10
-    const estimatedMaxSeconds = 30
-
-    if (statusEl) {
-      statusEl.textContent = `⏳ 正在生成报告，预计约 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒完成，请耐心等待...`
-    }
-
-    // 模拟进度：前 60% 较快，后面缓慢接近 90%
-    let fakeProgress = 0
-    downloadProgressInterval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      if (elapsed < 5000) {
-        // 0-5 秒：0% → 60%
-        fakeProgress = Math.min(60, (elapsed / 5000) * 60)
-      } else if (elapsed < 20000) {
-        // 5-20 秒：60% → 90%
-        const t = (elapsed - 5000) / 15000
-        fakeProgress = 60 + t * 30
-      } else {
-        // 20 秒后保持在 90%，等待真实完成
-        fakeProgress = 90
-      }
-
-      const usedSeconds = Math.floor(elapsed / 1000)
-      const textParts = [
-        `⏳ 正在生成报告（模拟进度 ${Math.round(fakeProgress)}%）`,
-        `已用时约 ${usedSeconds} 秒，通常需要 ${estimatedMinSeconds}~${estimatedMaxSeconds} 秒`,
-      ]
-
-      if (statusEl) {
-        statusEl.textContent = textParts.join("，")
-      }
-    }, 800)
-
-    const blob = await window.API.downloadReport(userId)
 
     if (!(blob instanceof Blob)) {
       throw new Error("服务器返回的数据格式不正确，期望 PDF 文件")
@@ -3614,11 +3700,6 @@ async function downloadReport() {
       document.body.removeChild(a)
     }, 100)
 
-    // 清理进度定时器并更新提示
-    if (downloadProgressInterval) {
-      clearInterval(downloadProgressInterval)
-      downloadProgressInterval = null
-    }
     if (statusEl) {
       statusEl.textContent =
         "✅ 报告已生成并开始下载，如浏览器未自动弹出保存，请检查下载栏或稍后重试。"
@@ -3956,7 +4037,7 @@ function stopAllPlayback() {
 }
 
 async function playWelcomeMessage() {
-  if (!shouldPlayWelcomeMessage) {
+  if (!shouldPlayWelcomeMessage || isCheckingReportStatus) {
     return
   }
   hideIntroImage()
@@ -4140,20 +4221,25 @@ function setupAuthControls() {
 }
 
 async function routeToReportSummaryIfAvailable() {
-  if (!window.API || typeof window.API.getReportStatus !== "function") {
+  if (!window.API || typeof window.API.downloadReport !== "function") {
+    return false
+  }
+  const userId = getCurrentUserId()
+  if (!userId) {
     return false
   }
   try {
-    const response = await window.API.getReportStatus()
-    const statusInfo = buildReportStatusFromResponse(response)
+    const blob = await window.API.downloadReport(userId)
+    const statusInfo = buildReportStatusFromResponse(blob)
     if (!statusInfo) {
       return false
     }
+    prefetchedReportBlob = blob
     latestReportStatus = statusInfo
     showSummary({ reportStatus: statusInfo })
     return true
   } catch (error) {
-    console.warn("[Report] 获取报告状态失败:", error)
+    console.warn("[Report] 下载报告失败（用于检测状态）:", error)
     return false
   }
 }
@@ -4169,13 +4255,20 @@ async function checkLoginAndInit() {
     return
   }
 
-  // 已登录：优先尝试跳转报告页（除非正在准备重新测试）
-  let routedToSummary = false
-  if (!shouldSkipReportRedirect()) {
-    routedToSummary = await routeToReportSummaryIfAvailable()
-  }
-  if (routedToSummary) {
-    return
+  // 已登录：先显示全屏加载状态，再根据下载报告接口结果决定是否跳转报告页
+  showReportCheckLoading()
+  try {
+    // 优先尝试跳转报告页（除非正在准备重新测试）
+    let routedToSummary = false
+    if (!shouldSkipReportRedirect()) {
+      routedToSummary = await routeToReportSummaryIfAvailable()
+    }
+    if (routedToSummary) {
+      return
+    }
+  } finally {
+    // 无论是否跳转到报告页，都结束登录后的加载状态
+    hideReportCheckLoading()
   }
 
   // 继续初始化测试流程
