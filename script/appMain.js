@@ -2102,17 +2102,39 @@ function initAudio(stream) {
   source.connect(analyser)
   const dataArray = new Uint8Array(analyser.frequencyBinCount)
 
-  // 使用更保守的检测逻辑，避免误判
+  // 使用更保守、带自适应基线的检测逻辑，避免在无语音时被环境噪音误判
   let speakingCount = 0 // 连续检测到语音的帧数
-  const SPEAKING_THRESHOLD = 25 // 提高阈值，减少环境噪音误判（原值10）
-  const MIN_SPEAKING_FRAMES = 3 // 需要连续3帧才认为在说话，减少瞬时噪音影响
+  let baselineNoise = 0 // 环境噪音基线
+  let baselineSamples = 0 // 已采样的基线帧数
+  const MAX_BASELINE_SAMPLES = 120 // 约2秒（60fps）采样，用来估计环境噪音
+  const MIN_SPEAKING_FRAMES = 5 // 需要连续多帧才认为在说话，减少瞬时噪音影响
+
+  function getDynamicThreshold() {
+    // 动态阈值 = 噪音基线 + 15，且至少为 35，避免过低
+    const base = baselineSamples > 0 ? baselineNoise : 20
+    return Math.max(35, base + 15)
+  }
+
+  function updateBaseline(average) {
+    // 只在未判定为说话时、且采样数量未达上限时更新基线
+    if (!state.isSpeaking && baselineSamples < MAX_BASELINE_SAMPLES) {
+      baselineNoise =
+        (baselineNoise * baselineSamples + average) / (baselineSamples + 1)
+      baselineSamples++
+    }
+  }
 
   function checkSpeaking() {
     analyser.getByteFrequencyData(dataArray)
     let sum = dataArray.reduce((a, b) => a + b, 0)
     const average = sum / dataArray.length
 
-    // 使用更保守的检测逻辑
+    // 更新环境噪音基线（仅在非说话状态下）
+    updateBaseline(average)
+
+    const SPEAKING_THRESHOLD = getDynamicThreshold()
+
+    // 使用更保守、基于动态阈值的检测逻辑
     if (average > SPEAKING_THRESHOLD) {
       speakingCount++
       // 只有连续检测到语音才认为在说话

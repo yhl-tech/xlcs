@@ -59,7 +59,7 @@ if (typeof window !== "undefined") {
 // skipIntroInDev: true 时，开发环境跳过介绍页面和预览窗口，直接进入测试
 // skipIntroInDev: false 时，开发环境正常显示介绍页面和预览窗口
 export const DEV_CONFIG = {
-  skipIntroInDev: false, // 开发环境跳过介绍页面和预览窗口，直接进入测试
+  skipIntroInDev: true, // 开发环境跳过介绍页面和预览窗口，直接进入测试
   // 开发环境默认基本信息
   defaultBasicInfo: {
     sex: "男",

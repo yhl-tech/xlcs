@@ -92,7 +92,7 @@ export async function startOperationReactionTest(onComplete = null) {
     await playTTS(finalText)
 
     // 等待一小段时间确保播报完全完成
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await new Promise((resolve) => setTimeout(resolve))
 
     // 测试完成
     console.log("[操作反应测试] 测试完成")
@@ -423,7 +423,7 @@ async function playTTS(text) {
         }
 
         // 估算播放时间（每字约 300ms，但至少 2 秒）
-        const estimatedDuration = Math.max(2000, text.length * 300)
+        const estimatedDuration = Math.max(2000, text.length * 270)
         console.log(`[操作反应测试] 预计播放时间: ${estimatedDuration}ms`)
 
         let resolved = false
@@ -460,7 +460,7 @@ async function playTTS(text) {
         setTimeout(() => {
           console.log("[操作反应测试] 播报超时，强制完成")
           doResolve()
-        }, estimatedDuration + 2000) // 额外增加 2 秒缓冲
+        }, estimatedDuration + 1000) // 额外增加 2 秒缓冲
       } else if (
         window.dialogClient &&
         typeof window.sendTextQuery === "function" &&
