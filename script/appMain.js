@@ -3479,7 +3479,7 @@ function renderSummaryReportSection(container, grid, statusInfo) {
     const downloadBtn = document.createElement("button")
     downloadBtn.id = "download-report-btn"
     downloadBtn.style.marginTop = "8px"
-    downloadBtn.style.padding = "8px 18px"
+    downloadBtn.style.padding = "8px 18px 10px"
     downloadBtn.style.background = "var(--primary-light)"
     downloadBtn.style.color = "white"
     downloadBtn.style.border = "none"
@@ -3524,7 +3524,7 @@ function getReportStatusMessage(statusInfo = null) {
     return statusInfo.message
   }
   if (isReportReadyStatus(statusInfo)) {
-    return "报告已生成，可下载查看。"
+    return "报告已生成，可下载查看"
   }
   return DEFAULT_REPORT_WAITING_STATUS.message
 }
@@ -3548,52 +3548,80 @@ function buildReportStatusFromResponse(response) {
   if (!response) {
     return null
   }
+
+  // 如果响应是 Blob，说明报告已准备好
   if (response instanceof Blob) {
     return normalizeReportStatusPayload({
       status: "ready",
       rawStatus: "ready",
-      message: "报告已生成，可下载查看。",
+      message: "报告已生成，可下载查看",
       updatedAt: new Date().toLocaleString(),
     })
   }
-  const payload =
-    (response.data && typeof response.data === "object" && response.data) ||
-    (response.result &&
-      typeof response.result === "object" &&
-      response.result) ||
-    (typeof response === "object" ? response : null)
-  if (!payload) {
+
+  if (typeof response !== "object") {
     return null
   }
 
+  // 处理 data 字段：false 或不存在返回 null，true 表示文件存在
+  if (
+    response.data === false ||
+    response.data === undefined ||
+    response.data === null
+  ) {
+    return null
+  }
+  if (response.data === true) {
+    // data 为 true 表示文件存在，返回报告已准备好的状态
+    return normalizeReportStatusPayload({
+      status: "ready",
+      rawStatus: "ready",
+      message: "报告已生成，可下载查看",
+      updatedAt: new Date().toLocaleString(),
+    })
+  }
+
+  // 获取 payload：优先从 data/result 获取，如果不存在或不是对象，则使用 response 本身
+  let payload = response.data || response.result || response
+  if (typeof payload !== "object" || payload === null) {
+    return null
+  }
+
+  // 提取状态字段
   const rawStatus =
     payload.status ||
     payload.report_status ||
     payload.reportStatus ||
-    response.status ||
-    response.report_status ||
+    payload.state ||
     null
   const normalizedStatus = normalizeReportStatus(rawStatus)
+
+  // 检查是否有报告
   const hasReport =
     payload.has_report ||
     payload.hasReport ||
     payload.available ||
     payload.completed ||
     payload.reportReady ||
+    payload.report_ready ||
     false
 
+  // 如果状态不在已知状态集中，且没有 hasReport 标志，返回 null
   if (
     !hasReport &&
+    !normalizedStatus &&
     !REPORT_READY_STATUSES.has(normalizedStatus || "") &&
     !REPORT_PROCESSING_STATUSES.has(normalizedStatus || "")
   ) {
     return null
   }
 
+  // 构建状态信息对象
   const statusInfo = {
     status: normalizedStatus || rawStatus,
-    rawStatus,
-    message: payload.message || response.message || response.msg || "",
+    rawStatus: rawStatus,
+    message:
+      payload.message || payload.msg || response.message || response.msg || "",
     progress:
       payload.progress ??
       payload.percent ??
@@ -3605,6 +3633,7 @@ function buildReportStatusFromResponse(response) {
       payload.update_time ||
       payload.updatedAt ||
       payload.updateTime ||
+      payload.updated_at_time ||
       null,
   }
 
@@ -4092,11 +4121,10 @@ const WELCOME_TEXT_CONTENT = Object.freeze({
     "Hello，亲爱的用户您好，欢迎来到知己心探（InnerScan）心理测试，在测试前，需要跟您确认以下几点：",
   points: [
     "1.请先填写左侧的个人信息。",
-    "2.请确保您的电脑麦克风和音响正常。您可以在浏览器上配置您的麦克风。",  // 这里应该有个确认语音听见的交互。并配一张图作为麦克风配置的提示。
+    "2.请确保您的电脑麦克风和音响正常。您可以在浏览器上配置您的麦克风。", // 这里应该有个确认语音听见的交互。并配一张图作为麦克风配置的提示。
     "3.测试时需要保持您周围的环境保持安静，避免被外界电话、信息打扰。",
     "4.整个心理测试过程采用数字人语音交互完成，确保您的信息隐私安全，请放心。",
-    "如果以上信息确认完毕，那么请点击蓝色的开始测试按钮，我们将正式开始心理测试。"
-
+    "如果以上信息确认完毕，那么请点击蓝色的开始测试按钮，我们将正式开始心理测试。",
   ],
 })
 
@@ -4201,7 +4229,7 @@ function updateAuthUI() {
   if (window.auth && window.auth.isLoggedIn()) {
     // 已登录：显示用户名和退出按钮
     const userInfo = window.auth.getUserInfo()
-    const username = userInfo?.username || "用户"
+    const username = userInfo?.username || userInfo?.phone
     usernameDisplay.textContent = username
     authControls.style.display = "flex"
     loginBtn.style.display = "none"
@@ -4250,7 +4278,7 @@ function setupAuthControls() {
 }
 
 async function routeToReportSummaryIfAvailable() {
-  if (!window.API || typeof window.API.downloadReport !== "function") {
+  if (!window.API || typeof window.API.checkReportStatus !== "function") {
     return false
   }
   const userId = getCurrentUserId()
@@ -4258,17 +4286,16 @@ async function routeToReportSummaryIfAvailable() {
     return false
   }
   try {
-    const blob = await window.API.downloadReport(userId)
-    const statusInfo = buildReportStatusFromResponse(blob)
+    const response = await window.API.checkReportStatus(userId)
+    const statusInfo = buildReportStatusFromResponse(response)
     if (!statusInfo) {
       return false
     }
-    prefetchedReportBlob = blob
     latestReportStatus = statusInfo
     showSummary({ reportStatus: statusInfo })
     return true
   } catch (error) {
-    console.warn("[Report] 下载报告失败（用于检测状态）:", error)
+    console.warn("[Report] 检查报告状态失败:", error)
     return false
   }
 }

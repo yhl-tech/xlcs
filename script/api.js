@@ -1146,6 +1146,41 @@
       }
     },
 
+    //查验测试报告状态是否正常
+    async checkReportStatus(userId) {
+      if (!userId) {
+        throw new Error("用户ID不能为空")
+      }
+
+      try {
+        const token =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("token")
+            : null
+
+        const headers = {}
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`
+        }
+
+        const response = await apiClient.post(
+          "/rorschach/user/get_report_status",
+          {
+            user_id: userId,
+          },
+          {
+            headers: headers,
+          }
+        )
+        console.log("[API] 检查报告状态:", response)
+
+        return response
+      } catch (error) {
+        console.error("[API] 检查报告状态失败:", error)
+        throw error
+      }
+    },
     /**
      * 用户注册
      * @param {string} username - 用户名
@@ -1198,18 +1233,29 @@
           window.apiClient.clearAuthToken()
         }
 
-        const response = await apiClient.post(
-          "/rorschach/send_verification_code",
-          {
-            phone: phone,
-          }
-        )
+        const response = await apiClient.post("/rorschach/send_sms_code", {
+          phone: phone,
+        })
 
         return response
       } catch (error) {
         console.error("[API] 发送验证码失败:", error)
         throw error
       }
+    },
+
+    //手机号注册登录接口
+    async phoneLogin(phone, verificationCode) {
+      if (!phone || !verificationCode) {
+        throw new Error("手机号和验证码不能为空")
+      }
+
+      const response = await apiClient.post("/rorschach/user_register_sms", {
+        phone: phone,
+        sms_code: verificationCode,
+      })
+
+      return response
     },
 
     /**
