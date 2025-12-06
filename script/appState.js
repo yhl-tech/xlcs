@@ -13,7 +13,7 @@ export const SESSION_SAVE_DEBOUNCE = 600
 
 export const INACTIVITY_THRESHOLD_1 = 10000
 export const INACTIVITY_THRESHOLD_2 = 20000
-export const NEXT_BUTTON_COOLDOWN = 1 //冷却时间
+export const NEXT_BUTTON_COOLDOWN = 30 //冷却时间
 
 // 测试过程中的提示语配置
 export const PROMPT_TEXTS = {
@@ -227,6 +227,7 @@ export const state = {
   postTestAnswers: {},
   inactivityLevel: 0,
   nextButtonCooldown: 0,
+  imageCooldowns: {}, // 保存每张图片的冷却时间（当离开时保存，返回时恢复）
   visitedImages: new Set(),
   stage: "intro",
   introStep: INTRO_STEPS.INFO_FORM,

@@ -55,8 +55,6 @@ const pageReloaded = (() => {
   }
   return false
 })()
-let allowLoadingOverlay = pageReloaded
-let transientLoadingOverlayVisible = false
 let latestSnapshotVersion = 0
 let restoreSnapshotCache = null
 let restoringFromSnapshot = false
@@ -774,8 +772,6 @@ const audioPlayer = document.getElementById("audio-player")
 const controlsBar = document.getElementById("controls-bar")
 const rorschachImage = document.getElementById("rorschach-image")
 const canvas = document.getElementById("drawing-canvas")
-const imagePlaceholder = document.getElementById("image-placeholder")
-const imagePlaceholderText = document.getElementById("image-placeholder-text")
 const postTestView = document.getElementById("post-test-view")
 const summaryView = document.getElementById("summary-view")
 const questionText = document.getElementById("question-text")
@@ -1006,40 +1002,12 @@ function configureSessionPersistence() {
   }
 }
 
-function showImagePlaceholder(
-  message = "正在加载图版，请稍候...",
-  options = {}
-) {
-  if (!imagePlaceholder) {
-    return
-  }
-  const { force = false } = options
-  if (!force && !allowLoadingOverlay) {
-    imagePlaceholder.classList.add("hidden")
-    return
-  }
-  if (message && imagePlaceholderText) {
-    imagePlaceholderText.textContent = message
-  }
-  imagePlaceholder.classList.remove("hidden")
-  if (!force) {
-    transientLoadingOverlayVisible = true
-  }
-}
-
-function hideImagePlaceholder(options = {}) {
-  if (!imagePlaceholder) {
-    return
-  }
-  imagePlaceholder.classList.add("hidden")
-  if (transientLoadingOverlayVisible || options.disableFuture === true) {
-    allowLoadingOverlay = false
-    transientLoadingOverlayVisible = false
-  }
-}
-
 function showTestLoadingOverlay(message = "正在准备测试环境，请稍候...") {
   if (testLoadingOverlay) {
+    // 确保背景为渐变（与黑洞风格一致），防止被其他样式覆盖
+    testLoadingOverlay.style.background =
+      "linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(30, 58, 138, 0.85) 50%, rgba(0, 0, 0, 0.9) 100%)"
+    testLoadingOverlay.style.color = "rgba(255, 255, 255, 0.95)"
     testLoadingOverlay.classList.remove("hidden")
     testLoadingOverlay.setAttribute("aria-hidden", "false")
   }
@@ -1154,6 +1122,7 @@ function buildSessionSnapshot(reason = "manual") {
     currentQuestionIndex,
     inactivityLevel: state.inactivityLevel,
     nextButtonCooldown: state.nextButtonCooldown,
+    imageCooldowns: { ...state.imageCooldowns },
     isSpeaking: state.isSpeaking,
     sessionVersion: latestSnapshotVersion + 1,
     timestamp: Date.now(),
@@ -1348,6 +1317,7 @@ function applySnapshotToState(snapshot) {
     payload.currentQuestionIndex ?? payload.questionIndex ?? 0
   state.inactivityLevel = payload.inactivityLevel || 0
   state.nextButtonCooldown = payload.nextButtonCooldown || 0
+  state.imageCooldowns = payload.imageCooldowns || {}
   // isSpeaking 是实时状态，不应该从快照恢复，应该重置为 false
   state.isSpeaking = false
   state.sessionVersion = latestSnapshotVersion
@@ -1537,9 +1507,6 @@ async function resumeTestFromSnapshot(snapshot = null) {
 
   try {
     restoringFromSnapshot = true
-    if (pageReloaded) {
-      showImagePlaceholder("正在恢复上一张图版，请稍候...", { force: true })
-    }
     infoScreen.style.display = "none"
     appWindow.style.display = "flex"
     showTestLoadingOverlay("正在恢复上一张图版，请稍候...")
@@ -2107,8 +2074,16 @@ function initTest(restoredSnapshot = null) {
 
   if (!isRestored && state.currentIndex === 0) {
     disableNextButton()
-  } else if (isRestored && state.nextButtonCooldown > 0) {
-    disableNextButton(state.nextButtonCooldown, true)
+  } else if (isRestored) {
+    // 优先恢复保存的冷却时间（如果存在）
+    if (state.imageCooldowns[state.currentIndex] !== undefined) {
+      const savedCooldown = state.imageCooldowns[state.currentIndex]
+      disableNextButton(savedCooldown, true)
+      // 清除保存的冷却时间（避免重复恢复）
+      delete state.imageCooldowns[state.currentIndex]
+    } else if (state.nextButtonCooldown > 0) {
+      disableNextButton(state.nextButtonCooldown, true)
+    }
   }
 
   const resizeObserver = new ResizeObserver(() => {
@@ -2582,6 +2557,22 @@ function navigate(direction) {
 
   saveCanvasState(state.currentIndex)
   const newIndex = state.currentIndex + direction
+  const previousIndex = state.currentIndex
+
+  // 如果点击"上一张"按钮，且当前图片有冷却时间，保存冷却时间并立即结束冷却
+  if (direction === -1 && state.nextButtonCooldown > 0) {
+    // 保存当前图片的冷却时间
+    state.imageCooldowns[previousIndex] = state.nextButtonCooldown
+    // 清除冷却定时器
+    if (nextButtonCooldownTimer) {
+      clearInterval(nextButtonCooldownTimer)
+      nextButtonCooldownTimer = null
+    }
+    // 立即结束冷却
+    state.nextButtonCooldown = 0
+    nextBtn.disabled = false
+    nextBtn.textContent = "下一张 ▶"
+  }
 
   // 检查是否需要冷却豁免（如果是已浏览过的图片）
   const isVisitedImage = state.visitedImages.has(newIndex)
@@ -2658,6 +2649,17 @@ function navigate(direction) {
     state.currentIndex = newIndex
     console.log("[调试] state.currentIndex 更新为:", state.currentIndex)
 
+    // 检查是否有保存的冷却时间需要恢复
+    let hasRestoredCooldown = false
+    if (state.imageCooldowns[state.currentIndex] !== undefined) {
+      const savedCooldown = state.imageCooldowns[state.currentIndex]
+      // 恢复冷却时间
+      disableNextButton(savedCooldown, true)
+      // 清除保存的冷却时间（避免重复恢复）
+      delete state.imageCooldowns[state.currentIndex]
+      hasRestoredCooldown = true
+    }
+
     // 将当前图片标记为已浏览
     state.visitedImages.add(state.currentIndex)
     saveSessionSnapshot("navigate")
@@ -2692,6 +2694,7 @@ function navigate(direction) {
 
     // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
     // 但如果目标图片已浏览过，则不启动冷却
+    // 如果已经恢复了冷却时间，则不再启动新的冷却
     if (direction === 1) {
       if (
         window.InteractionTracker &&
@@ -2701,7 +2704,7 @@ function navigate(direction) {
       }
     }
 
-    if (direction === 1 && !isVisitedImage) {
+    if (direction === 1 && !isVisitedImage && !hasRestoredCooldown) {
       disableNextButton()
 
       // 播报当前图片的提示语音
@@ -2746,11 +2749,8 @@ function loadImage(index) {
 
   // 等待淡出动画完成后再加载新图片（增加延迟时间，让渐隐效果更慢）
   setTimeout(() => {
-    showImagePlaceholder(`正在加载第 ${index + 1} 张图，请稍候...`)
-
     rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
     rorschachImage.onerror = () => {
-      showImagePlaceholder("图片加载失败，请检查网络后重试。", { force: true })
       rorschachImage.classList.remove("image-fade-out")
     }
 
@@ -2759,7 +2759,6 @@ function loadImage(index) {
       // 图片已缓存，立即加载画布状态
       resizeCanvas()
       loadCanvasState(index)
-      hideImagePlaceholder()
       // 渐显效果：移除淡出类，触发淡入
       rorschachImage.classList.remove("image-fade-out")
       rorschachImage.classList.add("image-fade-in")
@@ -2771,7 +2770,6 @@ function loadImage(index) {
       rorschachImage.onload = () => {
         resizeCanvas()
         loadCanvasState(index)
-        hideImagePlaceholder()
         // 渐显效果：移除淡出类，触发淡入
         rorschachImage.classList.remove("image-fade-out")
         rorschachImage.classList.add("image-fade-in")
@@ -3531,9 +3529,6 @@ function showInfoScreenForRetest() {
   }
   if (rorschachImage) {
     rorschachImage.src = ""
-  }
-  if (imagePlaceholder) {
-    imagePlaceholder.classList.add("hidden")
   }
   clearCanvas()
   showWelcomeCardContainer()
