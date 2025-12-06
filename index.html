@@ -162,6 +162,17 @@
         <img id="rorschach-image" src="" alt="" />
         <canvas id="drawing-canvas"></canvas>
       </div>
+
+      <!-- 能量柱 - 画笔绘画进度可视化 -->
+      <div id="energy-pillar-container">
+        <div id="energy-particles"></div>
+        <div id="energy-pillar">
+          <div id="energy-pillar-bg"></div>
+          <div id="energy-fill">
+            <div id="energy-ripple"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="post-test-view" style="display: none">
@@ -242,6 +253,9 @@
 
   <!-- 黑洞粒子背景特效 -->
   <script src="./script/blackHoleBackground.js"></script>
+
+  <!-- 能量柱效果 -->
+  <script src="./script/energyPillar.js"></script>
 
   <!-- Axios 库 -->
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>

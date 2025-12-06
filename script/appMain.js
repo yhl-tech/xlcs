@@ -2663,28 +2663,47 @@ function loadImage(index) {
   rorschachImage.onload = null
   rorschachImage.onerror = null
 
-  showImagePlaceholder(`正在加载第 ${index + 1} 张图，请稍候...`)
+  // 渐隐效果：先让当前图片淡出
+  rorschachImage.classList.add('image-fade-out')
 
-  rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
-  rorschachImage.onerror = () => {
-    showImagePlaceholder("图片加载失败，请检查网络后重试。", { force: true })
-  }
+  // 等待淡出动画完成后再加载新图片
+  setTimeout(() => {
+    showImagePlaceholder(`正在加载第 ${index + 1} 张图，请稍候...`)
 
-  // 确保图片加载后加载该图版的画布状态
-  if (rorschachImage.complete) {
-    // 图片已缓存，立即加载画布状态
-    resizeCanvas()
-    loadCanvasState(index)
-    hideImagePlaceholder()
-  } else {
-    // 图片需要加载，等待加载完成
-    rorschachImage.onload = () => {
+    rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
+    rorschachImage.onerror = () => {
+      showImagePlaceholder("图片加载失败，请检查网络后重试。", { force: true })
+      rorschachImage.classList.remove('image-fade-out')
+    }
+
+    // 确保图片加载后加载该图版的画布状态
+    if (rorschachImage.complete) {
+      // 图片已缓存，立即加载画布状态
       resizeCanvas()
       loadCanvasState(index)
       hideImagePlaceholder()
-      rorschachImage.onload = null
+      // 渐显效果：移除淡出类，触发淡入
+      rorschachImage.classList.remove('image-fade-out')
+      rorschachImage.classList.add('image-fade-in')
+      setTimeout(() => {
+        rorschachImage.classList.remove('image-fade-in')
+      }, 400)
+    } else {
+      // 图片需要加载，等待加载完成
+      rorschachImage.onload = () => {
+        resizeCanvas()
+        loadCanvasState(index)
+        hideImagePlaceholder()
+        // 渐显效果：移除淡出类，触发淡入
+        rorschachImage.classList.remove('image-fade-out')
+        rorschachImage.classList.add('image-fade-in')
+        setTimeout(() => {
+          rorschachImage.classList.remove('image-fade-in')
+        }, 400)
+        rorschachImage.onload = null
+      }
     }
-  }
+  }, 300)  // 等待淡出动画（300ms）
 
   updateNavButtons()
 }
@@ -3898,6 +3917,11 @@ function startDrawing(e) {
     window.InteractionTracker._trackDrawingStart(lastX, lastY)
   }
 
+  // 触发能量柱粒子效果（仅画笔模式）
+  if (state.tool === "pen" && window.EnergyPillar) {
+    window.EnergyPillar.startDrawing()
+  }
+
   resetInactivityTimer()
 }
 
@@ -3936,6 +3960,12 @@ function draw(e) {
     window.InteractionTracker._trackDrawingPoint(x, y)
   }
 
+  // 能量柱粒子效果：从画笔位置飞向能量柱（仅画笔模式）
+  if (state.tool === "pen" && window.EnergyPillar && window.EnergyPillar.onDrawMove) {
+    // 使用鼠标在视口中的坐标
+    window.EnergyPillar.onDrawMove(e.clientX, e.clientY)
+  }
+
   lastX = x
   lastY = y
   resetInactivityTimer()
@@ -3952,6 +3982,12 @@ function stopDrawing() {
   ) {
     window.InteractionTracker._trackDrawingEnd()
   }
+
+  // 停止能量柱粒子效果
+  if (window.EnergyPillar) {
+    window.EnergyPillar.stopDrawing()
+  }
+
   saveCanvasState(state.currentIndex)
 }
 
