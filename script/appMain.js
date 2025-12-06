@@ -375,9 +375,8 @@ function initPreviewCanvasInteractions() {
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
       introPreviewImage.style.display = ""
-      introPreviewImage.src = `./images/rorschach-blot-${
-        previewState.currentImageIndex + 1
-      }.webp`
+      introPreviewImage.src = `./images/rorschach-blot-${previewState.currentImageIndex + 1
+        }.webp`
     }
     // 重置画布尺寸并恢复状态
     if (introPreviewImage && previewCanvas) {
@@ -944,7 +943,7 @@ function ensureSessionId() {
   if (!state.sessionId) {
     const restoredSessionId =
       window.SessionManager &&
-      typeof window.SessionManager.getSessionId === "function"
+        typeof window.SessionManager.getSessionId === "function"
         ? window.SessionManager.getSessionId()
         : null
     if (restoredSessionId) {
@@ -1108,7 +1107,7 @@ function buildSessionSnapshot(reason = "manual") {
   ensureSessionId()
   const trackerSnapshot =
     window.InteractionTracker &&
-    typeof window.InteractionTracker.serialize === "function"
+      typeof window.InteractionTracker.serialize === "function"
       ? window.InteractionTracker.serialize()
       : null
 
@@ -1152,10 +1151,10 @@ function buildSessionSnapshot(reason = "manual") {
         introOverlayVisible: introOverlay.style.display !== "none",
         enterButton: enterBtn
           ? {
-              visible: enterBtn.style.display !== "none",
-              disabled: enterBtn.disabled,
-              text: enterBtn.textContent,
-            }
+            visible: enterBtn.style.display !== "none",
+            disabled: enterBtn.disabled,
+            text: enterBtn.textContent,
+          }
           : null,
       },
     },
@@ -1296,7 +1295,7 @@ function applySnapshotToState(snapshot) {
   state.rotation = payload.rotation ?? 0
   state.canvasStates =
     Array.isArray(payload.canvasStates) &&
-    payload.canvasStates.length === state.totalImages
+      payload.canvasStates.length === state.totalImages
       ? payload.canvasStates
       : new Array(state.totalImages).fill(null)
   state.visitedImages = new Set(
@@ -1734,8 +1733,8 @@ async function prepareIntroExperience({ resume = false } = {}) {
           window.dialogClient.config?.outputAudio?.sampleRate || 24000
         window.dialogClient.audioContext = new (window.AudioContext ||
           window.webkitAudioContext)({
-          sampleRate: sampleRate,
-        })
+            sampleRate: sampleRate,
+          })
         window.dialogClient.nextPlayTime =
           window.dialogClient.audioContext.currentTime
         console.log("[介绍页] 提前创建音频上下文，采样率:", sampleRate)
@@ -2013,6 +2012,15 @@ function initTest(restoredSnapshot = null) {
       window.InteractionTracker.restore(trackerSnapshot)
     }
     window.InteractionTracker._updateCurrentPlate(state.currentIndex)
+  }
+
+  // 初始化黑洞粒子背景
+  if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
+    window.BlackHoleBackground.init('blackhole-bg-container')
+    // 设置初始主题
+    if (window.BlackHoleBackground.setTheme) {
+      window.BlackHoleBackground.setTheme(state.currentIndex)
+    }
   }
 
   setupEventListeners()
@@ -2597,6 +2605,11 @@ function navigate(direction) {
     loadImage(state.currentIndex)
     updateProgress()
 
+    // 切换背景主题颜色
+    if (window.BlackHoleBackground && window.BlackHoleBackground.setTheme) {
+      window.BlackHoleBackground.setTheme(state.currentIndex)
+    }
+
     console.log("[调试] updateProgress 后，currentIndex:", state.currentIndex)
 
     // 如果是点击下一张（包括从第一张切换到第二张），切换到新图版后立即启动冷却
@@ -2613,19 +2626,19 @@ function navigate(direction) {
     if (direction === 1 && !isVisitedImage) {
       disableNextButton()
 
-      // 播报当前图片的提示语音
-      ;(async () => {
-        try {
-          const imageNumber = state.currentIndex + 1 // 图片编号从1开始
-          const promptText = `这张图你可以看到什么？`
-          console.log("[切换图片] 播报提示:", promptText)
-          const introQuery = buildTTSQuery(promptText)
-          await sendTextQuery(introQuery, { ensure: false })
-          console.log("[切换图片] 提示已发送")
-        } catch (err) {
-          console.warn("[切换图片] 播报提示失败:", err)
-        }
-      })()
+        // 播报当前图片的提示语音
+        ; (async () => {
+          try {
+            const imageNumber = state.currentIndex + 1 // 图片编号从1开始
+            const promptText = `这张图你可以看到什么？`
+            console.log("[切换图片] 播报提示:", promptText)
+            const introQuery = buildTTSQuery(promptText)
+            await sendTextQuery(introQuery, { ensure: false })
+            console.log("[切换图片] 提示已发送")
+          } catch (err) {
+            console.warn("[切换图片] 播报提示失败:", err)
+          }
+        })()
     }
   }
   resetInactivityTimer()
@@ -2698,9 +2711,8 @@ function updateProgress() {
     "显示:",
     state.currentIndex + 1
   )
-  progressText.textContent = `第 ${state.currentIndex + 1} / ${
-    state.totalImages
-  } 张图片`
+  progressText.textContent = `第 ${state.currentIndex + 1} / ${state.totalImages
+    } 张图片`
 }
 
 // 后测试视图
@@ -2737,9 +2749,8 @@ function showPostTestView(options = {}) {
     const item = document.createElement("div")
     item.className = "grid-item"
     item.dataset.index = i
-    item.innerHTML = `<img src="./images/rorschach-blot-${
-      i + 1
-    }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
+    item.innerHTML = `<img src="./images/rorschach-blot-${i + 1
+      }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
     item.addEventListener("click", handleImageSelection)
     grid.appendChild(item)
   }
@@ -2992,7 +3003,7 @@ function finishAndSave() {
   // 调用接口提交数据到服务器
   if (window.submitTestDataToServer && window.InteractionTracker) {
     // 使用异步方式提交，不阻塞页面显示
-    ;(async () => {
+    ; (async () => {
       try {
         // 显示提交提示
         if (finishBtn) {
@@ -3148,20 +3159,20 @@ function handleRetestClick(event) {
     return
   }
   retestFlowActive = true
-  ;(async () => {
-    try {
-      setSkipReportRedirectFlag(true)
-      await prepareForRetest()
-      await startRetestFlow()
-    } catch (error) {
-      console.error("[Retest] 初始化失败:", error)
-      setSkipReportRedirectFlag(false)
-      alert("重新测试准备失败，请刷新页面或稍后重试。")
-      showInfoScreenForRetest()
-    } finally {
-      retestFlowActive = false
-    }
-  })()
+    ; (async () => {
+      try {
+        setSkipReportRedirectFlag(true)
+        await prepareForRetest()
+        await startRetestFlow()
+      } catch (error) {
+        console.error("[Retest] 初始化失败:", error)
+        setSkipReportRedirectFlag(false)
+        alert("重新测试准备失败，请刷新页面或稍后重试。")
+        showInfoScreenForRetest()
+      } finally {
+        retestFlowActive = false
+      }
+    })()
 }
 
 async function prepareForRetest() {
@@ -3262,7 +3273,7 @@ function cleanupResourcesForRetest() {
     try {
       const tracks =
         state.mediaRecorder.stream &&
-        typeof state.mediaRecorder.stream.getTracks === "function"
+          typeof state.mediaRecorder.stream.getTracks === "function"
           ? state.mediaRecorder.stream.getTracks()
           : []
       tracks.forEach((track) => track.stop())
@@ -4337,6 +4348,11 @@ async function checkLoginAndInit() {
 window.addEventListener("beforeunload", () => {
   saveSessionSnapshot("beforeunload", { immediate: true })
 })
+
+// 立即初始化黑洞粒子背景（模块加载时 DOM 已就绪）
+if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
+  window.BlackHoleBackground.init('blackhole-bg-container')
+}
 
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {

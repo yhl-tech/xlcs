@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黑洞背景测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #blackhole-bg-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+
+        #status div {
+            margin: 5px 0;
+        }
+
+        .success {
+            color: #0f0;
+        }
+
+        .error {
+            color: #f00;
+        }
+
+        .info {
+            color: #0ff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="blackhole-bg-container"></div>
+    <div id="status">
+        <div id="status-three" class="info">检查 Three.js...</div>
+        <div id="status-script" class="info">检查黑洞脚本...</div>
+        <div id="status-init" class="info">初始化中...</div>
+        <div id="status-render" class="info">渲染状态...</div>
+    </div>
+
+    <!-- Three.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+    <!-- 黑洞背景脚本 -->
+    <script src="./script/blackHoleBackground.js"></script>
+
+    <script>
+        const statusThree = document.getElementById('status-three');
+        const statusScript = document.getElementById('status-script');
+        const statusInit = document.getElementById('status-init');
+        const statusRender = document.getElementById('status-render');
+
+        // 检查 Three.js
+        if (typeof THREE !== 'undefined') {
+            statusThree.textContent = '✓ Three.js 加载成功: v' + THREE.REVISION;
+            statusThree.className = 'success';
+        } else {
+            statusThree.textContent = '✗ Three.js 加载失败';
+            statusThree.className = 'error';
+        }
+
+        // 检查黑洞脚本
+        if (typeof window.BlackHoleBackground !== 'undefined') {
+            statusScript.textContent = '✓ 黑洞脚本加载成功';
+            statusScript.className = 'success';
+        } else {
+            statusScript.textContent = '✗ 黑洞脚本加载失败';
+            statusScript.className = 'error';
+        }
+
+        // 初始化
+        setTimeout(() => {
+            try {
+                if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
+                    window.BlackHoleBackground.init('blackhole-bg-container');
+                    statusInit.textContent = '✓ 初始化完成';
+                    statusInit.className = 'success';
+
+                    // 检查渲染
+                    setTimeout(() => {
+                        const container = document.getElementById('blackhole-bg-container');
+                        const canvas = container.querySelector('canvas');
+                        if (canvas) {
+                            statusRender.textContent = `✓ Canvas 已创建: ${canvas.width}x${canvas.height}`;
+                            statusRender.className = 'success';
+                        } else {
+                            statusRender.textContent = '✗ 未找到 Canvas 元素';
+                            statusRender.className = 'error';
+                        }
+                    }, 1000);
+                } else {
+                    statusInit.textContent = '✗ BlackHoleBackground 未定义';
+                    statusInit.className = 'error';
+                }
+            } catch (error) {
+                statusInit.textContent = '✗ 初始化错误: ' + error.message;
+                statusInit.className = 'error';
+                console.error('初始化错误:', error);
+            }
+        }, 500);
+    </script>
+</body>
+
+</html>

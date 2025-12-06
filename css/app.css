@@ -16,6 +16,35 @@
   --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.15);
 }
 
+/* 黑洞粒子背景 */
+#blackhole-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: #000;
+}
+
+#blackhole-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+#blackhole-loading.visible {
+  opacity: 1;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -25,13 +54,19 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
     sans-serif;
-  background: var(--bg-gradient);
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
   user-select: none;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+html {
+  background: #000;
 }
 
 /* 屏幕切换 */
@@ -40,6 +75,8 @@ body {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
+  position: relative;
+  z-index: 2;
 }
 
 #info-screen {
@@ -48,7 +85,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  background: var(--bg-gradient);
+  background: transparent;
 }
 
 .info-layout {
@@ -73,6 +110,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -291,11 +329,9 @@ body {
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px dashed rgba(148, 163, 184, 0.8);
-  background: linear-gradient(
-    135deg,
-    rgba(248, 250, 252, 0.95),
-    rgba(236, 244, 255, 0.95)
-  );
+  background: linear-gradient(135deg,
+      rgba(248, 250, 252, 0.95),
+      rgba(236, 244, 255, 0.95));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -315,16 +351,20 @@ body {
 }
 
 @keyframes deviceCheckShake {
+
   0%,
   100% {
     transform: translateX(0);
   }
+
   25% {
     transform: translateX(-6px);
   }
+
   50% {
     transform: translateX(5px);
   }
+
   75% {
     transform: translateX(-3px);
   }
@@ -517,19 +557,21 @@ body {
   max-width: 1200px;
   height: 95vh;
   max-height: 900px;
-  background: var(--card-bg);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  background: transparent;
+  /* backdrop-filter: blur(10px); */
+  /* border-radius: 16px;
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0, 0, 0, 0.3); */
+  overflow: hidden;
   overflow: hidden;
   position: relative;
+  /* border: 1px solid rgba(255, 255, 255, 0.1); */
+  z-index: 10;
 }
 
 .title-bar {
-  background: linear-gradient(
-    90deg,
-    var(--primary-color),
-    var(--primary-light)
-  );
+  /* background: linear-gradient(90deg,
+      var(--primary-color),
+      var(--primary-light)); */
   color: white;
   padding: 16px 24px;
   font-size: 18px;
@@ -537,7 +579,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border-color);
+  /* border-bottom: 1px solid var(--border-color); */
 }
 
 .title-bar-right {
@@ -598,7 +640,7 @@ body {
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  background: #fafafa;
+  background: transparent;
 }
 
 .test-loading-overlay {
@@ -656,11 +698,9 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(248, 250, 252, 0.95) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(248, 250, 252, 0.95) 100%);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -754,11 +794,9 @@ body {
   gap: 10px;
   padding: 6px 10px;
   border-radius: 14px;
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.08),
-    rgba(14, 165, 233, 0.08)
-  );
+  background: linear-gradient(135deg,
+      rgba(59, 130, 246, 0.08),
+      rgba(14, 165, 233, 0.08));
   border: 1px solid rgba(148, 163, 184, 0.3);
   box-shadow: var(--shadow-sm);
   line-height: 1.5;
@@ -773,7 +811,7 @@ body {
   flex-shrink: 0;
 }
 
-.welcome-list li > div {
+.welcome-list li>div {
   flex: 1;
   word-break: break-word;
 }
@@ -839,11 +877,9 @@ body {
   align-items: center;
   padding: 8px 12px;
   border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    var(--primary-color),
-    var(--primary-light)
-  );
+  background: linear-gradient(90deg,
+      var(--primary-color),
+      var(--primary-light));
   color: white;
   font-weight: 600;
   font-size: 14px;
@@ -1018,12 +1054,10 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(99, 102, 241, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(99, 102, 241, 0.2),
+      transparent);
 }
 
 .intro-info-text p {
@@ -1060,11 +1094,9 @@ body {
 .intro-info-text strong {
   color: #1e293b;
   font-weight: 600;
-  background: linear-gradient(
-    135deg,
-    rgba(99, 102, 241, 0.12),
-    rgba(139, 92, 246, 0.08)
-  );
+  background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.12),
+      rgba(139, 92, 246, 0.08));
   padding: 2px 6px;
   border-radius: 4px;
   display: inline-block;
@@ -1261,6 +1293,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1293,12 +1326,13 @@ body {
   align-items: center;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-  border: 2px dashed rgba(15, 23, 42, 0.1);
-  border-radius: 16px;
+  background: transparent;
+  /* border: 1px solid rgba(255, 255, 255, 0.15); */
+  /* border-radius: 16px; */
   padding: 24px;
-  box-sizing: border-box;
+  /* box-sizing: border-box; */
   min-height: min(70vh, 640px);
+  /* backdrop-filter: blur(5px); */
 }
 
 .image-placeholder {
@@ -1386,8 +1420,10 @@ body {
 
 /* 隐藏 post-test-view 的滚动条 */
 #post-test-view {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
 }
 
 #post-test-view::-webkit-scrollbar {
@@ -1398,8 +1434,10 @@ body {
 
 /* 隐藏 summary-view 的滚动条 */
 #summary-view {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
 }
 
 #summary-view::-webkit-scrollbar {
@@ -1456,11 +1494,9 @@ body {
 
 .grid-item.selected {
   border-color: var(--success-color);
-  background: linear-gradient(
-    135deg,
-    rgba(16, 185, 129, 0.1) 0%,
-    rgba(16, 185, 129, 0.05) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(16, 185, 129, 0.1) 0%,
+      rgba(16, 185, 129, 0.05) 100%);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   transform: scale(1.05);
 }
@@ -1516,8 +1552,9 @@ body {
   justify-content: center;
   align-items: center;
   padding: 16px;
-  border-top: 2px solid var(--border-color);
-  background: linear-gradient(90deg, #f8fafc 0%, #f0f9ff 100%);
+  /* border-top: 1px solid rgba(255, 255, 255, 0.15); */
+  /* background: rgba(20, 20, 30, 0.85);
+  backdrop-filter: blur(10px); */
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -1526,22 +1563,23 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: white;
+  background: rgba(255, 255, 255, 0.1);
   padding: 8px 12px;
   border-radius: 8px;
   box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .control-group button {
   padding: 8px 12px;
-  border: 2px solid var(--border-color);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  background: white;
+  background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   transition: all 0.2s ease;
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1549,8 +1587,8 @@ body {
 
 .control-group button:hover {
   border-color: var(--primary-light);
-  background: var(--primary-lighter);
-  color: var(--primary-color);
+  background: rgba(59, 130, 246, 0.3);
+  color: white;
 }
 
 .control-group button:disabled {
@@ -1594,6 +1632,7 @@ body {
   display: flex;
   justify-content: center;
 }
+
 #finish-btn {
   padding: 9px 28px;
   display: block;
@@ -1635,6 +1674,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
