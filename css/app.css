@@ -54,7 +54,8 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
     sans-serif;
-  background: transparent;
+  /* background: transparent; */
+  background: var(--bg-gradient);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -79,12 +80,26 @@ html {
   z-index: 2;
 }
 
+/* 测试模式下，screen 背景透明 */
+.test-mode .screen {
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
 #info-screen {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
+  background: var(--bg-gradient);
+}
+
+/* 测试模式下，info-screen 背景透明 */
+.test-mode #info-screen {
   background: transparent;
 }
 
@@ -558,21 +573,31 @@ html {
   max-width: 1200px;
   height: 95vh;
   max-height: 900px;
-  background: transparent;
-  /* backdrop-filter: blur(10px); */
-  /* border-radius: 16px;
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(0, 0, 0, 0.3); */
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   overflow: hidden;
   position: relative;
-  /* border: 1px solid rgba(255, 255, 255, 0.1); */
   z-index: 10;
 }
 
+/* 测试模式下，app-window 背景透明 */
+.test-mode .app-window {
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
 .title-bar {
-  /* background: linear-gradient(90deg,
-      var(--primary-color),
-      var(--primary-light)); */
+  background: linear-gradient(
+    90deg,
+    var(--primary-color),
+    var(--primary-light)
+  );
   color: white;
   padding: 16px 24px;
   font-size: 18px;
@@ -580,7 +605,13 @@ html {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  /* border-bottom: 1px solid var(--border-color); */
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 测试模式下，title-bar 背景透明 */
+.test-mode .title-bar {
+  background: transparent;
+  border: none;
 }
 
 .title-bar-right {
@@ -1593,10 +1624,15 @@ html {
   font-size: 13px;
   font-weight: 600;
   transition: all 0.2s ease;
-  color: rgba(255, 255, 255, 0.9);
+  /* color: rgba(255, 255, 255, 0.9); */
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* 测试模式下，control-group button 颜色为白色 */
+.test-mode .control-group button {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .control-group button:hover {
@@ -1778,6 +1814,16 @@ html {
 
 #energy-pillar-container.visible {
   display: block;
+}
+
+/* 测试模式下显示能量柱 */
+.test-mode #energy-pillar-container.visible {
+  display: block;
+}
+
+/* 非测试模式下隐藏能量柱 */
+body:not(.test-mode) #energy-pillar-container {
+  display: none !important;
 }
 
 #energy-pillar {

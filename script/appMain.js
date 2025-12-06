@@ -1090,13 +1090,20 @@ function hideReportCheckLoading() {
   isCheckingReportStatus = false
 
   // 如果已经进入测试或报告汇总阶段，交由现有逻辑处理主内容区域
-  const inMainFlow = state.stage === "test" || state.stage === "summary"
-  console.log(
-    "[hideReportCheckLoading] state.stage:",
-    state.stage,
-    "inMainFlow:",
-    inMainFlow
-  )
+  // 如果是页面刷新，先检查快照中的 stage，避免在快照恢复前错误显示介绍页
+  let inMainFlow = state.stage === "test" || state.stage === "summary"
+  if (pageReloaded && !inMainFlow) {
+    // 页面刷新时，检查快照中的 stage，避免在快照恢复前错误显示介绍页
+    const snapshot = getStoredSnapshot()
+    if (snapshot && canRestoreSnapshot(snapshot)) {
+      const payload = snapshot.payload || {}
+      const snapshotStage = payload.stage
+      if (snapshotStage === "test" || snapshotStage === "summary") {
+        inMainFlow = true
+      }
+    }
+  }
+
   hideTestLoadingOverlay({ keepMainHidden: inMainFlow })
 
   // 仍在登录后初始阶段：恢复介绍页布局
@@ -1710,6 +1717,24 @@ async function prepareIntroExperience({ resume = false } = {}) {
     appWindow.style.display = "flex"
   }
   appWindow.classList.add("intro-mode")
+
+  // 隐藏背景动画（介绍页和预览页不显示背景）
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 移除 test-mode 类，恢复非测试模式样式
+  document.body.classList.remove("test-mode")
+
+  // 隐藏能量柱容器
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
   console.log(
     "[正常流程] 已添加 intro-mode 类，appWindow.classList:",
     appWindow.classList.toString()
@@ -2036,13 +2061,30 @@ function initTest(restoredSnapshot = null) {
     window.InteractionTracker._updateCurrentPlate(state.currentIndex)
   }
 
-  // 初始化黑洞粒子背景
+  // 初始化黑洞粒子背景（仅在测试阶段显示）
   if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
     window.BlackHoleBackground.init("blackhole-bg-container")
     // 设置初始主题（对应第一张图片，索引0）
     if (window.BlackHoleBackground.switchTheme) {
       window.BlackHoleBackground.switchTheme(0)
     }
+    // 显示背景容器
+    const bgContainer = document.getElementById("blackhole-bg-container")
+    if (bgContainer) {
+      bgContainer.style.display = "block"
+    }
+  }
+
+  // 添加 test-mode 类，切换样式为测试模式
+  document.body.classList.add("test-mode")
+
+  // 显示能量柱容器（测试阶段显示）
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "block"
+    energyPillarContainer.classList.add("visible")
   }
 
   setupEventListeners()
@@ -2783,6 +2825,24 @@ function showPostTestView(options = {}) {
   postTestView.style.display = "block"
   progressText.textContent = "测试总结阶段"
 
+  // 隐藏背景动画（后测试阶段不显示背景）
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 移除 test-mode 类，恢复非测试模式样式
+  document.body.classList.remove("test-mode")
+
+  // 隐藏能量柱容器
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
+
   // 记录进入选择阶段的时间
   if (
     window.InteractionTracker &&
@@ -3173,6 +3233,24 @@ function showSummary(options = {}) {
   postTestView.style.display = "none"
   summaryView.style.display = "block"
   progressText.textContent = "测试已完成！"
+
+  // 隐藏背景动画（汇总阶段不显示背景）
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 移除 test-mode 类，恢复非测试模式样式
+  document.body.classList.remove("test-mode")
+
+  // 隐藏能量柱容器
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
 
   const grid = document.getElementById("summary-grid")
   if (!grid) {
@@ -3890,18 +3968,6 @@ function stopInactivityMonitoring() {
 // 绘图和变换
 function updateTransform(newTransforms = {}, force = false) {
   const startTime = performance.now()
-  console.log(
-    "[updateTransform] 开始执行，参数:",
-    newTransforms,
-    "force:",
-    force
-  )
-  console.log(
-    "[updateTransform] 当前 state.zoom:",
-    state.zoom,
-    "state.rotation:",
-    state.rotation
-  )
 
   if (!force) {
     if (typeof newTransforms.zoom === "number") {
@@ -3920,24 +3986,12 @@ function updateTransform(newTransforms = {}, force = false) {
   }
 
   const transformValue = `scale(${state.zoom}) rotate(${state.rotation}deg)`
-  console.log("[updateTransform] 计算后的 transformValue:", transformValue)
-  console.log(
-    "[updateTransform] 更新后的 state.zoom:",
-    state.zoom,
-    "state.rotation:",
-    state.rotation
-  )
 
   // 同步更新图片和画布的变换，确保它们在同一调用栈中更新
   // 注意：保持与 main.js 相同的更新顺序和方式
   if (rorschachImage) {
     const beforeImage = rorschachImage.style.transform
     rorschachImage.style.transform = transformValue
-    console.log(
-      `[updateTransform] 图片变换已应用: ${beforeImage || "(空)"} -> ${
-        rorschachImage.style.transform
-      }`
-    )
   } else {
     console.warn("[updateTransform] rorschachImage 元素不存在")
   }
@@ -3945,17 +3999,11 @@ function updateTransform(newTransforms = {}, force = false) {
   if (canvas) {
     const beforeCanvas = canvas.style.transform
     canvas.style.transform = `${CANVAS_BASE_TRANSFORM} ${transformValue}`
-    console.log(
-      `[updateTransform] 画布变换已应用: ${beforeCanvas || "(空)"} -> ${
-        canvas.style.transform
-      }`
-    )
   } else {
     console.warn("[updateTransform] canvas 元素不存在")
   }
 
   const elapsed = performance.now() - startTime
-  console.log(`[updateTransform] 变换应用完成，耗时: ${elapsed.toFixed(2)}ms`)
 }
 
 let lastX = 0,
@@ -4420,43 +4468,25 @@ function setupAuthControls() {
 }
 
 async function routeToReportSummaryIfAvailable() {
-  console.log("[routeToReportSummaryIfAvailable] 开始检查报告状态")
   if (!window.API || typeof window.API.checkReportStatus !== "function") {
-    console.log("[routeToReportSummaryIfAvailable] API 不可用，返回 false")
     return false
   }
   const userId = getCurrentUserId()
   if (!userId) {
-    console.log("[routeToReportSummaryIfAvailable] 用户ID不存在，返回 false")
     return false
   }
   try {
-    console.log(
-      "[routeToReportSummaryIfAvailable] 调用 API.checkReportStatus，userId:",
-      userId
-    )
     const response = await window.API.checkReportStatus(userId)
-    console.log("[routeToReportSummaryIfAvailable] API 响应:", response)
+
     const statusInfo = buildReportStatusFromResponse(response)
-    console.log(
-      "[routeToReportSummaryIfAvailable] 解析后的状态信息:",
-      statusInfo
-    )
+
     if (!statusInfo) {
-      console.log("[routeToReportSummaryIfAvailable] 状态信息为空，返回 false")
       return false
     }
     latestReportStatus = statusInfo
-    console.log(
-      "[routeToReportSummaryIfAvailable] 调用 showSummary 前，state.stage:",
-      state.stage
-    )
+
     showSummary({ reportStatus: statusInfo })
-    console.log(
-      "[routeToReportSummaryIfAvailable] 调用 showSummary 后，state.stage:",
-      state.stage
-    )
-    console.log("[routeToReportSummaryIfAvailable] 返回 true")
+
     return true
   } catch (error) {
     console.warn("[Report] 检查报告状态失败:", error)
@@ -4481,27 +4511,14 @@ async function checkLoginAndInit() {
     // 优先尝试跳转报告页（除非正在准备重新测试）
     let routedToSummary = false
     if (!shouldSkipReportRedirect()) {
-      console.log("[checkLoginAndInit] 开始检查报告状态...")
       routedToSummary = await routeToReportSummaryIfAvailable()
-      console.log(
-        "[checkLoginAndInit] routeToReportSummaryIfAvailable 返回:",
-        routedToSummary
-      )
-      console.log("[checkLoginAndInit] 当前 state.stage:", state.stage)
     }
     if (routedToSummary) {
-      console.log(
-        "[checkLoginAndInit] 已跳转到报告页，准备 return，当前 state.stage:",
-        state.stage
-      )
       return
     }
   } finally {
     // 无论是否跳转到报告页，都结束登录后的加载状态
-    console.log(
-      "[checkLoginAndInit] finally 块执行，当前 state.stage:",
-      state.stage
-    )
+
     hideReportCheckLoading()
   }
 
@@ -4516,17 +4533,26 @@ window.addEventListener("beforeunload", () => {
   saveSessionSnapshot("beforeunload", { immediate: true })
 })
 
-// 立即初始化黑洞粒子背景（模块加载时 DOM 已就绪）
-if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
-  window.BlackHoleBackground.init("blackhole-bg-container")
-  // 设置初始主题（对应第一张图片，索引0）
-  if (window.BlackHoleBackground.switchTheme) {
-    window.BlackHoleBackground.switchTheme(0)
-  }
-}
-
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
+  // 确保背景容器初始状态为隐藏（只在测试阶段显示）
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 确保能量柱容器初始状态为隐藏
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
+
+  // 确保初始状态不是测试模式
+  document.body.classList.remove("test-mode")
+
   renderWelcomeText()
   // 先设置登录/退出按钮事件（不依赖模块加载）
   setupAuthControls()
