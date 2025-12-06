@@ -1091,10 +1091,17 @@ function hideReportCheckLoading() {
 
   // 如果已经进入测试或报告汇总阶段，交由现有逻辑处理主内容区域
   const inMainFlow = state.stage === "test" || state.stage === "summary"
+  console.log(
+    "[hideReportCheckLoading] state.stage:",
+    state.stage,
+    "inMainFlow:",
+    inMainFlow
+  )
   hideTestLoadingOverlay({ keepMainHidden: inMainFlow })
 
   // 仍在登录后初始阶段：恢复介绍页布局
   if (!inMainFlow) {
+    console.log("[hideReportCheckLoading] 恢复介绍页布局")
     if (infoScreen) {
       infoScreen.style.display = "flex"
     }
@@ -1110,6 +1117,8 @@ function hideReportCheckLoading() {
         console.warn("[欢迎页] 播放欢迎语失败:", error)
       })
     }
+  } else {
+    console.log("[hideReportCheckLoading] 已在主流程中，不恢复介绍页")
   }
 }
 
@@ -2418,18 +2427,22 @@ function setupEventListeners() {
   finishBtn.addEventListener("click", finishAndSave)
 
   document.getElementById("zoom-in-btn").addEventListener("click", () => {
+    console.log("[按钮事件] 放大按钮被点击，当前 zoom:", state.zoom)
     updateTransform({ zoom: state.zoom * 1.2 })
     resetInactivityTimer()
   })
   document.getElementById("zoom-out-btn").addEventListener("click", () => {
+    console.log("[按钮事件] 缩小按钮被点击，当前 zoom:", state.zoom)
     updateTransform({ zoom: Math.max(0.2, state.zoom / 1.2) })
     resetInactivityTimer()
   })
   document.getElementById("rotate-left-btn").addEventListener("click", () => {
+    console.log("[按钮事件] 左旋转按钮被点击，当前 rotation:", state.rotation)
     updateTransform({ rotation: state.rotation - 30 })
     resetInactivityTimer()
   })
   document.getElementById("rotate-right-btn").addEventListener("click", () => {
+    console.log("[按钮事件] 右旋转按钮被点击，当前 rotation:", state.rotation)
     updateTransform({ rotation: state.rotation + 30 })
     resetInactivityTimer()
   })
@@ -3126,6 +3139,7 @@ function finishAndSave() {
 }
 
 function showSummary(options = {}) {
+  console.log("[showSummary] 开始执行，当前 state.stage:", state.stage)
   const { reportStatus = null } = options || {}
   if (reportStatus) {
     latestReportStatus = normalizeReportStatusPayload(reportStatus)
@@ -3135,7 +3149,15 @@ function showSummary(options = {}) {
   }
 
   setSkipReportRedirectFlag(false)
+  console.log(
+    "[showSummary] 设置 state.stage = 'summary' 前，当前值:",
+    state.stage
+  )
   state.stage = "summary"
+  console.log(
+    "[showSummary] 设置 state.stage = 'summary' 后，当前值:",
+    state.stage
+  )
   state.completed = true
   hideTestLoadingOverlay({ keepMainHidden: true })
   if (
@@ -3867,6 +3889,20 @@ function stopInactivityMonitoring() {
 
 // 绘图和变换
 function updateTransform(newTransforms = {}, force = false) {
+  const startTime = performance.now()
+  console.log(
+    "[updateTransform] 开始执行，参数:",
+    newTransforms,
+    "force:",
+    force
+  )
+  console.log(
+    "[updateTransform] 当前 state.zoom:",
+    state.zoom,
+    "state.rotation:",
+    state.rotation
+  )
+
   if (!force) {
     if (typeof newTransforms.zoom === "number") {
       state.zoom = Math.max(0.2, newTransforms.zoom)
@@ -3884,12 +3920,42 @@ function updateTransform(newTransforms = {}, force = false) {
   }
 
   const transformValue = `scale(${state.zoom}) rotate(${state.rotation}deg)`
+  console.log("[updateTransform] 计算后的 transformValue:", transformValue)
+  console.log(
+    "[updateTransform] 更新后的 state.zoom:",
+    state.zoom,
+    "state.rotation:",
+    state.rotation
+  )
+
+  // 同步更新图片和画布的变换，确保它们在同一调用栈中更新
+  // 注意：保持与 main.js 相同的更新顺序和方式
   if (rorschachImage) {
+    const beforeImage = rorschachImage.style.transform
     rorschachImage.style.transform = transformValue
+    console.log(
+      `[updateTransform] 图片变换已应用: ${beforeImage || "(空)"} -> ${
+        rorschachImage.style.transform
+      }`
+    )
+  } else {
+    console.warn("[updateTransform] rorschachImage 元素不存在")
   }
+
   if (canvas) {
+    const beforeCanvas = canvas.style.transform
     canvas.style.transform = `${CANVAS_BASE_TRANSFORM} ${transformValue}`
+    console.log(
+      `[updateTransform] 画布变换已应用: ${beforeCanvas || "(空)"} -> ${
+        canvas.style.transform
+      }`
+    )
+  } else {
+    console.warn("[updateTransform] canvas 元素不存在")
   }
+
+  const elapsed = performance.now() - startTime
+  console.log(`[updateTransform] 变换应用完成，耗时: ${elapsed.toFixed(2)}ms`)
 }
 
 let lastX = 0,
@@ -4354,21 +4420,43 @@ function setupAuthControls() {
 }
 
 async function routeToReportSummaryIfAvailable() {
+  console.log("[routeToReportSummaryIfAvailable] 开始检查报告状态")
   if (!window.API || typeof window.API.checkReportStatus !== "function") {
+    console.log("[routeToReportSummaryIfAvailable] API 不可用，返回 false")
     return false
   }
   const userId = getCurrentUserId()
   if (!userId) {
+    console.log("[routeToReportSummaryIfAvailable] 用户ID不存在，返回 false")
     return false
   }
   try {
+    console.log(
+      "[routeToReportSummaryIfAvailable] 调用 API.checkReportStatus，userId:",
+      userId
+    )
     const response = await window.API.checkReportStatus(userId)
+    console.log("[routeToReportSummaryIfAvailable] API 响应:", response)
     const statusInfo = buildReportStatusFromResponse(response)
+    console.log(
+      "[routeToReportSummaryIfAvailable] 解析后的状态信息:",
+      statusInfo
+    )
     if (!statusInfo) {
+      console.log("[routeToReportSummaryIfAvailable] 状态信息为空，返回 false")
       return false
     }
     latestReportStatus = statusInfo
+    console.log(
+      "[routeToReportSummaryIfAvailable] 调用 showSummary 前，state.stage:",
+      state.stage
+    )
     showSummary({ reportStatus: statusInfo })
+    console.log(
+      "[routeToReportSummaryIfAvailable] 调用 showSummary 后，state.stage:",
+      state.stage
+    )
+    console.log("[routeToReportSummaryIfAvailable] 返回 true")
     return true
   } catch (error) {
     console.warn("[Report] 检查报告状态失败:", error)
@@ -4393,13 +4481,27 @@ async function checkLoginAndInit() {
     // 优先尝试跳转报告页（除非正在准备重新测试）
     let routedToSummary = false
     if (!shouldSkipReportRedirect()) {
+      console.log("[checkLoginAndInit] 开始检查报告状态...")
       routedToSummary = await routeToReportSummaryIfAvailable()
+      console.log(
+        "[checkLoginAndInit] routeToReportSummaryIfAvailable 返回:",
+        routedToSummary
+      )
+      console.log("[checkLoginAndInit] 当前 state.stage:", state.stage)
     }
     if (routedToSummary) {
+      console.log(
+        "[checkLoginAndInit] 已跳转到报告页，准备 return，当前 state.stage:",
+        state.stage
+      )
       return
     }
   } finally {
     // 无论是否跳转到报告页，都结束登录后的加载状态
+    console.log(
+      "[checkLoginAndInit] finally 块执行，当前 state.stage:",
+      state.stage
+    )
     hideReportCheckLoading()
   }
 

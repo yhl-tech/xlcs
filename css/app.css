@@ -1402,7 +1402,9 @@ html {
   max-height: 90%;
   object-fit: contain;
   border-radius: 8px;
+  transform-origin: center center;
   transition: transform 0.2s ease-out;
+  will-change: transform;
 }
 
 #drawing-canvas {
@@ -1415,6 +1417,7 @@ html {
   max-width: 90%;
   max-height: 90%;
   transition: transform 0.2s ease-out;
+  will-change: transform;
 }
 
 /* 后测试视图 */
@@ -1724,7 +1727,9 @@ html {
 
 /* 图片切换渐隐渐显动画 */
 #rorschach-image {
-  transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+  /* 同时设置 opacity 和 transform 的 transition，确保不会覆盖基础样式 */
+  /* opacity 用于图片切换动画，transform 用于缩放旋转操作 */
+  transition: opacity 0.8s ease-in-out, transform 0.2s ease-out;
 }
 
 #rorschach-image.image-fade-out {
@@ -1750,7 +1755,8 @@ html {
 
 /* 画布跟随图片动画 */
 #drawing-canvas {
-  transition: opacity 0.8s ease-in-out;
+  /* 确保画布的 transform transition 与图片一致（由基础样式控制为 0.2s） */
+  transition: opacity 0.8s ease-in-out, transform 0.2s ease-out;
 }
 
 #rorschach-image.image-fade-out ~ #drawing-canvas {
