@@ -40,6 +40,8 @@
     }
 
     initialized = true
+    // 初始化时更新填充状态，确保 empty 类正确设置
+    updateFillLevel()
     console.log("[EnergyPillar] 初始化成功")
     return true
   }
@@ -129,6 +131,13 @@
 
     const percentage = (energy / CONFIG.MAX_ENERGY) * 100
     elements.fill.style.height = `${percentage}%`
+
+    // 当没有能量时，添加 empty 类使 border-top 透明
+    if (energy === 0) {
+      elements.fill.classList.add("empty")
+    } else {
+      elements.fill.classList.remove("empty")
+    }
   }
 
   /**

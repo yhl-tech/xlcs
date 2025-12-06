@@ -368,6 +368,18 @@ function initPreviewCanvasInteractions() {
         previewState.currentImageIndex--
       }
     }
+
+    // 切换背景主题（立即切换，不延迟）
+    if (
+      window.BlackHoleBackground &&
+      typeof window.BlackHoleBackground.switchTheme === "function"
+    ) {
+      console.log("[图片切换] 切换到图片索引:", previewState.currentImageIndex)
+      window.BlackHoleBackground.switchTheme(previewState.currentImageIndex)
+    } else {
+      console.warn("[图片切换] BlackHoleBackground.switchTheme 不可用")
+    }
+
     // 更新图片
     const introPreviewImage = document.getElementById("intro-preview-image")
     if (introPreviewImage) {
@@ -375,8 +387,9 @@ function initPreviewCanvasInteractions() {
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
       introPreviewImage.style.display = ""
-      introPreviewImage.src = `./images/rorschach-blot-${previewState.currentImageIndex + 1
-        }.webp`
+      introPreviewImage.src = `./images/rorschach-blot-${
+        previewState.currentImageIndex + 1
+      }.webp`
     }
     // 重置画布尺寸并恢复状态
     if (introPreviewImage && previewCanvas) {
@@ -943,7 +956,7 @@ function ensureSessionId() {
   if (!state.sessionId) {
     const restoredSessionId =
       window.SessionManager &&
-        typeof window.SessionManager.getSessionId === "function"
+      typeof window.SessionManager.getSessionId === "function"
         ? window.SessionManager.getSessionId()
         : null
     if (restoredSessionId) {
@@ -1107,7 +1120,7 @@ function buildSessionSnapshot(reason = "manual") {
   ensureSessionId()
   const trackerSnapshot =
     window.InteractionTracker &&
-      typeof window.InteractionTracker.serialize === "function"
+    typeof window.InteractionTracker.serialize === "function"
       ? window.InteractionTracker.serialize()
       : null
 
@@ -1151,10 +1164,10 @@ function buildSessionSnapshot(reason = "manual") {
         introOverlayVisible: introOverlay.style.display !== "none",
         enterButton: enterBtn
           ? {
-            visible: enterBtn.style.display !== "none",
-            disabled: enterBtn.disabled,
-            text: enterBtn.textContent,
-          }
+              visible: enterBtn.style.display !== "none",
+              disabled: enterBtn.disabled,
+              text: enterBtn.textContent,
+            }
           : null,
       },
     },
@@ -1295,7 +1308,7 @@ function applySnapshotToState(snapshot) {
   state.rotation = payload.rotation ?? 0
   state.canvasStates =
     Array.isArray(payload.canvasStates) &&
-      payload.canvasStates.length === state.totalImages
+    payload.canvasStates.length === state.totalImages
       ? payload.canvasStates
       : new Array(state.totalImages).fill(null)
   state.visitedImages = new Set(
@@ -1733,8 +1746,8 @@ async function prepareIntroExperience({ resume = false } = {}) {
           window.dialogClient.config?.outputAudio?.sampleRate || 24000
         window.dialogClient.audioContext = new (window.AudioContext ||
           window.webkitAudioContext)({
-            sampleRate: sampleRate,
-          })
+          sampleRate: sampleRate,
+        })
         window.dialogClient.nextPlayTime =
           window.dialogClient.audioContext.currentTime
         console.log("[介绍页] 提前创建音频上下文，采样率:", sampleRate)
@@ -2016,10 +2029,10 @@ function initTest(restoredSnapshot = null) {
 
   // 初始化黑洞粒子背景
   if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
-    window.BlackHoleBackground.init('blackhole-bg-container')
-    // 设置初始主题
-    if (window.BlackHoleBackground.setTheme) {
-      window.BlackHoleBackground.setTheme(state.currentIndex)
+    window.BlackHoleBackground.init("blackhole-bg-container")
+    // 设置初始主题（对应第一张图片，索引0）
+    if (window.BlackHoleBackground.switchTheme) {
+      window.BlackHoleBackground.switchTheme(0)
     }
   }
 
@@ -2602,13 +2615,23 @@ function navigate(direction) {
     ) {
       window.InteractionTracker._updateCurrentPlate(state.currentIndex)
     }
-    loadImage(state.currentIndex)
-    updateProgress()
 
-    // 切换背景主题颜色
-    if (window.BlackHoleBackground && window.BlackHoleBackground.setTheme) {
-      window.BlackHoleBackground.setTheme(state.currentIndex)
+    // 先切换背景主题颜色，让用户看到背景动画过渡
+    if (
+      window.BlackHoleBackground &&
+      typeof window.BlackHoleBackground.switchTheme === "function"
+    ) {
+      console.log("[图片切换] 切换到图片索引:", state.currentIndex)
+      window.BlackHoleBackground.switchTheme(state.currentIndex)
+    } else {
+      console.warn("[图片切换] BlackHoleBackground.switchTheme 不可用")
     }
+
+    // 延迟加载图片，让用户能看到背景动画过渡效果和渐隐渐显效果
+    setTimeout(() => {
+      loadImage(state.currentIndex)
+      updateProgress()
+    }, 800)
 
     console.log("[调试] updateProgress 后，currentIndex:", state.currentIndex)
 
@@ -2626,19 +2649,19 @@ function navigate(direction) {
     if (direction === 1 && !isVisitedImage) {
       disableNextButton()
 
-        // 播报当前图片的提示语音
-        ; (async () => {
-          try {
-            const imageNumber = state.currentIndex + 1 // 图片编号从1开始
-            const promptText = `这张图你可以看到什么？`
-            console.log("[切换图片] 播报提示:", promptText)
-            const introQuery = buildTTSQuery(promptText)
-            await sendTextQuery(introQuery, { ensure: false })
-            console.log("[切换图片] 提示已发送")
-          } catch (err) {
-            console.warn("[切换图片] 播报提示失败:", err)
-          }
-        })()
+      // 播报当前图片的提示语音
+      ;(async () => {
+        try {
+          const imageNumber = state.currentIndex + 1 // 图片编号从1开始
+          const promptText = `这张图你可以看到什么？`
+          console.log("[切换图片] 播报提示:", promptText)
+          const introQuery = buildTTSQuery(promptText)
+          await sendTextQuery(introQuery, { ensure: false })
+          console.log("[切换图片] 提示已发送")
+        } catch (err) {
+          console.warn("[切换图片] 播报提示失败:", err)
+        }
+      })()
     }
   }
   resetInactivityTimer()
@@ -2664,16 +2687,16 @@ function loadImage(index) {
   rorschachImage.onerror = null
 
   // 渐隐效果：先让当前图片淡出
-  rorschachImage.classList.add('image-fade-out')
+  rorschachImage.classList.add("image-fade-out")
 
-  // 等待淡出动画完成后再加载新图片
+  // 等待淡出动画完成后再加载新图片（增加延迟时间，让渐隐效果更慢）
   setTimeout(() => {
     showImagePlaceholder(`正在加载第 ${index + 1} 张图，请稍候...`)
 
     rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
     rorschachImage.onerror = () => {
       showImagePlaceholder("图片加载失败，请检查网络后重试。", { force: true })
-      rorschachImage.classList.remove('image-fade-out')
+      rorschachImage.classList.remove("image-fade-out")
     }
 
     // 确保图片加载后加载该图版的画布状态
@@ -2683,11 +2706,11 @@ function loadImage(index) {
       loadCanvasState(index)
       hideImagePlaceholder()
       // 渐显效果：移除淡出类，触发淡入
-      rorschachImage.classList.remove('image-fade-out')
-      rorschachImage.classList.add('image-fade-in')
+      rorschachImage.classList.remove("image-fade-out")
+      rorschachImage.classList.add("image-fade-in")
       setTimeout(() => {
-        rorschachImage.classList.remove('image-fade-in')
-      }, 400)
+        rorschachImage.classList.remove("image-fade-in")
+      }, 800) // 增加渐显动画时间到800ms，让效果更慢
     } else {
       // 图片需要加载，等待加载完成
       rorschachImage.onload = () => {
@@ -2695,15 +2718,15 @@ function loadImage(index) {
         loadCanvasState(index)
         hideImagePlaceholder()
         // 渐显效果：移除淡出类，触发淡入
-        rorschachImage.classList.remove('image-fade-out')
-        rorschachImage.classList.add('image-fade-in')
+        rorschachImage.classList.remove("image-fade-out")
+        rorschachImage.classList.add("image-fade-in")
         setTimeout(() => {
-          rorschachImage.classList.remove('image-fade-in')
-        }, 400)
+          rorschachImage.classList.remove("image-fade-in")
+        }, 800) // 增加渐显动画时间到800ms，让效果更慢
         rorschachImage.onload = null
       }
     }
-  }, 300)  // 等待淡出动画（300ms）
+  }, 800) // 增加淡出动画时间到800ms，让渐隐效果更慢
 
   updateNavButtons()
 }
@@ -2730,8 +2753,9 @@ function updateProgress() {
     "显示:",
     state.currentIndex + 1
   )
-  progressText.textContent = `第 ${state.currentIndex + 1} / ${state.totalImages
-    } 张图片`
+  progressText.textContent = `第 ${state.currentIndex + 1} / ${
+    state.totalImages
+  } 张图片`
 }
 
 // 后测试视图
@@ -2768,8 +2792,9 @@ function showPostTestView(options = {}) {
     const item = document.createElement("div")
     item.className = "grid-item"
     item.dataset.index = i
-    item.innerHTML = `<img src="./images/rorschach-blot-${i + 1
-      }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
+    item.innerHTML = `<img src="./images/rorschach-blot-${
+      i + 1
+    }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
     item.addEventListener("click", handleImageSelection)
     grid.appendChild(item)
   }
@@ -3022,7 +3047,7 @@ function finishAndSave() {
   // 调用接口提交数据到服务器
   if (window.submitTestDataToServer && window.InteractionTracker) {
     // 使用异步方式提交，不阻塞页面显示
-    ; (async () => {
+    ;(async () => {
       try {
         // 显示提交提示
         if (finishBtn) {
@@ -3178,20 +3203,20 @@ function handleRetestClick(event) {
     return
   }
   retestFlowActive = true
-    ; (async () => {
-      try {
-        setSkipReportRedirectFlag(true)
-        await prepareForRetest()
-        await startRetestFlow()
-      } catch (error) {
-        console.error("[Retest] 初始化失败:", error)
-        setSkipReportRedirectFlag(false)
-        alert("重新测试准备失败，请刷新页面或稍后重试。")
-        showInfoScreenForRetest()
-      } finally {
-        retestFlowActive = false
-      }
-    })()
+  ;(async () => {
+    try {
+      setSkipReportRedirectFlag(true)
+      await prepareForRetest()
+      await startRetestFlow()
+    } catch (error) {
+      console.error("[Retest] 初始化失败:", error)
+      setSkipReportRedirectFlag(false)
+      alert("重新测试准备失败，请刷新页面或稍后重试。")
+      showInfoScreenForRetest()
+    } finally {
+      retestFlowActive = false
+    }
+  })()
 }
 
 async function prepareForRetest() {
@@ -3292,7 +3317,7 @@ function cleanupResourcesForRetest() {
     try {
       const tracks =
         state.mediaRecorder.stream &&
-          typeof state.mediaRecorder.stream.getTracks === "function"
+        typeof state.mediaRecorder.stream.getTracks === "function"
           ? state.mediaRecorder.stream.getTracks()
           : []
       tracks.forEach((track) => track.stop())
@@ -3961,7 +3986,11 @@ function draw(e) {
   }
 
   // 能量柱粒子效果：从画笔位置飞向能量柱（仅画笔模式）
-  if (state.tool === "pen" && window.EnergyPillar && window.EnergyPillar.onDrawMove) {
+  if (
+    state.tool === "pen" &&
+    window.EnergyPillar &&
+    window.EnergyPillar.onDrawMove
+  ) {
     // 使用鼠标在视口中的坐标
     window.EnergyPillar.onDrawMove(e.clientX, e.clientY)
   }
@@ -4387,7 +4416,11 @@ window.addEventListener("beforeunload", () => {
 
 // 立即初始化黑洞粒子背景（模块加载时 DOM 已就绪）
 if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
-  window.BlackHoleBackground.init('blackhole-bg-container')
+  window.BlackHoleBackground.init("blackhole-bg-container")
+  // 设置初始主题（对应第一张图片，索引0）
+  if (window.BlackHoleBackground.switchTheme) {
+    window.BlackHoleBackground.switchTheme(0)
+  }
 }
 
 // 初始化

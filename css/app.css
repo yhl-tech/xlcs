@@ -329,9 +329,11 @@ html {
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px dashed rgba(148, 163, 184, 0.8);
-  background: linear-gradient(135deg,
-      rgba(248, 250, 252, 0.95),
-      rgba(236, 244, 255, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(248, 250, 252, 0.95),
+    rgba(236, 244, 255, 0.95)
+  );
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -351,7 +353,6 @@ html {
 }
 
 @keyframes deviceCheckShake {
-
   0%,
   100% {
     transform: translateX(0);
@@ -698,9 +699,9 @@ html {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg,
+  /* background: linear-gradient(135deg,
       rgba(255, 255, 255, 0.95) 0%,
-      rgba(248, 250, 252, 0.95) 100%);
+      rgba(248, 250, 252, 0.95) 100%); */
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -794,9 +795,11 @@ html {
   gap: 10px;
   padding: 6px 10px;
   border-radius: 14px;
-  background: linear-gradient(135deg,
-      rgba(59, 130, 246, 0.08),
-      rgba(14, 165, 233, 0.08));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.08),
+    rgba(14, 165, 233, 0.08)
+  );
   border: 1px solid rgba(148, 163, 184, 0.3);
   box-shadow: var(--shadow-sm);
   line-height: 1.5;
@@ -811,7 +814,7 @@ html {
   flex-shrink: 0;
 }
 
-.welcome-list li>div {
+.welcome-list li > div {
   flex: 1;
   word-break: break-word;
 }
@@ -877,9 +880,11 @@ html {
   align-items: center;
   padding: 8px 12px;
   border-radius: 12px;
-  background: linear-gradient(90deg,
-      var(--primary-color),
-      var(--primary-light));
+  background: linear-gradient(
+    90deg,
+    var(--primary-color),
+    var(--primary-light)
+  );
   color: white;
   font-weight: 600;
   font-size: 14px;
@@ -1054,10 +1059,12 @@ html {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg,
-      transparent,
-      rgba(99, 102, 241, 0.2),
-      transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.2),
+    transparent
+  );
 }
 
 .intro-info-text p {
@@ -1094,9 +1101,11 @@ html {
 .intro-info-text strong {
   color: #1e293b;
   font-weight: 600;
-  background: linear-gradient(135deg,
-      rgba(99, 102, 241, 0.12),
-      rgba(139, 92, 246, 0.08));
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.12),
+    rgba(139, 92, 246, 0.08)
+  );
   padding: 2px 6px;
   border-radius: 4px;
   display: inline-block;
@@ -1494,9 +1503,11 @@ html {
 
 .grid-item.selected {
   border-color: var(--success-color);
-  background: linear-gradient(135deg,
-      rgba(16, 185, 129, 0.1) 0%,
-      rgba(16, 185, 129, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.1) 0%,
+    rgba(16, 185, 129, 0.05) 100%
+  );
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   transform: scale(1.05);
 }
@@ -1713,7 +1724,7 @@ html {
 
 /* 图片切换渐隐渐显动画 */
 #rorschach-image {
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
 }
 
 #rorschach-image.image-fade-out {
@@ -1722,7 +1733,7 @@ html {
 }
 
 #rorschach-image.image-fade-in {
-  animation: imageFadeIn 0.4s ease-out forwards;
+  animation: imageFadeIn 0.8s ease-out forwards;
 }
 
 @keyframes imageFadeIn {
@@ -1739,10 +1750,10 @@ html {
 
 /* 画布跟随图片动画 */
 #drawing-canvas {
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 0.8s ease-in-out;
 }
 
-#rorschach-image.image-fade-out~#drawing-canvas {
+#rorschach-image.image-fade-out ~ #drawing-canvas {
   opacity: 0;
 }
 
@@ -1764,10 +1775,10 @@ html {
 }
 
 #energy-pillar {
-  width: 24px;
+  width: 32px;
   height: 280px;
   position: relative;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: visible;
 }
 
@@ -1776,7 +1787,7 @@ html {
   inset: 0;
   background: rgba(20, 30, 50, 0.6);
   border: 1px solid rgba(100, 150, 200, 0.3);
-  border-radius: 12px;
+  border-radius: 16px;
   backdrop-filter: blur(4px);
   overflow: hidden;
 }
@@ -1787,35 +1798,41 @@ html {
   left: 2px;
   right: 2px;
   height: 0%;
-  background: 
-    linear-gradient(to top,
-      rgba(64, 224, 255, 1) 0%,
-      rgba(100, 200, 255, 0.98) 25%,
-      rgba(140, 180, 255, 0.95) 50%,
-      rgba(180, 160, 255, 0.9) 75%,
-      rgba(220, 140, 255, 0.75) 100%);
-  border-radius: 0 0 10px 10px;
+  background: linear-gradient(
+    to top,
+    rgba(64, 224, 255, 1) 0%,
+    rgba(100, 200, 255, 0.98) 25%,
+    rgba(140, 180, 255, 0.95) 50%,
+    rgba(180, 160, 255, 0.9) 75%,
+    rgba(220, 140, 255, 0.75) 100%
+  );
+  border-radius: 0 0 14px 14px;
   transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow:
-    0 0 35px rgba(64, 224, 255, 0.8),
-    0 0 70px rgba(100, 200, 255, 0.5),
-    0 0 100px rgba(180, 160, 255, 0.3),
+  box-shadow: 0 0 35px rgba(64, 224, 255, 0.8),
+    0 0 70px rgba(100, 200, 255, 0.5), 0 0 100px rgba(180, 160, 255, 0.3),
     inset 0 0 30px rgba(255, 255, 255, 0.4),
     inset 0 -10px 25px rgba(64, 224, 255, 0.7);
   border-top: 1px solid rgba(220, 140, 255, 0.8);
 }
 
+/* 当没有绘画时，border-top 透明 */
+#energy-fill.empty {
+  border-top: 1px solid transparent;
+}
+
 #energy-fill::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 20%;
-  background: linear-gradient(to bottom,
+  background: linear-gradient(
+    to bottom,
     rgba(255, 255, 255, 0.3) 0%,
-    transparent 100%);
-  border-radius: 0 0 10px 10px;
+    transparent 100%
+  );
+  border-radius: 0 0 14px 14px;
   pointer-events: none;
 }
 
@@ -1825,12 +1842,13 @@ html {
   left: 0;
   right: 0;
   height: 100%;
-  background:
-    repeating-linear-gradient(0deg,
-      transparent 0px,
-      transparent 8px,
-      rgba(255, 255, 255, 0.1) 8px,
-      rgba(255, 255, 255, 0.1) 10px);
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 8px,
+    rgba(255, 255, 255, 0.1) 8px,
+    rgba(255, 255, 255, 0.1) 10px
+  );
   animation: energyRipple 2s linear infinite;
   opacity: 0;
   transition: opacity 0.3s;
@@ -1872,22 +1890,42 @@ html {
 }
 
 .energy-particle.cyan {
-  background: radial-gradient(circle, #00ffff 0%, #00aaff 50%, transparent 100%);
+  background: radial-gradient(
+    circle,
+    #00ffff 0%,
+    #00aaff 50%,
+    transparent 100%
+  );
   box-shadow: 0 0 8px #00ffff, 0 0 15px rgba(0, 255, 255, 0.5);
 }
 
 .energy-particle.magenta {
-  background: radial-gradient(circle, #ff00ff 0%, #aa00ff 50%, transparent 100%);
+  background: radial-gradient(
+    circle,
+    #ff00ff 0%,
+    #aa00ff 50%,
+    transparent 100%
+  );
   box-shadow: 0 0 8px #ff00ff, 0 0 15px rgba(255, 0, 255, 0.5);
 }
 
 .energy-particle.blue {
-  background: radial-gradient(circle, #4080ff 0%, #0040ff 50%, transparent 100%);
+  background: radial-gradient(
+    circle,
+    #4080ff 0%,
+    #0040ff 50%,
+    transparent 100%
+  );
   box-shadow: 0 0 8px #4080ff, 0 0 15px rgba(64, 128, 255, 0.5);
 }
 
 .energy-particle.white {
-  background: radial-gradient(circle, #ffffff 0%, #aaccff 50%, transparent 100%);
+  background: radial-gradient(
+    circle,
+    #ffffff 0%,
+    #aaccff 50%,
+    transparent 100%
+  );
   box-shadow: 0 0 8px #ffffff, 0 0 15px rgba(255, 255, 255, 0.5);
 }
 
@@ -1905,14 +1943,18 @@ html {
 
 /* 能量脉冲效果 */
 #energy-pillar::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   width: 40px;
   height: 40px;
-  background: radial-gradient(circle, rgba(0, 220, 255, 0.4) 0%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgba(0, 220, 255, 0.4) 0%,
+    transparent 70%
+  );
   border-radius: 50%;
   opacity: 0;
   animation: none;
