@@ -1156,9 +1156,10 @@ function buildSessionSnapshot(reason = "manual") {
           : null,
       },
     },
-    energy: window.EnergyPillar && typeof window.EnergyPillar.getEnergy === "function"
-      ? window.EnergyPillar.getEnergy()
-      : 0,
+    energy:
+      window.EnergyPillar && typeof window.EnergyPillar.getEnergy === "function"
+        ? window.EnergyPillar.getEnergy()
+        : 0,
   }
 
   sessionState.payload = payload
@@ -1688,10 +1689,18 @@ async function prepareIntroExperience({ resume = false } = {}) {
   }
   appWindow.classList.add("intro-mode")
 
-  // 隐藏背景动画（介绍页和预览页不显示背景）
-  const bgContainer = document.getElementById("blackhole-bg-container")
-  if (bgContainer) {
-    bgContainer.style.display = "none"
+  // 初始化黑洞粒子背景（介绍页和预览窗口页显示背景）
+  const bgInitSuccess = initBlackHoleBackground({
+    themeIndex: 0,
+    logPrefix: "[介绍页]",
+  })
+
+  if (!bgInitSuccess) {
+    // 如果 BlackHoleBackground 还未加载，延迟重试
+    console.warn("[介绍页] BlackHoleBackground 未加载，延迟初始化")
+    setTimeout(() => {
+      initBackgroundForIntro()
+    }, 200)
   }
 
   // 移除 test-mode 类，恢复非测试模式样式
@@ -1705,6 +1714,14 @@ async function prepareIntroExperience({ resume = false } = {}) {
     energyPillarContainer.style.display = "none"
     energyPillarContainer.classList.remove("visible")
   }
+
+  // 隐藏测试页的图片容器（介绍页和预览窗口页不显示）
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "none"
+    console.log("[介绍页] image-container 已隐藏")
+  }
+
   console.log(
     "[正常流程] 已添加 intro-mode 类，appWindow.classList:",
     appWindow.classList.toString()
@@ -1932,6 +1949,14 @@ async function enterTestExperience({
 
     introOverlay.style.display = "none"
     appWindow.classList.remove("intro-mode")
+
+    // 显示测试页的图片容器
+    const imageContainer = document.getElementById("image-container")
+    if (imageContainer) {
+      imageContainer.style.display = "flex"
+      console.log("[进入测试] image-container 已显示")
+    }
+
     const shouldShowControls =
       state.stage !== "post" && state.stage !== "summary"
     if (shouldShowControls) {
@@ -2032,18 +2057,12 @@ function initTest(restoredSnapshot = null) {
   }
 
   // 初始化黑洞粒子背景（仅在测试阶段显示）
-  if (window.BlackHoleBackground && window.BlackHoleBackground.init) {
-    window.BlackHoleBackground.init("blackhole-bg-container")
-    // 设置初始主题（对应第一张图片，索引0）
-    if (window.BlackHoleBackground.switchTheme) {
-      window.BlackHoleBackground.switchTheme(0)
-    }
-    // 显示背景容器
-    const bgContainer = document.getElementById("blackhole-bg-container")
-    if (bgContainer) {
-      bgContainer.style.display = "block"
-    }
-  }
+  // 测试阶段强制重新初始化，确保背景正确显示
+  initBlackHoleBackground({
+    themeIndex: 0,
+    forceInit: true,
+    logPrefix: "[测试页]",
+  })
 
   // 添加 test-mode 类，切换样式为测试模式
   document.body.classList.add("test-mode")
@@ -2060,7 +2079,10 @@ function initTest(restoredSnapshot = null) {
   // 恢复能量值（如果有快照）
   if (isRestored && restoredSnapshot?.payload?.energy !== undefined) {
     const savedEnergy = restoredSnapshot.payload.energy
-    if (window.EnergyPillar && typeof window.EnergyPillar.setEnergy === "function") {
+    if (
+      window.EnergyPillar &&
+      typeof window.EnergyPillar.setEnergy === "function"
+    ) {
       window.EnergyPillar.setEnergy(savedEnergy)
       console.log("[恢复快照] 能量值已恢复:", savedEnergy)
     }
@@ -2076,6 +2098,13 @@ function initTest(restoredSnapshot = null) {
   if (state.stage === "summary") {
     showSummary()
     return
+  }
+
+  // 确保测试页的图片容器显示（测试阶段）
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "flex"
+    console.log("[initTest] image-container 已显示")
   }
 
   loadImage(state.currentIndex)
@@ -2832,6 +2861,11 @@ function showPostTestView(options = {}) {
   hideTestLoadingOverlay({ keepMainHidden: true })
   mainContent.style.display = "none"
   controlsBar.style.display = "none"
+  // 确保 image-container 隐藏（后测试阶段不显示）
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "none"
+  }
   postTestView.style.display = "block"
   progressText.textContent = "测试总结阶段"
 
@@ -3241,6 +3275,11 @@ function showSummary(options = {}) {
   mainContent.style.display = "none"
   controlsBar.style.display = "none"
   postTestView.style.display = "none"
+  // 确保 image-container 隐藏（汇总阶段不显示）
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "none"
+  }
   summaryView.style.display = "block"
   progressText.textContent = "测试已完成！"
 
@@ -3575,6 +3614,29 @@ function getCurrentUserId() {
   return ""
 }
 
+/**
+ * 隐藏下载报告相关的UI元素
+ * 当显示下载按钮时，隐藏"📈 完整测试汇总"标签和download-report-status元素
+ */
+function hideSummaryElementsForDownload() {
+  // 隐藏"📈 完整测试汇总"标签（summary-view中的h2）
+  const summaryView = document.getElementById("summary-view")
+  if (summaryView) {
+    const h2Elements = summaryView.querySelectorAll("h2")
+    h2Elements.forEach((h2) => {
+      if (h2.textContent.includes("📈 完整测试汇总")) {
+        h2.style.display = "none"
+      }
+    })
+  }
+
+  // 隐藏download-report-status元素
+  const statusEl = document.getElementById("download-report-status")
+  if (statusEl) {
+    statusEl.style.display = "none"
+  }
+}
+
 function renderSummaryReportSection(container, grid, statusInfo) {
   if (!container || !grid) return
   const reportCard = document.createElement("div")
@@ -3604,6 +3666,7 @@ function renderSummaryReportSection(container, grid, statusInfo) {
   if (isReportReadyStatus(statusInfo)) {
     const statusEl = document.createElement("div")
     statusEl.id = "download-report-status"
+    statusEl.style.display = "none" // 直接隐藏 download-report-status 元素
     reportCard.appendChild(statusEl)
 
     const downloadBtn = document.createElement("button")
@@ -3615,6 +3678,11 @@ function renderSummaryReportSection(container, grid, statusInfo) {
 
   // 将 reportCard 插入到 summary-view 中，在 grid 之前
   container.insertBefore(reportCard, grid)
+
+  // 在元素插入到 DOM 后，隐藏"📈 完整测试汇总"标签
+  if (isReportReadyStatus(statusInfo)) {
+    hideSummaryElementsForDownload()
+  }
 }
 
 function normalizeReportStatus(value) {
@@ -4214,13 +4282,22 @@ function clearAllDrawing() {
   saveCanvasState(state.currentIndex)
 
   // 一键擦除时减少能量（减少当前能量的 50%，但至少减少 50 点）
-  if (window.EnergyPillar && typeof window.EnergyPillar.getEnergy === "function" && typeof window.EnergyPillar.removeEnergy === "function") {
+  if (
+    window.EnergyPillar &&
+    typeof window.EnergyPillar.getEnergy === "function" &&
+    typeof window.EnergyPillar.removeEnergy === "function"
+  ) {
     const currentEnergy = window.EnergyPillar.getEnergy()
     if (currentEnergy > 0) {
       // 减少当前能量的 50%，但至少减少 50 点
       const reduceAmount = Math.max(50, Math.floor(currentEnergy * 0.5))
       window.EnergyPillar.removeEnergy(reduceAmount)
-      console.log("[一键擦除] 能量减少:", reduceAmount, "当前能量:", currentEnergy - reduceAmount)
+      console.log(
+        "[一键擦除] 能量减少:",
+        reduceAmount,
+        "当前能量:",
+        currentEnergy - reduceAmount
+      )
     }
   }
 
@@ -4234,7 +4311,8 @@ function clearAllDrawing() {
 function waitForModules(callback, maxRetries = 50) {
   let retries = 0
   const checkModules = () => {
-    if (window.auth && window.apiClient) {
+    // 检查所有必需的模块：auth、apiClient 和 API
+    if (window.auth && window.apiClient && window.API) {
       callback()
     } else if (retries < maxRetries) {
       retries++
@@ -4496,6 +4574,12 @@ async function checkLoginAndInit() {
     return
   }
 
+  // 正常登录时，清除重测标记（确保报告检查不会被跳过）
+  // 只有在重测流程中才会重新设置这个标记
+  if (!retestFlowActive) {
+    setSkipReportRedirectFlag(false)
+  }
+
   // 已登录：先显示全屏加载状态，再根据下载报告接口结果决定是否跳转报告页
   showReportCheckLoading()
   try {
@@ -4509,7 +4593,6 @@ async function checkLoginAndInit() {
     }
   } finally {
     // 无论是否跳转到报告页，都结束登录后的加载状态
-
     hideReportCheckLoading()
   }
 
@@ -4524,13 +4607,88 @@ window.addEventListener("beforeunload", () => {
   saveSessionSnapshot("beforeunload", { immediate: true })
 })
 
+/**
+ * 初始化黑洞粒子背景（通用函数，可被其他函数复用）
+ * @param {Object} options - 初始化选项
+ * @param {number} options.themeIndex - 主题索引（默认0）
+ * @param {boolean} options.forceInit - 是否强制重新初始化（默认false）
+ * @param {string} options.logPrefix - 日志前缀（用于标识调用来源）
+ * @param {boolean} options.showContainer - 是否显示背景容器（默认true）
+ * @returns {boolean} 是否初始化成功
+ */
+function initBlackHoleBackground(options = {}) {
+  const {
+    themeIndex = 0,
+    forceInit = false,
+    logPrefix = "[背景初始化]",
+    showContainer = true,
+  } = options
+
+  // 检查 BlackHoleBackground 模块是否加载
+  if (!window.BlackHoleBackground || !window.BlackHoleBackground.init) {
+    return false
+  }
+
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (!bgContainer) {
+    console.warn(`${logPrefix} 背景容器未找到`)
+    return false
+  }
+
+  // 如果已初始化且不强制重新初始化，只确保显示
+  if (bgContainer.dataset.initialized === "true" && !forceInit) {
+    if (showContainer) {
+      bgContainer.style.display = "block"
+    }
+    // 如果提供了主题索引，切换主题
+    if (window.BlackHoleBackground.switchTheme && themeIndex !== undefined) {
+      window.BlackHoleBackground.switchTheme(themeIndex)
+    }
+    return true
+  }
+
+  // 执行初始化
+  try {
+    window.BlackHoleBackground.init("blackhole-bg-container")
+    bgContainer.dataset.initialized = "true"
+
+    // 设置主题
+    if (window.BlackHoleBackground.switchTheme && themeIndex !== undefined) {
+      window.BlackHoleBackground.switchTheme(themeIndex)
+    }
+
+    // 显示背景容器
+    if (showContainer) {
+      bgContainer.style.display = "block"
+    }
+
+    console.log(`${logPrefix} 黑洞粒子背景已初始化，主题索引: ${themeIndex}`)
+    return true
+  } catch (error) {
+    console.warn(`${logPrefix} 背景初始化失败:`, error)
+    return false
+  }
+}
+
+/**
+ * 初始化背景（在页面加载时，带延迟重试机制）
+ */
+function initBackgroundForIntro() {
+  const success = initBlackHoleBackground({
+    themeIndex: 0,
+    logPrefix: "[初始化-信息填写页]",
+  })
+
+  if (!success) {
+    // 如果 BlackHoleBackground 还未加载，延迟重试
+    setTimeout(initBackgroundForIntro, 100)
+  }
+}
+
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
-  // 确保背景容器初始状态为隐藏（只在测试阶段显示）
-  const bgContainer = document.getElementById("blackhole-bg-container")
-  if (bgContainer) {
-    bgContainer.style.display = "none"
-  }
+  // 初始化背景（信息填写页和介绍页都需要显示）
+  initBackgroundForIntro()
 
   // 确保能量柱容器初始状态为隐藏
   const energyPillarContainer = document.getElementById(
