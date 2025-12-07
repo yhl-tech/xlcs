@@ -91,8 +91,8 @@ export async function startOperationReactionTest(onComplete = null) {
       "现在开始第二项测试，测试时我会依次给你展示 10 张图片，你只需要告诉我在图片中看到了什么，并描述你看到的东西、联想到的东西。不管看见什么，都可以直接描述，没有正确与错误。在一张图片中你可能会看到多个物体和场景，描述得越详细越好。测试过程中，你可以旋转调整图像画面，观察不同的角度，用画笔标记出你看到的物体或场景。"
     await playTTS(finalText)
 
-    // 等待一小段时间确保播报完全完成
-    await new Promise((resolve) => setTimeout(resolve))
+    // // 等待一小段时间确保播报完全完成
+    // await new Promise((resolve) => setTimeout(resolve))
 
     // 测试完成
     console.log("[操作反应测试] 测试完成")
@@ -182,9 +182,8 @@ async function executeStep(step) {
 
   // 8. 播报完成提示
   await playTTS("好的，操作完成")
-
   // 9. 等待一小段时间再进入下一步
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 1500))
 }
 
 /**
@@ -423,7 +422,7 @@ async function playTTS(text) {
         }
 
         // 估算播放时间（每字约 300ms，但至少 2 秒）
-        const estimatedDuration = Math.max(2000, text.length * 270)
+        const estimatedDuration = Math.max(2000, text.length * 220)
         console.log(`[操作反应测试] 预计播放时间: ${estimatedDuration}ms`)
 
         let resolved = false

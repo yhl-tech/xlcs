@@ -1156,6 +1156,9 @@ function buildSessionSnapshot(reason = "manual") {
           : null,
       },
     },
+    energy: window.EnergyPillar && typeof window.EnergyPillar.getEnergy === "function"
+      ? window.EnergyPillar.getEnergy()
+      : 0,
   }
 
   sessionState.payload = payload
@@ -2052,6 +2055,15 @@ function initTest(restoredSnapshot = null) {
   if (energyPillarContainer) {
     energyPillarContainer.style.display = "block"
     energyPillarContainer.classList.add("visible")
+  }
+
+  // 恢复能量值（如果有快照）
+  if (isRestored && restoredSnapshot?.payload?.energy !== undefined) {
+    const savedEnergy = restoredSnapshot.payload.energy
+    if (window.EnergyPillar && typeof window.EnergyPillar.setEnergy === "function") {
+      window.EnergyPillar.setEnergy(savedEnergy)
+      console.log("[恢复快照] 能量值已恢复:", savedEnergy)
+    }
   }
 
   setupEventListeners()
@@ -3265,7 +3277,6 @@ function showSummary(options = {}) {
   for (let i = 0; i < state.totalImages; i++) {
     const item = document.createElement("div")
     item.className = "summary-item"
-    item.innerHTML = `<h4>图 ${i + 1}</h4>`
     const compositeContainer = document.createElement("div")
     compositeContainer.style.position = "relative"
     const baseImage = document.createElement("img")
@@ -3282,6 +3293,9 @@ function showSummary(options = {}) {
       compositeContainer.appendChild(drawingImage)
     }
     item.appendChild(compositeContainer)
+    const heading = document.createElement("h4")
+    heading.textContent = `图 ${i + 1}`
+    item.appendChild(heading)
     grid.appendChild(item)
   }
   saveSessionSnapshot("stage_change", { immediate: true })
@@ -3564,55 +3578,25 @@ function getCurrentUserId() {
 function renderSummaryReportSection(container, grid, statusInfo) {
   if (!container || !grid) return
   const reportCard = document.createElement("div")
-  reportCard.style.textAlign = "center"
-  reportCard.style.padding = "16px 20px 16px 20px"
-  reportCard.style.background = "var(--primary-lighter)"
-  reportCard.style.borderRadius = "12px"
-  reportCard.style.marginBottom = "20px"
-  reportCard.style.boxShadow = "var(--shadow-sm)"
-  reportCard.style.position = "relative"
-  reportCard.style.width = "100%"
-  reportCard.style.boxSizing = "border-box"
+  reportCard.className = "summary-report-card"
 
   const retestBtn = document.createElement("button")
   retestBtn.id = "restart-test-btn"
   retestBtn.type = "button"
   retestBtn.textContent = "🔁 重新测试"
-  retestBtn.style.position = "absolute"
-  retestBtn.style.top = "12px"
-  retestBtn.style.right = "12px"
-  retestBtn.style.border = "none"
-  retestBtn.style.background = "rgba(255, 255, 255, 0.25)"
-  retestBtn.style.color = "var(--primary-color, #2563eb)"
-  retestBtn.style.fontWeight = "600"
-  retestBtn.style.fontSize = "13px"
-  retestBtn.style.padding = "6px 16px"
-  retestBtn.style.borderRadius = "999px"
-  retestBtn.style.cursor = "pointer"
-  retestBtn.style.boxShadow = "var(--shadow-sm)"
-  retestBtn.style.transition = "all 0.2s ease"
   retestBtn.addEventListener("click", handleRetestClick)
   reportCard.appendChild(retestBtn)
 
   const title = document.createElement("h3")
-  title.style.color = "var(--primary-color)"
-  title.style.margin = "0 0 6px 0"
-  title.style.fontSize = "18px"
   title.textContent = "✅ 感谢您的参与！"
   reportCard.appendChild(title)
 
   const message = document.createElement("p")
-  message.style.margin = "0 0 4px 0"
-  message.style.color = "var(--text-secondary)"
-  message.style.fontSize = "13px"
   message.textContent = getReportStatusMessage(statusInfo)
   reportCard.appendChild(message)
 
   if (statusInfo?.updatedAt) {
     const updated = document.createElement("div")
-    updated.style.fontSize = "12px"
-    updated.style.color = "var(--text-tertiary, #707070)"
-    updated.style.marginTop = "2px"
     updated.textContent = `最近更新：${statusInfo.updatedAt}`
     reportCard.appendChild(updated)
   }
@@ -3620,25 +3604,10 @@ function renderSummaryReportSection(container, grid, statusInfo) {
   if (isReportReadyStatus(statusInfo)) {
     const statusEl = document.createElement("div")
     statusEl.id = "download-report-status"
-    statusEl.style.marginTop = "4px"
-    statusEl.style.fontSize = "12px"
-    statusEl.style.color = "var(--text-secondary)"
-    statusEl.style.minHeight = "18px"
     reportCard.appendChild(statusEl)
 
     const downloadBtn = document.createElement("button")
     downloadBtn.id = "download-report-btn"
-    downloadBtn.style.marginTop = "8px"
-    downloadBtn.style.padding = "8px 18px 10px"
-    downloadBtn.style.background = "var(--primary-light)"
-    downloadBtn.style.color = "white"
-    downloadBtn.style.border = "none"
-    downloadBtn.style.borderRadius = "8px"
-    downloadBtn.style.fontSize = "16px"
-    downloadBtn.style.fontWeight = "600"
-    downloadBtn.style.cursor = "pointer"
-    downloadBtn.style.transition = "all 0.3s ease"
-    downloadBtn.style.boxShadow = "var(--shadow-md)"
     downloadBtn.textContent = "📥 下载测试报告"
     downloadBtn.addEventListener("click", downloadReport)
     reportCard.appendChild(downloadBtn)
@@ -4104,6 +4073,22 @@ function draw(e) {
     window.EnergyPillar.onDrawMove(e.clientX, e.clientY)
   }
 
+  // 擦除时减少能量（擦除轨迹时）
+  if (
+    state.tool === "eraser" &&
+    window.EnergyPillar &&
+    typeof window.EnergyPillar.removeEnergy === "function"
+  ) {
+    // 擦除时减少能量，使用节流避免减少过快
+    const now = Date.now()
+    if (!window._lastEraseTime) window._lastEraseTime = 0
+    if (now - window._lastEraseTime >= 100) {
+      // 每 100ms 减少一次能量
+      window.EnergyPillar.removeEnergy(5) // 每次减少 5 点能量
+      window._lastEraseTime = now
+    }
+  }
+
   lastX = x
   lastY = y
   resetInactivityTimer()
@@ -4227,6 +4212,17 @@ function clearAllDrawing() {
 
   // 保存空的画布状态
   saveCanvasState(state.currentIndex)
+
+  // 一键擦除时减少能量（减少当前能量的 50%，但至少减少 50 点）
+  if (window.EnergyPillar && typeof window.EnergyPillar.getEnergy === "function" && typeof window.EnergyPillar.removeEnergy === "function") {
+    const currentEnergy = window.EnergyPillar.getEnergy()
+    if (currentEnergy > 0) {
+      // 减少当前能量的 50%，但至少减少 50 点
+      const reduceAmount = Math.max(50, Math.floor(currentEnergy * 0.5))
+      window.EnergyPillar.removeEnergy(reduceAmount)
+      console.log("[一键擦除] 能量减少:", reduceAmount, "当前能量:", currentEnergy - reduceAmount)
+    }
+  }
 
   // 记录一键擦除操作
   if (window.InteractionTracker && window.InteractionTracker._trackClearAll) {

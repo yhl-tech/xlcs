@@ -124,6 +124,19 @@
   }
 
   /**
+   * 减少能量
+   */
+  function removeEnergy(amount = CONFIG.ENERGY_PER_STROKE) {
+    if (!initialized) return
+
+    energy = Math.max(energy - amount, 0)
+    updateFillLevel()
+
+    // 触发脉冲效果（即使减少也触发，提供视觉反馈）
+    triggerPulse()
+  }
+
+  /**
    * 更新填充高度
    */
   function updateFillLevel() {
@@ -236,6 +249,7 @@
     stopDrawing,
     onDrawMove,
     addEnergy,
+    removeEnergy,
     reset,
     getEnergy,
     setEnergy,
