@@ -1,0 +1,212 @@
+/* 登录页面动画背景样式 */
+
+/* 背景容器 */
+.login-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 渐变背景层 - 浅蓝色渐变（从顶部几乎白色到底部淡蓝色） */
+.login-bg-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    #f5f9ff 0%,
+    #eef5ff 20%,
+    #e6f0ff 40%,
+    #deebff 60%,
+    #d6e6ff 80%,
+    #d0e3ff 100%
+  );
+  background-attachment: fixed;
+}
+
+/* 第二层渐变 - 增加柔和深度 */
+.login-bg-gradient::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(238, 245, 255, 0.1) 50%,
+    rgba(214, 230, 255, 0.15) 100%
+  );
+}
+
+/* 第三层 - 微妙的柔和光晕效果 */
+.login-bg-gradient::after {
+  content: "";
+  position: absolute;
+  top: 15%;
+  right: 10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(
+    circle,
+    rgba(245, 250, 255, 0.6) 0%,
+    rgba(238, 245, 255, 0.4) 30%,
+    transparent 65%
+  );
+  transform: translate(30%, -30%);
+  border-radius: 50%;
+  animation: glowPulse 12s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translate(30%, -30%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(30%, -30%) scale(1.05);
+  }
+}
+
+/* SVG 容器 */
+.login-bg-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+/* 有机线条 - 柔和的几何线条（提高可见度） */
+.organic-line {
+  fill: none;
+  stroke: rgba(180, 200, 230, 0.4);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  animation: lineFade 10s ease-in-out infinite;
+}
+
+.organic-line-2 {
+  fill: none;
+  stroke: rgba(180, 200, 230, 0.35);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  animation: lineFade 12s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* 线条淡入淡出动画（提高可见度） */
+@keyframes lineFade {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 装饰性小点（提高可见度，更明显） */
+.decorative-dot {
+  fill: rgba(150, 180, 220, 0.7);
+  animation: dotTwinkle 4s ease-in-out infinite;
+}
+
+.decorative-dot-2 {
+  fill: rgba(150, 180, 220, 0.65);
+  animation: dotTwinkle 5s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.decorative-dot-3 {
+  fill: rgba(150, 180, 220, 0.6);
+  animation: dotTwinkle 6s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+@keyframes dotTwinkle {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.15);
+  }
+}
+
+/* 光晕效果 */
+.glow-effect {
+  filter: blur(2px);
+  opacity: 0.3;
+}
+
+/* 确保登录容器在背景之上 */
+body {
+  position: relative;
+  z-index: 1;
+}
+
+.login-container {
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .organic-line {
+    stroke-width: 1.2;
+  }
+
+  .organic-line-2 {
+    stroke-width: 1;
+  }
+
+  .decorative-dot {
+    opacity: 0.4;
+  }
+
+  .login-container {
+    padding: 36px 24px;
+    border-radius: 20px;
+  }
+}
+
+/* 性能优化 */
+.login-background,
+.login-bg-svg,
+.spiral-path,
+.decorative-circle {
+  will-change: transform, opacity;
+}
+
+/* 减少动画（低性能设备） */
+@media (prefers-reduced-motion: reduce) {
+  .spiral-path,
+  .spiral-path-2,
+  .spiral-path-3,
+  .decorative-circle,
+  .decorative-circle-2,
+  .decorative-dot {
+    animation: none;
+    opacity: 0.3;
+  }
+}

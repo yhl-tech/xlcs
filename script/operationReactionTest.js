@@ -460,7 +460,7 @@ async function playTTS(text) {
         setTimeout(() => {
           console.log("[操作反应测试] 播报超时，强制完成")
           doResolve()
-        }, estimatedDuration + 1000) // 额外增加 2 秒缓冲
+        }, estimatedDuration) // 额外增加 2 秒缓冲
       } else if (
         window.dialogClient &&
         typeof window.sendTextQuery === "function" &&

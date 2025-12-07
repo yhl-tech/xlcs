@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>登录 - 罗夏墨迹测试</title>
+    <!-- 动画背景样式 -->
+    <link rel="stylesheet" href="./css/login-background.css" />
     <style>
       * {
         margin: 0;
@@ -14,22 +16,34 @@
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
           "Microsoft YaHei", sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(
+          to bottom,
+          #f5f9ff 0%,
+          #eef5ff 25%,
+          #e6f0ff 50%,
+          #deebff 75%,
+          #d6e6ff 100%
+        );
         display: flex;
         justify-content: center;
         align-items: center;
         min-height: 100vh;
         padding: 20px;
+        position: relative;
+        overflow-x: hidden;
       }
 
       .login-container {
-        background: white;
-        border-radius: 20px;
-        padding: 50px 40px;
-        box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
-        max-width: 450px;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 40px 32px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08),
+          0 1px 3px rgba(0, 0, 0, 0.05);
+        max-width: 420px;
         width: 100%;
         animation: slideUp 0.5s ease-out;
+        position: relative;
+        z-index: 10;
       }
 
       @keyframes slideUp {
@@ -44,40 +58,58 @@
       }
 
       .login-container h1 {
-        color: #1e3a8a;
+        color: #1e293b;
         text-align: center;
-        margin-bottom: 30px;
-        font-size: 28px;
-        font-weight: 700;
+        margin-bottom: 22px;
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        line-height: 1.4;
       }
 
       .form-group {
-        margin-bottom: 20px;
+        margin-bottom: 18px;
       }
 
       .form-group label {
         display: block;
         font-size: 14px;
-        font-weight: 600;
-        color: #1f2937;
+        font-weight: 500;
+        color: #333333;
         margin-bottom: 8px;
+        letter-spacing: 0;
       }
 
       .form-group input {
         width: 100%;
         padding: 12px 14px;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
         font-size: 14px;
-        transition: all 0.3s ease;
-        background: #f9fafb;
+        transition: all 0.2s ease;
+        background: #ffffff;
+        color: #1a1a1a;
+      }
+
+      .form-group input::placeholder {
+        color: #999999;
       }
 
       .form-group input:focus {
         outline: none;
         border-color: #3b82f6;
-        background: white;
-        box-shadow: 0 0 0 3px #dbeafe;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .form-group input.input-error {
+        border-color: #ef4444;
+        background: rgba(254, 242, 242, 0.5);
+      }
+
+      .form-group input.input-error:focus {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
       }
 
       .error-message {
@@ -85,6 +117,7 @@
         font-size: 13px;
         margin-top: 8px;
         display: none;
+        padding: 8px 0;
       }
 
       .error-message.show {
@@ -97,10 +130,10 @@
         margin-top: 8px;
         display: none;
         text-align: center;
-        padding: 10px;
-        background: #d1fae5;
-        border-radius: 8px;
-        border: 1px solid #10b981;
+        padding: 12px;
+        background: rgba(16, 185, 129, 0.1);
+        border-radius: 12px;
+        border: 1px solid rgba(16, 185, 129, 0.2);
       }
 
       .success-message.show {
@@ -111,25 +144,24 @@
       #register-btn,
       #phone-login-btn {
         width: 100%;
-        padding: 14px;
-        margin-top: 30px;
+        padding: 12px 24px;
+        margin-top: 24px;
         background: #3b82f6;
         color: white;
         border: none;
-        border-radius: 10px;
-        font-size: 16px;
-        font-weight: 600;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
       }
 
       #login-btn:hover,
       #register-btn:hover,
       #phone-login-btn:hover {
-        background: #1e3a8a;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        background: #2563eb;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
       }
 
       #login-btn:active,
@@ -141,7 +173,7 @@
       #login-btn:disabled,
       #register-btn:disabled,
       #phone-login-btn:disabled {
-        opacity: 0.6;
+        opacity: 0.5;
         cursor: not-allowed;
         transform: none;
       }
@@ -166,20 +198,22 @@
 
       .switch-form {
         text-align: center;
-        margin-top: 20px;
-        font-size: 14px;
-        color: #6b7280;
+        margin-top: 24px;
+        font-size: 13px;
+        color: #64748b;
       }
 
       .switch-form a {
-        color: #3b82f6;
+        color: #60a5fa;
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
+        transition: color 0.2s ease;
       }
 
       .switch-form a:hover {
-        text-decoration: underline;
+        color: #3b82f6;
+        text-decoration: none;
       }
 
       #register-form {
@@ -189,20 +223,20 @@
       /* 登录方式切换标签 */
       .login-tabs {
         display: flex;
-        margin-bottom: 30px;
-        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #e0e0e0;
       }
 
       .login-tab {
         flex: 1;
-        padding: 12px 20px;
+        padding: 10px 20px;
         text-align: center;
-        font-size: 15px;
-        font-weight: 600;
-        color: #6b7280;
+        font-size: 14px;
+        font-weight: 500;
+        color: #999999;
         cursor: pointer;
-        border-bottom: 3px solid transparent;
-        transition: all 0.3s ease;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
         background: none;
         border-top: none;
         border-left: none;
@@ -214,8 +248,9 @@
       }
 
       .login-tab.active {
-        color: #3b82f6;
+        color: #1a1a1a;
         border-bottom-color: #3b82f6;
+        font-weight: 600;
       }
 
       /* 用户名登录表单默认隐藏，手机号登录默认显示 */
@@ -226,7 +261,8 @@
       /* 验证码输入组 */
       .verification-code-group {
         display: flex;
-        gap: 10px;
+        gap: 12px;
+        align-items: flex-end;
       }
 
       .verification-code-group .form-group {
@@ -239,38 +275,206 @@
       }
 
       #send-code-btn {
-        padding: 12px 20px;
-        background: #f3f4f6;
-        color: #1f2937;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
+        padding: 12px 18px;
+        background: #ffffff;
+        color: #1a1a1a;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         white-space: nowrap;
-        min-width: 120px;
+        min-width: 110px;
+        align-self: flex-end;
       }
 
       #send-code-btn:hover:not(:disabled) {
-        background: #e5e7eb;
-        border-color: #d1d5db;
+        background: #f5f5f5;
+        border-color: #3b82f6;
+        color: #3b82f6;
       }
 
       #send-code-btn:disabled {
-        opacity: 0.6;
+        opacity: 0.5;
         cursor: not-allowed;
       }
 
       #send-code-btn.countdown {
-        background: #f9fafb;
-        color: #9ca3af;
+        background: rgba(248, 250, 252, 0.9);
+        color: #94a3b8;
+        border-color: rgba(148, 163, 184, 0.2);
       }
     </style>
   </head>
   <body>
+    <!-- 动画背景容器 -->
+    <div class="login-background">
+      <div class="login-bg-gradient"></div>
+      <svg
+        class="login-bg-svg"
+        viewBox="0 0 1200 800"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        <!-- 左上角区域 - 弧线组 -->
+        <path
+          class="organic-line"
+          d="M 50,50 Q 150,80 200,150 Q 180,200 100,250"
+        />
+        <path
+          class="organic-line"
+          d="M 100,100 Q 200,120 280,180 Q 250,240 150,280"
+        />
+        <path
+          class="organic-line-2"
+          d="M 80,120 Q 180,150 250,200 Q 220,260 120,300"
+        />
+
+        <!-- 顶部中央区域 - 大弧线 -->
+        <path
+          class="organic-line"
+          d="M 300,50 Q 500,100 700,80 Q 900,60 1100,100"
+        />
+        <path
+          class="organic-line-2"
+          d="M 400,80 Q 600,120 800,100 Q 1000,80 1150,120"
+        />
+
+        <!-- 右上角区域 - 弧线组 -->
+        <path
+          class="organic-line"
+          d="M 1000,50 Q 1100,100 1150,200 Q 1120,280 1050,320"
+        />
+        <path
+          class="organic-line-2"
+          d="M 1050,100 Q 1120,150 1170,250 Q 1140,300 1080,350"
+        />
+        <path
+          class="organic-line"
+          d="M 950,80 Q 1020,130 1070,220 Q 1040,270 980,310"
+        />
+
+        <!-- 左侧区域 - 垂直弧线 -->
+        <path
+          class="organic-line"
+          d="M 50,200 Q 80,300 100,400 Q 90,500 70,600"
+        />
+        <path
+          class="organic-line-2"
+          d="M 100,250 Q 120,350 140,450 Q 130,550 110,650"
+        />
+        <path
+          class="organic-line"
+          d="M 30,300 Q 60,400 80,500 Q 70,600 50,700"
+        />
+
+        <!-- 中左区域 - 有机曲线 -->
+        <path
+          class="organic-line"
+          d="M 200,300 Q 300,350 400,380 Q 500,400 600,420 Q 500,480 400,500 Q 300,480 200,450"
+        />
+        <path
+          class="organic-line-2"
+          d="M 250,350 Q 350,400 450,430 Q 550,450 650,470 Q 550,520 450,540 Q 350,520 250,490"
+        />
+
+        <!-- 中右区域 - 扩散弧线 -->
+        <path
+          class="organic-line"
+          d="M 800,300 Q 900,350 1000,400 Q 1100,450 1150,500 Q 1100,550 1000,600 Q 900,550 800,500"
+        />
+        <path
+          class="organic-line-2"
+          d="M 850,350 Q 950,400 1050,450 Q 1120,500 1170,550 Q 1120,600 1050,650 Q 950,600 850,550"
+        />
+        <path
+          class="organic-line"
+          d="M 750,320 Q 850,370 950,420 Q 1050,470 1100,520 Q 1050,570 950,620 Q 850,570 750,520"
+        />
+
+        <!-- 右侧区域 - 垂直弧线 -->
+        <path
+          class="organic-line"
+          d="M 1150,200 Q 1120,300 1100,400 Q 1110,500 1130,600"
+        />
+        <path
+          class="organic-line-2"
+          d="M 1100,250 Q 1070,350 1050,450 Q 1060,550 1080,650"
+        />
+
+        <!-- 底部左侧 - 弧线组 -->
+        <path
+          class="organic-line"
+          d="M 50,600 Q 150,650 250,700 Q 200,750 100,780"
+        />
+        <path
+          class="organic-line-2"
+          d="M 100,620 Q 200,670 300,720 Q 250,760 150,790"
+        />
+        <path
+          class="organic-line"
+          d="M 80,640 Q 180,690 280,740 Q 230,770 130,800"
+        />
+
+        <!-- 底部中央 - 大弧线 -->
+        <path
+          class="organic-line"
+          d="M 300,700 Q 500,720 700,740 Q 900,760 1100,750"
+        />
+        <path
+          class="organic-line-2"
+          d="M 400,720 Q 600,740 800,760 Q 1000,780 1150,770"
+        />
+
+        <!-- 底部右侧 - 弧线组 -->
+        <path
+          class="organic-line"
+          d="M 1000,650 Q 1100,680 1150,720 Q 1120,760 1050,780"
+        />
+        <path
+          class="organic-line-2"
+          d="M 1050,670 Q 1120,700 1170,740 Q 1140,770 1080,790"
+        />
+
+        <!-- 装饰性小点 - 散布全屏 -->
+        <circle class="decorative-dot" cx="150" cy="120" r="2.5" />
+        <circle class="decorative-dot-2" cx="280" cy="180" r="3" />
+        <circle class="decorative-dot" cx="450" cy="250" r="2.5" />
+        <circle class="decorative-dot-3" cx="650" cy="320" r="2.5" />
+        <circle class="decorative-dot" cx="850" cy="280" r="3" />
+        <circle class="decorative-dot-2" cx="1050" cy="350" r="2.5" />
+        <circle class="decorative-dot" cx="200" cy="450" r="2.5" />
+        <circle class="decorative-dot-3" cx="500" cy="520" r="3" />
+        <circle class="decorative-dot" cx="800" cy="580" r="2.5" />
+        <circle class="decorative-dot-2" cx="1100" cy="620" r="2.5" />
+        <circle class="decorative-dot" cx="350" cy="680" r="3" />
+        <circle class="decorative-dot-3" cx="700" cy="720" r="2.5" />
+        <circle class="decorative-dot" cx="950" cy="750" r="2.5" />
+        <circle class="decorative-dot-2" cx="120" cy="550" r="2.5" />
+        <circle class="decorative-dot" cx="980" cy="480" r="3" />
+        <!-- 新增装饰点 -->
+        <circle class="decorative-dot" cx="80" cy="250" r="2.5" />
+        <circle class="decorative-dot-2" cx="320" cy="100" r="2.5" />
+        <circle class="decorative-dot-3" cx="600" cy="150" r="2.5" />
+        <circle class="decorative-dot" cx="900" cy="200" r="3" />
+        <circle class="decorative-dot-2" cx="1150" cy="280" r="2.5" />
+        <circle class="decorative-dot" cx="250" cy="320" r="2.5" />
+        <circle class="decorative-dot-3" cx="550" cy="400" r="3" />
+        <circle class="decorative-dot" cx="750" cy="450" r="2.5" />
+        <circle class="decorative-dot-2" cx="1000" cy="500" r="2.5" />
+        <circle class="decorative-dot" cx="180" cy="600" r="3" />
+        <circle class="decorative-dot-3" cx="420" cy="650" r="2.5" />
+        <circle class="decorative-dot" cx="680" cy="600" r="2.5" />
+        <circle class="decorative-dot-2" cx="920" cy="650" r="3" />
+        <circle class="decorative-dot" cx="1100" cy="700" r="2.5" />
+        <circle class="decorative-dot-3" cx="300" cy="750" r="2.5" />
+        <circle class="decorative-dot" cx="580" cy="780" r="3" />
+        <circle class="decorative-dot-2" cx="850" cy="800" r="2.5" />
+      </svg>
+    </div>
+
     <div class="login-container">
-      <h1>🔐 用户登录</h1>
+      <h1>用户登录</h1>
 
       <!-- 登录方式切换标签 -->
       <div class="login-tabs">
@@ -687,7 +891,7 @@
             switchText.innerHTML = "已有账户？"
             switchLink.textContent = "立即登录"
             document.querySelector(".login-container h1").textContent =
-              "📝 用户注册"
+              "用户注册"
             hideRegisterMessages()
             hideLoginMessages()
             hidePhoneLoginMessages()
@@ -698,7 +902,7 @@
             switchText.innerHTML = "没有账户？"
             switchLink.textContent = "立即注册"
             document.querySelector(".login-container h1").textContent =
-              "🔐 用户登录"
+              "用户登录"
             hideRegisterMessages()
 
             // 根据记录的登录方式显示对应的表单
@@ -842,7 +1046,7 @@
                   switchText.innerHTML = "没有账户？"
                   switchLink.textContent = "立即注册"
                   document.querySelector(".login-container h1").textContent =
-                    "🔐 用户登录"
+                    "用户登录"
                   hideRegisterMessages()
 
                   // 自动填充用户名

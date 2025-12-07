@@ -1786,7 +1786,7 @@ async function prepareIntroExperience({ resume = false } = {}) {
           }
         }
       }
-    }, 300)
+    }, 250)
   } catch (e) {
     console.warn("[启动页介绍] 初始化失败，已忽略：", e)
   }
@@ -2235,7 +2235,7 @@ async function playAudio(src, onendedCallback = null, options = {}) {
       // 由于实时对话是流式播放，无法准确判断播放完成时间
       // 根据文本长度估算播放时间（平均语速约 3-4 字/秒）
       if (onendedCallback) {
-        const estimatedDuration = Math.max(2000, src.length * 300) // 至少 2 秒，每字约 300ms
+        const estimatedDuration = Math.max(2000, src.length * 250) // 至少 2 秒，每字约 300ms
         setTimeout(() => {
           if (onendedCallback) {
             onendedCallback()
