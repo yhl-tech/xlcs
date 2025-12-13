@@ -149,20 +149,31 @@
             }
           }
 
+          // Web Speech API 作为备用：只有在后端没有文本时才使用
+          // 检查当前是否有后端文本正在显示
+          const currentUserText =
+            this.currentSpeaker === "user" ? this.currentText : ""
+
           // 优先处理最终结果
           if (finalTranscript) {
             const text = finalTranscript.trim()
             if (text) {
-              // 清除中间结果缓存
-              delete this.interimCache.user_interim
-              // 使用打字机效果显示最终结果
-              this.addText(text, "user", true, { skipDuplicateCheck: true })
+              // 只有在当前没有用户文本显示时，才使用 Web Speech API 的结果（作为备用）
+              if (!currentUserText) {
+                // 清除中间结果缓存
+                delete this.interimCache.user_interim
+                // 使用打字机效果显示最终结果
+                this.addText(text, "user", true, { skipDuplicateCheck: true })
+              }
             }
           } else if (interimTranscript) {
             const text = interimTranscript.trim()
             if (text) {
-              // 中间结果：使用打字机效果显示（实时更新）
-              this.addText(text, "user", false, { skipDuplicateCheck: true })
+              // 只有在当前没有用户文本显示时，才使用 Web Speech API 的中间结果（作为备用）
+              if (!currentUserText) {
+                // 中间结果：使用打字机效果显示（实时更新）
+                this.addText(text, "user", false, { skipDuplicateCheck: true })
+              }
             }
           }
         }
@@ -414,14 +425,31 @@
           this.currentText !== textToShow &&
           this.currentSpeaker === speaker
         ) {
+          console.log(
+            `[Subtitle] addText 打字中收到新文本 | speaker=${speaker} | currentText="${
+              this.currentText
+            }" | currentLength=${
+              this.currentText.length
+            } | newText="${textToShow}" | newLength=${
+              textToShow.length
+            } | currentLastChar="${
+              this.currentText[this.currentText.length - 1] || ""
+            }" | newLastChar="${textToShow[textToShow.length - 1] || ""}"`
+          )
           // 如果新文本是当前文本的扩展（累积文本更新），继续打字机效果
           if (
             textToShow.startsWith(this.currentText) &&
             textToShow.length > this.currentText.length
           ) {
+            console.log(
+              `[Subtitle] addText 累积文本更新，继续打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+            )
             // 累积文本更新：继续打字机效果，从当前位置继续
             this.typeText(textToShow, speaker, options)
           } else {
+            console.log(
+              `[Subtitle] addText 文本完全不同，重新开始打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+            )
             // 新文本完全不同，停止当前打字机效果，重新开始
             if (this.typingTimer) {
               clearTimeout(this.typingTimer)
@@ -431,6 +459,17 @@
             this.typeText(textToShow, speaker, options)
           }
         } else {
+          console.log(
+            `[Subtitle] addText 开始新的打字机效果 | isTyping=${
+              this.isTyping
+            } | currentSpeaker=${
+              this.currentSpeaker
+            } | newSpeaker=${speaker} | currentText="${
+              this.currentText
+            }" | newText="${textToShow}" | newLastChar="${
+              textToShow[textToShow.length - 1] || ""
+            }"`
+          )
           // 没有正在打字机效果，或者说话人不同，直接开始
           this.typeText(textToShow, speaker, options)
         }
@@ -454,13 +493,15 @@
       const speed = options.typingSpeed || CONFIG.typingSpeed
       const targetText = text // 保存目标文本，防止被覆盖
 
-      // 如果说话人改变，清空当前文本并停止之前的打字机效果
+      // 如果说话人改变，停止之前的打字机效果，但保留当前文本（不立即清空）
+      // 这样可以避免用户正在说话时，助手开始说话导致用户文本被清空
       if (this.currentSpeaker && this.currentSpeaker !== speaker) {
         if (this.isTyping && this.typingTimer) {
           clearTimeout(this.typingTimer)
           this.typingTimer = null
           this.isTyping = false
         }
+        // 清空当前文本，为新说话人准备
         this.currentText = ""
         this.displayText("", speaker, false)
       }
@@ -498,11 +539,23 @@
       const type = () => {
         if (index < targetText.length) {
           this.currentText = targetText.substring(0, index + 1)
+          console.log(
+            `[Subtitle] typeText 打字中 | speaker=${speaker} | index=${index} | currentLength=${
+              this.currentText.length
+            } | targetLength=${targetText.length} | currentText="${
+              this.currentText
+            }" | lastChar="${this.currentText[this.currentText.length - 1]}"`
+          )
           this.displayText(this.currentText, speaker, false)
           this.typingTimer = setTimeout(type, speed)
           index++
         } else {
           // 打字机效果完成
+          console.log(
+            `[Subtitle] typeText 完成 | speaker=${speaker} | finalText="${targetText}" | finalLength=${
+              targetText.length
+            } | lastChar="${targetText[targetText.length - 1]}"`
+          )
           this.displayText(targetText, speaker, true)
           this.typingTimer = null
           this.isTyping = false
@@ -528,8 +581,29 @@
         this.isVisible = true
       }
 
+      const oldText = this.currentText
       this.currentText = text
+      const displayedText = this.textElement.textContent
+
+      console.log(
+        `[Subtitle] displayText | speaker=${speaker} | isComplete=${isComplete} | oldText="${oldText}" | newText="${text}" | textLength=${
+          text.length
+        } | lastChar="${
+          text[text.length - 1] || ""
+        }" | displayedText="${displayedText}" | displayedLength=${
+          displayedText.length
+        }`
+      )
+
       this.textElement.textContent = text
+
+      // 验证显示后的文本
+      const afterDisplay = this.textElement.textContent
+      if (afterDisplay !== text) {
+        console.warn(
+          `[Subtitle] displayText 文本不匹配 | expected="${text}" | actual="${afterDisplay}" | expectedLength=${text.length} | actualLength=${afterDisplay.length}`
+        )
+      }
 
       // 设置样式类
       this.textElement.className = `subtitle-text ${
@@ -729,24 +803,63 @@
       const text = message.text || message.accumulated_text || ""
       const isFinal = message.is_final !== false // 默认为 true
 
-      // 用户语音且 Web Speech API 正常工作时，优先使用 Web Speech API
-      // 但如果后端文本与当前显示不同且更长，可能是更准确的识别结果，允许更新
-      if (speaker === "user" && this.webSpeechWorking) {
-        // 如果后端文本比当前显示的文本更长或完全不同，可能是更准确的识别，允许更新
+      // 用户语音：优先使用后端文本，Web Speech API 作为备用
+      if (speaker === "user") {
         const backendText = text.trim()
         const currentUserText =
           this.currentSpeaker === "user" ? this.currentText : ""
 
-        // 如果后端文本明显不同且更长，可能是更准确的识别结果
-        if (
-          backendText.length > currentUserText.length + 5 ||
-          (backendText !== currentUserText && backendText.length > 10)
-        ) {
-          // 允许后端识别覆盖（可能是更准确的结果）
-        } else {
-          // 否则忽略后端文本，使用 Web Speech API 的结果
+        console.log(
+          `[Subtitle] handleTextMessage 用户语音 | backendText="${backendText}" | backendLength=${
+            backendText.length
+          } | backendLastChar="${
+            backendText[backendText.length - 1] || ""
+          }" | currentUserText="${currentUserText}" | currentLength=${
+            currentUserText.length
+          } | currentLastChar="${
+            currentUserText[currentUserText.length - 1] || ""
+          }"`
+        )
+
+        // 优先使用后端文本
+        // 如果后端文本与当前显示的 Web Speech API 文本不同，使用后端文本
+        if (backendText && backendText !== currentUserText) {
+          // 检查：如果后端文本是当前文本的前缀（去掉末尾标点符号后），说明只是去掉了标点，不应该重新开始
+          // 常见的中文标点符号：。，！？；：、""''（）【】《》
+          const punctuationRegex = /[。，！？；：、""''（）【】《》\s]+$/
+          const currentTextWithoutPunctuation = currentUserText.replace(
+            punctuationRegex,
+            ""
+          )
+          const backendTextWithoutPunctuation = backendText.replace(
+            punctuationRegex,
+            ""
+          )
+
+          // 如果去掉标点后，后端文本是当前文本的前缀，且后端文本更短，说明只是去掉了标点，跳过
+          if (
+            backendTextWithoutPunctuation === currentTextWithoutPunctuation &&
+            backendText.length < currentUserText.length
+          ) {
+            console.log(
+              `[Subtitle] handleTextMessage 用户语音：后端文本只是去掉了标点符号，跳过 | backendText="${backendText}" | currentText="${currentUserText}"`
+            )
+            return
+          }
+
+          console.log(
+            `[Subtitle] handleTextMessage 用户语音：使用后端文本 | backendText="${backendText}"`
+          )
+          // 使用后端文本，继续处理
+        } else if (backendText === currentUserText && backendText) {
+          console.log(
+            `[Subtitle] handleTextMessage 用户语音：后端文本与当前显示相同，跳过 | text="${backendText}"`
+          )
+          // 后端文本与当前显示相同，跳过（避免重复显示）
           return
         }
+        // 如果后端文本为空，但 Web Speech API 有结果，继续使用 Web Speech API 的结果
+        // 这个逻辑在 Web Speech API 的 onresult 事件中处理
       }
 
       if (!text?.trim()) return
@@ -766,19 +879,24 @@
         }
 
         // 如果这是新的回复（不同的 reply_id），清空去重缓存和当前文本
+        // 但如果当前显示的是用户文本，不清空（让用户文本继续显示）
         if (message.reply_id) {
           const lastReplyId = this.lastReplyId
           if (lastReplyId && lastReplyId !== message.reply_id) {
-            // 新的回复，清空去重缓存和当前状态
+            // 新的回复，清空去重缓存
             this.displayedAccumulatedTexts.clear()
-            this.currentText = ""
-            this.currentSpeaker = null
-            // 停止当前打字机效果
-            if (this.typingTimer) {
-              clearTimeout(this.typingTimer)
-              this.typingTimer = null
+            // 只有在当前显示的不是用户文本时，才清空当前状态
+            // 这样可以避免用户正在说话时，助手开始说话导致用户文本被清空
+            if (this.currentSpeaker !== "user") {
+              this.currentText = ""
+              this.currentSpeaker = null
+              // 停止当前打字机效果
+              if (this.typingTimer) {
+                clearTimeout(this.typingTimer)
+                this.typingTimer = null
+              }
+              this.isTyping = false
             }
-            this.isTyping = false
           }
           this.lastReplyId = message.reply_id
         }
