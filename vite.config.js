@@ -1,118 +1,124 @@
-import { defineConfig } from 'vite';
-import { createHtmlPlugin } from 'vite-plugin-html';
+import { defineConfig } from "vite"
+import { createHtmlPlugin } from "vite-plugin-html"
 
 /**
  * Vite 构建配置
- * 用于打包罗夏墨迹测试前端项目
+ * 用于打包知己心探测试前端项目
  */
 export default defineConfig({
   // 项目根目录
-  root: '.',
+  root: ".",
   // publicPath:'/xlcp/',
   // 构建配置
   build: {
     // 输出目录
-    outDir: 'dist',
-    
+    outDir: "dist",
+
     // 是否生成 source map（生产环境建议关闭）
     sourcemap: false,
-    
+
     // 构建后是否生成 manifest.json
     manifest: false,
-    
+
     // 压缩配置
     // 使用 terser 以获得更好的压缩效果和更可靠的 console 移除
-    minify: 'terser',
+    minify: "terser",
     terserOptions: {
       compress: {
-        drop_console: true,  // 删除 console
+        drop_console: true, // 删除 console
         drop_debugger: true, // 移除 debugger
-        pure_funcs: ['console.log', 'console.info', 'console.warn', 'console.error', 'console.debug'] // 移除特定的 console 方法
+        pure_funcs: [
+          "console.log",
+          "console.info",
+          "console.warn",
+          "console.error",
+          "console.debug",
+        ], // 移除特定的 console 方法
       },
       mangle: true, // 变量名混淆
       format: {
-        comments: false // 移除注释
-      }
+        comments: false, // 移除注释
+      },
     },
     // esbuild 配置（已替换为 terser，此配置不再使用）
     // esbuild: {
     //   drop: ['console', 'debugger'], // 生产环境删除 console 和 debugger
     // },
-    
+
     // CSS 代码分割（将 CSS 提取到独立文件）
     cssCodeSplit: true,
-    
+
     // 资源内联阈值（小于此大小的资源会被内联为 base64）
     assetsInlineLimit: 4096, // 4KB
-    
+
     // 代码分割配置
     rollupOptions: {
       // 多入口配置，确保 index.html 和 login.html 都会被打包
       input: {
-        main: 'index.html',
-        login: 'login.html'
+        main: "index.html",
+        login: "login.html",
       },
       output: {
         // 资源文件命名
         assetFileNames: (assetInfo) => {
-          const info = assetInfo.name.split('.');
-          const ext = info[info.length - 1];
+          const info = assetInfo.name.split(".")
+          const ext = info[info.length - 1]
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
-            return `images/[name]-[hash][extname]`;
+            return `images/[name]-[hash][extname]`
           }
           if (/mp3|wav|ogg|m4a/i.test(ext)) {
-            return `audio/[name]-[hash][extname]`;
+            return `audio/[name]-[hash][extname]`
           }
           if (/css/i.test(ext)) {
-            return `css/[name]-[hash][extname]`;
+            return `css/[name]-[hash][extname]`
           }
-          return `assets/[name]-[hash][extname]`;
+          return `assets/[name]-[hash][extname]`
         },
         // JS 文件命名
-        chunkFileNames: 'js/[name]-[hash].js',
-        entryFileNames: 'js/[name]-[hash].js',
+        chunkFileNames: "js/[name]-[hash].js",
+        entryFileNames: "js/[name]-[hash].js",
         // 手动代码分割（可选）
         manualChunks: undefined, // 使用默认的自动分割策略
       },
     },
-    
+
     // 构建大小警告阈值（KB）
     chunkSizeWarningLimit: 1000,
-    
+
     // 是否在构建时清空输出目录
     emptyOutDir: true,
-    
+
     // 报告压缩后的大小（gzip）
     reportCompressedSize: true,
   },
-  
+
   // 开发服务器配置（用于 vite preview）
   server: {
     port: 8080,
     open: false,
     cors: true,
   },
-  
+
   // 预览服务器配置
   preview: {
     port: 8080,
     open: false,
     cors: true,
   },
-  
+
   // 公共基础路径
-  base: './',
-  
+  base: "./",
+
   // 静态资源处理
   // 使用 public 目录，Vite 会自动复制 public 目录下的所有文件到 dist 根目录
-  publicDir: 'public',
-  
+  publicDir: "public",
+
   // 优化配置
   optimizeDeps: {
     // 预构建的依赖（axios 使用 CDN，不需要预构建）
     include: [],
   },
-  
+
   // 插件配置
   plugins: [
     // HTML 压缩插件
@@ -143,4 +149,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+})

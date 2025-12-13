@@ -300,7 +300,7 @@ function showBlinkingHint(button) {
     .operation-hint-blink::before {
       content: "👆";
       position: absolute;
-      top: -30px;
+      top: 5px;
       left: 50%;
       transform: translateX(-50%);
       font-size: 24px;

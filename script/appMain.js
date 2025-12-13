@@ -4370,7 +4370,7 @@ async function playWelcomeMessage() {
   }
 }
 
-//罗夏墨迹心理测试需要坐在电脑前，使用本网站，采用语音交互完成。
+//知己心探心理测试需要坐在电脑前，使用本网站，采用语音交互完成。
 //首先，确定您的电脑话筒和音响正常，测试期间，您需要根据 AI 语音的指示进行测试。
 //心理测试全程时长大概 30 min 至最长约 2 小时，测试时需要保持安静，在一个安静、放松的环境里，不被外界电话、信息打扰。
 //测试后大约 1~3 天会收到测试报告。
@@ -4589,6 +4589,8 @@ async function checkLoginAndInit() {
       routedToSummary = await routeToReportSummaryIfAvailable()
     }
     if (routedToSummary) {
+      // 已跳转报告页，不再播报欢迎语
+      disableWelcomeMessagePlayback()
       return
     }
   } finally {

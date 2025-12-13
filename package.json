@@ -1,7 +1,7 @@
 {
   "name": "rorschach-test",
   "version": "1.0.0",
-  "description": "罗夏墨迹测试系统",
+  "description": "知己心探测试系统",
   "type": "module",
   "scripts": {
     "dev": "node proxy-server.js",
