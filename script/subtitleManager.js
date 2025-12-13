@@ -16,6 +16,7 @@
     maxHistoryLength: 1000, // 最大历史记录数
     storageKey: "subtitleHistory", // sessionStorage 键名
     storageStatsKey: "subtitleStats", // 统计信息键名
+    maxTypingLength: 30, // 超过此长度的文本直接显示，不使用打字机效果
   }
 
   class SubtitleManager {
@@ -406,8 +407,29 @@
       // 显示逻辑
       const textToShow = text.trim()
 
-      // 用户和助手语音都使用打字机效果
+      // 检查文本长度，如果超过阈值，直接显示，不使用打字机效果
+      const isLongText = textToShow.length > CONFIG.maxTypingLength
+
+      // 用户和助手语音都使用打字机效果（除非是长文本）
       if (speaker === "user" || speaker === "assistant") {
+        // 如果是长文本，直接显示，不使用打字机效果
+        if (isLongText) {
+          console.log(
+            `[Subtitle] addText 长文本直接显示 | speaker=${speaker} | textLength=${textToShow.length} | maxTypingLength=${CONFIG.maxTypingLength}`
+          )
+          // 停止当前打字机效果（如果有）
+          if (this.typingTimer) {
+            clearTimeout(this.typingTimer)
+            this.typingTimer = null
+          }
+          this.isTyping = false
+          // 直接显示完整文本
+          this.currentText = textToShow
+          this.currentSpeaker = speaker
+          this.displayText(textToShow, speaker, true)
+          return
+        }
+
         // 如果当前显示的文本已经是完整的目标文本，先清空再开始打字机效果
         if (
           this.currentText === textToShow &&
@@ -419,38 +441,64 @@
           this.displayText("", speaker, false)
         }
 
-        // 如果正在打字机效果，且新文本与当前不同
+        // 如果新文本与当前不同，且说话人相同
         if (
-          this.isTyping &&
           this.currentText !== textToShow &&
           this.currentSpeaker === speaker
         ) {
-          console.log(
-            `[Subtitle] addText 打字中收到新文本 | speaker=${speaker} | currentText="${
-              this.currentText
-            }" | currentLength=${
-              this.currentText.length
-            } | newText="${textToShow}" | newLength=${
-              textToShow.length
-            } | currentLastChar="${
-              this.currentText[this.currentText.length - 1] || ""
-            }" | newLastChar="${textToShow[textToShow.length - 1] || ""}"`
-          )
           // 如果新文本是当前文本的扩展（累积文本更新），继续打字机效果
           if (
             textToShow.startsWith(this.currentText) &&
             textToShow.length > this.currentText.length
           ) {
-            console.log(
-              `[Subtitle] addText 累积文本更新，继续打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
-            )
+            if (this.isTyping) {
+              console.log(
+                `[Subtitle] addText 打字中收到新文本 | speaker=${speaker} | currentText="${
+                  this.currentText
+                }" | currentLength=${
+                  this.currentText.length
+                } | newText="${textToShow}" | newLength=${
+                  textToShow.length
+                } | currentLastChar="${
+                  this.currentText[this.currentText.length - 1] || ""
+                }" | newLastChar="${textToShow[textToShow.length - 1] || ""}"`
+              )
+              console.log(
+                `[Subtitle] addText 累积文本更新，继续打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+              )
+            } else {
+              console.log(
+                `[Subtitle] addText 打字完成后收到扩展文本，继续打字机效果 | isTyping=${
+                  this.isTyping
+                } | currentText="${
+                  this.currentText
+                }" | newText="${textToShow}" | newLastChar="${
+                  textToShow[textToShow.length - 1] || ""
+                }"`
+              )
+            }
             // 累积文本更新：继续打字机效果，从当前位置继续
             this.typeText(textToShow, speaker, options)
           } else {
-            console.log(
-              `[Subtitle] addText 文本完全不同，重新开始打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
-            )
             // 新文本完全不同，停止当前打字机效果，重新开始
+            if (this.isTyping) {
+              console.log(
+                `[Subtitle] addText 文本完全不同，重新开始打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+              )
+            } else {
+              console.log(
+                `[Subtitle] addText 开始新的打字机效果 | isTyping=${
+                  this.isTyping
+                } | currentSpeaker=${
+                  this.currentSpeaker
+                } | newSpeaker=${speaker} | currentText="${
+                  this.currentText
+                }" | newText="${textToShow}" | newLastChar="${
+                  textToShow[textToShow.length - 1] || ""
+                }"`
+              )
+            }
+            // 停止当前打字机效果（如果有）
             if (this.typingTimer) {
               clearTimeout(this.typingTimer)
               this.typingTimer = null
@@ -459,6 +507,14 @@
             this.typeText(textToShow, speaker, options)
           }
         } else {
+          // 文本相同或说话人不同
+          if (
+            this.currentText === textToShow &&
+            this.currentSpeaker === speaker
+          ) {
+            // 文本完全相同，跳过
+            return
+          }
           console.log(
             `[Subtitle] addText 开始新的打字机效果 | isTyping=${
               this.isTyping
@@ -470,7 +526,7 @@
               textToShow[textToShow.length - 1] || ""
             }"`
           )
-          // 没有正在打字机效果，或者说话人不同，直接开始
+          // 说话人不同，直接开始新的打字机效果
           this.typeText(textToShow, speaker, options)
         }
       } else {
@@ -489,12 +545,29 @@
       this.getDOM()
       if (!this.textElement) return
 
+      // 检查文本长度，如果超过阈值，直接显示，不使用打字机效果
+      if (text.length > CONFIG.maxTypingLength) {
+        console.log(
+          `[Subtitle] typeText 长文本直接显示 | speaker=${speaker} | textLength=${text.length} | maxTypingLength=${CONFIG.maxTypingLength}`
+        )
+        // 停止当前打字机效果（如果有）
+        if (this.typingTimer) {
+          clearTimeout(this.typingTimer)
+          this.typingTimer = null
+        }
+        this.isTyping = false
+        // 直接显示完整文本
+        this.currentText = text
+        this.currentSpeaker = speaker
+        this.displayText(text, speaker, true)
+        return
+      }
+
       // 打字机效果
       const speed = options.typingSpeed || CONFIG.typingSpeed
       const targetText = text // 保存目标文本，防止被覆盖
 
-      // 如果说话人改变，停止之前的打字机效果，但保留当前文本（不立即清空）
-      // 这样可以避免用户正在说话时，助手开始说话导致用户文本被清空
+      // 如果说话人改变，停止之前的打字机效果，清空当前文本
       if (this.currentSpeaker && this.currentSpeaker !== speaker) {
         if (this.isTyping && this.typingTimer) {
           clearTimeout(this.typingTimer)
@@ -503,6 +576,10 @@
         }
         // 清空当前文本，为新说话人准备
         this.currentText = ""
+        // 立即清空显示，避免显示上一次的文本
+        if (this.textElement) {
+          this.textElement.textContent = ""
+        }
         this.displayText("", speaker, false)
       }
 
@@ -528,8 +605,11 @@
           this.typingTimer = null
           this.isTyping = false
         }
-        this.currentText = ""
-        this.displayText("", speaker, false)
+        // 只有在说话人没有改变时才清空（说话人改变时已经在上面清空了）
+        if (this.currentSpeaker === speaker) {
+          this.currentText = ""
+          this.displayText("", speaker, false)
+        }
         index = 0
       }
 
@@ -582,26 +662,34 @@
       }
 
       const oldText = this.currentText
-      this.currentText = text
-      const displayedText = this.textElement.textContent
+      const displayedTextBefore = this.textElement.textContent
 
       console.log(
-        `[Subtitle] displayText | speaker=${speaker} | isComplete=${isComplete} | oldText="${oldText}" | newText="${text}" | textLength=${
+        `[Subtitle] displayText 调用 | speaker=${speaker} | isComplete=${isComplete} | oldText="${oldText}" | newText="${text}" | textLength=${
           text.length
         } | lastChar="${
           text[text.length - 1] || ""
-        }" | displayedText="${displayedText}" | displayedLength=${
-          displayedText.length
+        }" | displayedTextBefore="${displayedTextBefore}" | displayedLengthBefore=${
+          displayedTextBefore.length
         }`
       )
 
+      // 更新状态
+      this.currentText = text
+      // 立即更新 DOM，避免显示上一次的文本
       this.textElement.textContent = text
 
       // 验证显示后的文本
-      const afterDisplay = this.textElement.textContent
-      if (afterDisplay !== text) {
+      const displayedTextAfter = this.textElement.textContent
+      console.log(
+        `[Subtitle] displayText 完成 | speaker=${speaker} | text="${text}" | displayedTextAfter="${displayedTextAfter}" | displayedLengthAfter=${
+          displayedTextAfter.length
+        } | match=${displayedTextAfter === text}`
+      )
+
+      if (displayedTextAfter !== text) {
         console.warn(
-          `[Subtitle] displayText 文本不匹配 | expected="${text}" | actual="${afterDisplay}" | expectedLength=${text.length} | actualLength=${afterDisplay.length}`
+          `[Subtitle] displayText 文本不匹配 | expected="${text}" | actual="${displayedTextAfter}" | expectedLength=${text.length} | actualLength=${displayedTextAfter.length}`
         )
       }
 
