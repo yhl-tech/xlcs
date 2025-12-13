@@ -1262,19 +1262,21 @@
     }
 
     /**
-     * 提交所有数据到服务器（旋转和时间戳分开提交）
+     * 提交所有数据到服务器（包括交互数据和音频）
      * @param {string} userId - 用户ID
+     * @param {Blob|null} audioBlob - 音频文件（可选，如果不提供则从AudioRecorder获取）
      * @returns {Promise<Object>} 提交结果
      */
-    async submitAllData(userId) {
+    async submitAllData(userId, audioBlob = null) {
       const results = {
         zoom: null,
         rotate: null,
         segTime: null,
         drawingTracks: null,
+        media: null,
       }
 
-      // 提交放大缩小数据
+      // 1. 提交放大缩小数据
       try {
         results.zoom = await this.submitZoomData(userId)
       } catch (error) {
@@ -1282,7 +1284,7 @@
         results.zoom = { success: false, error: error.message }
       }
 
-      // 提交旋转数据
+      // 2. 提交旋转数据
       try {
         results.rotate = await this.submitRotateData(userId)
       } catch (error) {
@@ -1290,7 +1292,7 @@
         results.rotate = { success: false, error: error.message }
       }
 
-      // 提交时间戳数据
+      // 3. 提交时间戳数据
       try {
         results.segTime = await this.submitSegTimeData(userId)
       } catch (error) {
@@ -1298,12 +1300,48 @@
         results.segTime = { success: false, error: error.message }
       }
 
-      // 提交笔迹轨迹数据
+      // 4. 提交笔迹轨迹数据
       try {
         results.drawingTracks = await this.submitDrawingTracksData(userId)
       } catch (error) {
         console.error("[InteractionTracker] 提交笔迹轨迹数据时出错:", error)
         results.drawingTracks = { success: false, error: error.message }
+      }
+
+      // 5. 提交音频文件
+      try {
+        let audioFileToUpload = audioBlob
+
+        // 如果未提供音频且录制器有数据，优先使用录制器导出的MP3
+        if (
+          !audioFileToUpload &&
+          window.AudioRecorder &&
+          window.AudioRecorder._instance
+        ) {
+          try {
+            const status = window.AudioRecorder.getStatus()
+            if (status.bufferCount > 0) {
+              window.AudioRecorder.stop()
+              audioFileToUpload = await window.AudioRecorder.exportMP3()
+            }
+          } catch (error) {
+            // 导出失败，继续使用原有的 audioBlob
+          }
+        }
+
+        // 如果有音频文件且API可用，则上传
+        if (audioFileToUpload && window.API && window.API.uploadMedia) {
+          results.media = await window.API.uploadMedia(
+            audioFileToUpload,
+            userId
+          )
+        } else if (audioFileToUpload) {
+          results.media = { success: false, error: "uploadMedia API 不可用" }
+        } else {
+          results.media = { success: false, error: "没有可上传的音频文件" }
+        }
+      } catch (error) {
+        results.media = { success: false, error: error.message }
       }
 
       return results
@@ -1374,7 +1412,8 @@
     submitSegTimeData: (userId) => trackerInstance.submitSegTimeData(userId),
     submitDrawingTracksData: (userId) =>
       trackerInstance.submitDrawingTracksData(userId),
-    submitAllData: (userId) => trackerInstance.submitAllData(userId),
+    submitAllData: (userId, audioBlob) =>
+      trackerInstance.submitAllData(userId, audioBlob),
 
     // 直接访问实例（高级用法）
     _instance: trackerInstance,

@@ -1961,6 +1961,10 @@ async function enterTestExperience({
       state.stage !== "post" && state.stage !== "summary"
     if (shouldShowControls) {
       controlsBar.style.display = "flex"
+      // 显示字幕
+      if (window.subtitleManager) {
+        window.subtitleManager.show()
+      }
     }
 
     if (!["post", "summary"].includes(state.stage)) {
@@ -2400,9 +2404,9 @@ function resetInactivityTimer() {
     return
   }
 
-  console.log(
-    `[不活动检测] 启动定时器，${INACTIVITY_THRESHOLD_1}ms 后触发第一次提示`
-  )
+  // console.log(
+  //   `[不活动检测] 启动定时器，${INACTIVITY_THRESHOLD_1}ms 后触发第一次提示`
+  // )
 
   // 第一次提示：10秒（INACTIVITY_THRESHOLD_1）
   inactivityTimer = setTimeout(() => {
@@ -2434,16 +2438,16 @@ function resetInactivityTimer() {
       console.log("[不活动检测] 触发第二次提示")
       playRandomPrompt()
     } else {
-      console.log(
-        "[不活动检测] 第二次提示被跳过，inactivityLevel:",
-        state.inactivityLevel,
-        "AI播放:",
-        isAIPlaying(),
-        "用户说话:",
-        state.isSpeaking,
-        "检测激活:",
-        inactivityActive
-      )
+      // console.log(
+      //   "[不活动检测] 第二次提示被跳过，inactivityLevel:",
+      //   state.inactivityLevel,
+      //   "AI播放:",
+      //   isAIPlaying(),
+      //   "用户说话:",
+      //   state.isSpeaking,
+      //   "检测激活:",
+      //   inactivityActive
+      // )
     }
   }, INACTIVITY_THRESHOLD_2)
 }
@@ -2861,6 +2865,10 @@ function showPostTestView(options = {}) {
   hideTestLoadingOverlay({ keepMainHidden: true })
   mainContent.style.display = "none"
   controlsBar.style.display = "none"
+  // 隐藏字幕
+  if (window.subtitleManager) {
+    window.subtitleManager.hide()
+  }
   // 确保 image-container 隐藏（后测试阶段不显示）
   const imageContainer = document.getElementById("image-container")
   if (imageContainer) {
@@ -3172,48 +3180,15 @@ function finishAndSave() {
           finishBtn.textContent = "正在提交数据..."
         }
 
-        // 获取音频数据（优先使用录制器导出的MP3）
+        // 获取音频数据（作为备用，submitAllData 会优先从 AudioRecorder 获取）
         let audioBlob = null
-
-        // 如果录制器有数据，优先使用录制器导出的MP3
-        if (window.AudioRecorder && window.AudioRecorder._instance) {
-          try {
-            const status = window.AudioRecorder.getStatus()
-            if (status.bufferCount > 0) {
-              console.log("[测试完成] 开始导出录制器音频为MP3...")
-              window.AudioRecorder.stop()
-              audioBlob = await window.AudioRecorder.exportMP3()
-              console.log(
-                "[测试完成] MP3导出成功，大小:",
-                audioBlob.size,
-                "bytes"
-              )
-
-              // 立即下载MP3文件
-              try {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-                // await window.AudioRecorder.downloadMP3(`rorschach-audio-${timestamp}.mp3`);
-                console.log("[测试完成] MP3文件已自动下载")
-              } catch (downloadError) {
-                console.error("[测试完成] MP3文件下载失败:", downloadError)
-              }
-            }
-          } catch (error) {
-            console.error("[测试完成] 导出录制器音频失败:", error)
-            // 如果导出失败，尝试使用原有的audioBlob
-            if (state.audioBlob) {
-              audioBlob = state.audioBlob
-            }
-          }
-        } else if (state.audioBlob) {
-          // 如果没有录制器或录制器导出失败，使用原有的audioBlob
+        if (state.audioBlob) {
           audioBlob = state.audioBlob
         } else if (state.audioChunks && state.audioChunks.length > 0) {
-          // 如果都没有，从audioChunks创建（但这是WebM格式，后端可能不接受）
           audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
         }
 
-        // 调用接口提交数据
+        // 调用接口提交数据（音频处理逻辑已统一到 submitAllData 中）
         const result = await window.submitTestDataToServer(
           window.InteractionTracker,
           audioBlob,
@@ -3274,6 +3249,10 @@ function showSummary(options = {}) {
   appWindow.style.display = "flex"
   mainContent.style.display = "none"
   controlsBar.style.display = "none"
+  // 隐藏字幕
+  if (window.subtitleManager) {
+    window.subtitleManager.hide()
+  }
   postTestView.style.display = "none"
   // 确保 image-container 隐藏（汇总阶段不显示）
   const imageContainer = document.getElementById("image-container")
@@ -3402,6 +3381,10 @@ async function startRetestFlow() {
   }
   if (controlsBar) {
     controlsBar.style.display = "none"
+  }
+  // 隐藏字幕
+  if (window.subtitleManager) {
+    window.subtitleManager.hide()
   }
   if (progressText) {
     progressText.textContent = "准备中..."
@@ -3558,6 +3541,10 @@ function showInfoScreenForRetest() {
   }
   if (controlsBar) {
     controlsBar.style.display = "none"
+  }
+  // 隐藏字幕
+  if (window.subtitleManager) {
+    window.subtitleManager.hide()
   }
   if (postTestView) {
     postTestView.style.display = "none"

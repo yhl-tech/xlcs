@@ -1292,9 +1292,11 @@
   }
 
   /**
-   * 测试数据提交辅助函数
-   * 用于在测试完成后整理并提交所有数据
-   * 根据新的后端接口，分别提交旋转数据和时间戳数据
+   * 提交完整的测试数据到服务器
+   * @param {Object} interactionTracker - InteractionTracker 实例
+   * @param {Blob|null} audioBlob - 音频文件（可选）
+   * @param {Object} postTestAnswers - 后测答案（暂未使用，保留以兼容旧代码）
+   * @returns {Promise<Object>} 提交结果
    */
   window.submitTestDataToServer = async function (
     interactionTracker,
@@ -1307,175 +1309,33 @@
       const userInfo = window.auth ? window.auth.getUserInfo() : null
 
       if (userInfo?.userId) {
-        // 使用从get_basic_info接口获取的userId
         userId = String(userInfo.userId)
-        console.log("[API] 使用保存的 userId:", userId)
       } else if (userInfo?.username) {
-        // 降级使用用户名
         userId = userInfo.username
-        console.warn("[API] userId 不存在，降级使用用户名:", userId)
       } else {
-        console.error("[API] 无法获取用户ID，userInfo:", userInfo)
         throw new Error("用户ID不存在，请先登录")
       }
 
-      console.log(
-        "[API] 开始提交测试数据，用户ID:",
-        userId,
-        "userInfo:",
-        userInfo
-      )
-      console.log("[API] interactionTracker:", interactionTracker)
-
-      const results = {
-        zoom: null,
-        rotate: null,
-        segTime: null,
-        drawingTracks: null,
-        media: null,
+      // 检查 interactionTracker 是否可用
+      if (!interactionTracker) {
+        throw new Error("InteractionTracker 不可用")
       }
 
-      // 1. 提交放大缩小数据
-      if (
-        interactionTracker &&
-        typeof interactionTracker.submitZoomData === "function"
-      ) {
-        try {
-          console.log("[API] 开始提交放大缩小数据...")
-          results.zoom = await interactionTracker.submitZoomData(userId)
-          console.log("[API] 放大缩小数据提交结果:", results.zoom)
-        } catch (error) {
-          console.error("[API] 放大缩小数据提交失败:", error)
-          results.zoom = { success: false, error: error.message || "提交失败" }
-        }
+      // 统一调用 submitAllData 提交所有数据（包括音频）
+      let results = {}
+      if (typeof interactionTracker.submitAllData === "function") {
+        results = await interactionTracker.submitAllData(userId, audioBlob)
       } else {
-        console.error("[API] interactionTracker.submitZoomData 方法不存在", {
-          hasTracker: !!interactionTracker,
-          methods: interactionTracker ? Object.keys(interactionTracker) : [],
-        })
+        throw new Error("interactionTracker.submitAllData 方法不存在")
       }
 
-      // 2. 提交旋转数据
-      if (
-        interactionTracker &&
-        typeof interactionTracker.submitRotateData === "function"
-      ) {
-        try {
-          console.log("[API] 开始提交旋转数据...")
-          results.rotate = await interactionTracker.submitRotateData(userId)
-          console.log("[API] 旋转数据提交结果:", results.rotate)
-        } catch (error) {
-          console.error("[API] 旋转数据提交失败:", error)
-          results.rotate = {
-            success: false,
-            error: error.message || "提交失败",
-          }
-        }
-      } else {
-        console.error("[API] interactionTracker.submitRotateData 方法不存在", {
-          hasTracker: !!interactionTracker,
-          methods: interactionTracker ? Object.keys(interactionTracker) : [],
-        })
-      }
-
-      // 3. 提交时间戳数据
-      if (
-        interactionTracker &&
-        typeof interactionTracker.submitSegTimeData === "function"
-      ) {
-        try {
-          console.log("[API] 开始提交时间戳数据...")
-          results.segTime = await interactionTracker.submitSegTimeData(userId)
-          console.log("[API] 时间戳数据提交结果:", results.segTime)
-        } catch (error) {
-          console.error("[API] 时间戳数据提交失败:", error)
-          results.segTime = {
-            success: false,
-            error: error.message || "提交失败",
-          }
-        }
-      } else {
-        console.error("[API] interactionTracker.submitSegTimeData 方法不存在", {
-          hasTracker: !!interactionTracker,
-          methods: interactionTracker ? Object.keys(interactionTracker) : [],
-        })
-      }
-
-      // 4. 提交笔迹轨迹数据
-      if (
-        interactionTracker &&
-        typeof interactionTracker.submitDrawingTracksData === "function"
-      ) {
-        try {
-          console.log("[API] 开始提交笔迹轨迹数据...")
-          results.drawingTracks =
-            await interactionTracker.submitDrawingTracksData(userId)
-          console.log("[API] 笔迹轨迹数据提交结果:", results.drawingTracks)
-        } catch (error) {
-          console.error("[API] 笔迹轨迹数据提交失败:", error)
-          results.drawingTracks = {
-            success: false,
-            error: error.message || "提交失败",
-          }
-        }
-      } else {
-        console.error(
-          "[API] interactionTracker.submitDrawingTracksData 方法不存在",
-          {
-            hasTracker: !!interactionTracker,
-            methods: interactionTracker ? Object.keys(interactionTracker) : [],
-          }
-        )
-      }
-
-      // 5. 提交音频文件（优先使用录制器导出的MP3）
-      let audioFileToUpload = audioBlob
-
-      // 如果录制器有数据，优先使用录制器导出的MP3
-      if (window.AudioRecorder && window.AudioRecorder._instance) {
-        try {
-          const status = window.AudioRecorder.getStatus()
-          if (status.bufferCount > 0) {
-            console.log("[API] 开始导出录制器音频为MP3...")
-            window.AudioRecorder.stop()
-            audioFileToUpload = await window.AudioRecorder.exportMP3()
-            console.log(
-              "[API] MP3导出成功，大小:",
-              audioFileToUpload.size,
-              "bytes"
-            )
-          }
-        } catch (error) {
-          console.error("[API] 导出录制器音频失败:", error)
-          // 如果导出失败，继续使用原有的audioBlob
-        }
-      }
-
-      if (audioFileToUpload && API.uploadMedia) {
-        try {
-          results.media = await API.uploadMedia(audioFileToUpload, userId)
-          console.log("[API] 音频文件提交结果:", results.media)
-        } catch (error) {
-          console.error("[API] 音频文件提交失败:", error)
-          results.media = { success: false, error: error.message }
-        }
-      }
-
-      // 返回所有提交结果
+      // 计算整体成功状态
       const allSuccess =
         (results.zoom === null || results.zoom?.success) &&
         (results.rotate === null || results.rotate?.success) &&
         (results.segTime === null || results.segTime?.success) &&
-        (results.drawingTracks === null || results.drawingTracks?.success)
-
-      console.log("[API] 所有数据提交完成:", {
-        success: allSuccess,
-        zoom: results.zoom?.success,
-        rotate: results.rotate?.success,
-        segTime: results.segTime?.success,
-        drawingTracks: results.drawingTracks?.success,
-        media: results.media?.success,
-      })
+        (results.drawingTracks === null || results.drawingTracks?.success) &&
+        (results.media === null || results.media?.success)
 
       return {
         success: allSuccess,

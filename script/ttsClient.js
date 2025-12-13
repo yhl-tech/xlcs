@@ -4,7 +4,6 @@
  */
 
 import { getWebSocketUrl } from "./config.js"
-
 ;(function (window) {
   "use strict"
 
@@ -249,6 +248,32 @@ import { getWebSocketUrl } from "./config.js"
     }
 
     handleMessage(event) {
+      // 优先处理文本消息（JSON 字符串）
+      if (typeof event.data === "string") {
+        try {
+          const textData = JSON.parse(event.data)
+          if (textData && textData.type === "text_transcription") {
+            // 调试日志
+            console.log("[TTS] 收到文本转录消息:", {
+              speaker: textData.speaker,
+              hasText: !!textData.text,
+              hasAccumulated: !!textData.accumulated_text,
+              isFinal: textData.is_final,
+            })
+            // 转发给字幕管理器
+            if (window.subtitleManager) {
+              window.subtitleManager.handleTextMessage(textData)
+            } else {
+              console.warn("[TTS] subtitleManager 未初始化，无法显示文本")
+            }
+            return // 文本消息处理完成，不继续处理音频
+          }
+        } catch (e) {
+          // 不是 JSON 文本，继续处理为音频
+        }
+      }
+
+      // 处理音频数据（二进制）
       let dataPromise
       if (event.data instanceof Blob) {
         dataPromise = event.data.arrayBuffer()

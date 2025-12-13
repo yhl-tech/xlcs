@@ -252,6 +252,23 @@
         <div id="summary-grid" class="image-grid"></div>
       </div>
 
+      <!-- 字幕显示区域 -->
+      <div
+        id="subtitle-container"
+        class="subtitle-container"
+        style="display: none"
+      >
+        <div class="subtitle-content">
+          <div class="subtitle-text" id="subtitle-text">
+            <span
+              class="typing-cursor"
+              id="subtitle-indicator"
+              style="display: none"
+            ></span>
+          </div>
+        </div>
+      </div>
+
       <div class="controls-bar" id="controls-bar" style="display: none">
         <div class="control-group">
           <button id="prev-btn">◀ 上一张</button>
@@ -361,6 +378,9 @@
 
     <!-- TTS 语音合成客户端 -->
     <script type="module" src="./script/ttsClient.js"></script>
+
+    <!-- 字幕管理器 -->
+    <script type="module" src="./script/subtitleManager.js"></script>
 
     <!-- Main workflow script (modularized) -->
     <script type="module" src="./script/appMain.js"></script>
