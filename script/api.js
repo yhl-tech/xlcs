@@ -1289,6 +1289,83 @@
         throw error
       }
     },
+
+    /**
+     * 验证用户 token 是否有效
+     * 通过调用需要认证的接口验证 token
+     * @returns {Promise<{valid: boolean, cleared: boolean}>} valid表示token是否有效，cleared表示是否清除了存储
+     */
+    async validateToken() {
+      let tenantToken = ""
+      try {
+        if (typeof localStorage !== "undefined") {
+          tenantToken = localStorage.getItem("tenantAccessToken") || ""
+        }
+      } catch (error) {
+        console.warn("[API] 读取租户 token 失败:", error)
+        return { valid: false, cleared: false }
+      }
+
+      if (!tenantToken) {
+        return { valid: false, cleared: false }
+      }
+
+      let userId = ""
+      try {
+        if (typeof localStorage !== "undefined") {
+          const userInfoStr = localStorage.getItem("userInfo")
+          if (userInfoStr) {
+            const userInfo = JSON.parse(userInfoStr)
+            userId = userInfo?.username || userInfo?.phone || ""
+          }
+        }
+      } catch (error) {
+        console.warn("[API] 读取用户信息失败:", error)
+        return { valid: false, cleared: false }
+      }
+
+      if (!userId) {
+        return { valid: false, cleared: false }
+      }
+
+      try {
+        const response = await apiClient.post(
+          "/rorschach/analyze/get_basic_info",
+          {
+            user_id: userId,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${tenantToken}`,
+            },
+          }
+        )
+
+        return { valid: true, cleared: false }
+      } catch (error) {
+        console.log("error", error)
+
+        if (error.status === 401 || error.response?.status === 401) {
+          console.warn("[API] 租户 Token 已过期或无效（401），清除本地存储")
+          try {
+            if (typeof localStorage !== "undefined") {
+              localStorage.removeItem("token")
+              localStorage.removeItem("userInfo")
+              localStorage.removeItem("tenantAccessToken")
+            }
+          } catch (clearError) {
+            console.warn("[API] 清除本地存储失败:", clearError)
+          }
+          return { valid: false, cleared: true }
+        }
+
+        console.warn(
+          "[API] Token 验证失败，但可能是网络或业务问题，不清除 token:",
+          error
+        )
+        return { valid: false, cleared: false }
+      }
+    },
   }
 
   /**

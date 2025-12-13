@@ -4561,6 +4561,28 @@ async function checkLoginAndInit() {
     return
   }
 
+  // 如果存在token，验证token是否有效
+  try {
+    const result = await window.API.validateToken()
+    if (!result.valid) {
+      if (result.cleared) {
+        console.log(
+          "[AppMain] Token已过期或无效，API已清除本地存储，跳转到登录页"
+        )
+      } else {
+        console.log("[AppMain] Token验证失败，清除本地token，跳转到登录页")
+        if (window.auth && typeof window.auth.clearAllStorage === "function") {
+          window.auth.clearAllStorage()
+        }
+      }
+      // 跳转到登录页
+      window.location.href = "./login.html"
+      return
+    }
+  } catch (error) {
+    console.warn("[AppMain] Token验证异常，但继续流程:", error)
+  }
+
   // 正常登录时，清除重测标记（确保报告检查不会被跳过）
   // 只有在重测流程中才会重新设置这个标记
   if (!retestFlowActive) {
