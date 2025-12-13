@@ -567,14 +567,12 @@ body:has(#intro-overlay[style*="display: block"]) #blackhole-bg-container,
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 8px;
-  /* 移除边框 */
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   padding: 4px 6px !important;
-  gap: 4px !important;
+  gap: 10px !important;
 }
 
-/* 预览窗口控制按钮样式 - 优化可见性，减少边框 */
 .test-preview-controls button {
   /* 使用更亮的半透明背景，提升可见性 */
   background: rgba(51, 65, 85, 0.8) !important;

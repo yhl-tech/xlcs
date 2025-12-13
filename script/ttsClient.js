@@ -254,12 +254,12 @@ import { getWebSocketUrl } from "./config.js"
           const textData = JSON.parse(event.data)
           if (textData && textData.type === "text_transcription") {
             // 调试日志
-            console.log("[TTS] 收到文本转录消息:", {
-              speaker: textData.speaker,
-              hasText: !!textData.text,
-              hasAccumulated: !!textData.accumulated_text,
-              isFinal: textData.is_final,
-            })
+            // console.log("[TTS] 收到文本转录消息:", {
+            //   speaker: textData.speaker,
+            //   hasText: !!textData.text,
+            //   hasAccumulated: !!textData.accumulated_text,
+            //   isFinal: textData.is_final,
+            // })
             // 转发给字幕管理器
             if (window.subtitleManager) {
               window.subtitleManager.handleTextMessage(textData)

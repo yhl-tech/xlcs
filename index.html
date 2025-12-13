@@ -154,16 +154,16 @@
                     <div class="test-preview-image-frame">
                       <img
                         id="intro-preview-image"
-                        src="./images/rorschach-blot-1.webp"
+                        src="./images/rorschach-blot-example.webp"
                         alt=""
                       />
                       <canvas class="test-preview-canvas"></canvas>
                     </div>
                   </div>
                   <div class="test-preview-controls">
-                    <div class="control-group">
+                    <!-- <div class="control-group">
                       <button disabled data-action="prev">◀ 上一张</button>
-                    </div>
+                    </div> -->
                     <div class="control-group">
                       <button disabled data-action="zoom-in">🔍+ 放大</button>
                       <button disabled data-action="zoom-out">🔍- 缩小</button>
@@ -196,9 +196,9 @@
                       <button disabled data-action="erase">🗑️ 擦除</button>
                       <button disabled data-action="clear">🧹 一键擦除</button>
                     </div>
-                    <div class="control-group">
+                    <!-- <div class="control-group">
                       <button disabled data-action="next">下一张 ▶</button>
-                    </div>
+                    </div> -->
                   </div>
                 </div>
               </div>
@@ -239,7 +239,10 @@
       </div>
 
       <div id="post-test-view" style="display: none">
+        <div class="post-test-header">
         <h2>📊 测试总结与反思</h2>
+          <button id="next-question-btn" style="display: none">下一页</button>
+        </div>
         <p id="question-text"></p>
         <div id="post-test-grid" class="image-grid"></div>
         <div class="finish">

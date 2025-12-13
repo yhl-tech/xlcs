@@ -444,8 +444,17 @@
       this.transitionDuration = 0
       this.transitionProgress = 0
       this.spiralArms = 3 // 当前螺旋臂数
+      
+      // 帧率节流
+      this.targetFPS = 30 // 目标帧率（降低以提升性能）
+      this.frameInterval = 1000 / this.targetFPS // 每帧间隔（毫秒）
+      this.lastFrameTime = 0
+      
+      // 颜色更新优化
       this.lastColorUpdateTime = 0 // 上次颜色更新时间
-      this.colorUpdateInterval = 0.05 // 颜色更新间隔（秒）- 降低以提高响应性
+      this.colorUpdateInterval = 0.1 // 颜色更新间隔（秒）- 每100ms更新一次
+      this.colorUpdateBatchSize = 5000 // 每批更新的粒子数量
+      this.colorUpdateBatchIndex = 0 // 当前批次索引
     }
 
     init() {
@@ -943,18 +952,10 @@
         positions[i * 3 + 1] = height
         positions[i * 3 + 2] = Math.sin(angle) * radius
 
-        // 如果在过渡中，每帧都更新所有粒子的颜色
-        // 如果不在过渡中，只在粒子被重置时更新颜色
-        if (shouldUpdateAllColors) {
-          const normalizedRadius =
-            (radius - innerRadius) / (outerRadius - innerRadius)
-          const color = this.getAccretionColor(normalizedRadius)
-          colors[i * 3] = color.r
-          colors[i * 3 + 1] = color.g
-          colors[i * 3 + 2] = color.b
-          alphas[i] = 0.3 + 0.7 * (1.0 - normalizedRadius)
-        } else if (radius >= outerRadius - 10) {
-          // 粒子被重置时更新颜色
+        // 优化：过渡期间的颜色更新由 updateParticleColorsBatched 处理
+        // 这里只在非过渡状态或粒子被重置时更新颜色
+        if (!shouldUpdateAllColors && radius >= outerRadius - 10) {
+          // 粒子被重置时更新颜色（非过渡状态）
           const normalizedRadius =
             (radius - innerRadius) / (outerRadius - innerRadius)
           const color = this.getAccretionColor(normalizedRadius)
@@ -966,10 +967,8 @@
       }
 
       this.accretionDisk.geometry.attributes.position.needsUpdate = true
-      if (shouldUpdateAllColors) {
-        this.accretionDisk.geometry.attributes.customColor.needsUpdate = true
-        this.accretionDisk.geometry.attributes.alpha.needsUpdate = true
-      } else {
+      // 颜色更新由 updateParticleColorsBatched 统一处理，这里只在非过渡状态更新
+      if (!shouldUpdateAllColors) {
         // 只在颜色数组被修改时才标记需要更新
         this.accretionDisk.geometry.attributes.customColor.needsUpdate = true
         this.accretionDisk.geometry.attributes.alpha.needsUpdate = true
@@ -1022,11 +1021,22 @@
       this.floatingParticles.geometry.attributes.position.needsUpdate = true
     }
 
-    // 动画循环
+    // 动画循环（带帧率节流）
     animate() {
       if (!this.isRunning) return
 
       this.animationId = requestAnimationFrame(() => this.animate())
+
+      // 帧率节流：限制帧率以提升性能
+      const currentTime = performance.now()
+      const elapsed = currentTime - this.lastFrameTime
+      
+      if (elapsed < this.frameInterval) {
+        // 跳过这一帧，保持目标帧率
+        return
+      }
+      
+      this.lastFrameTime = currentTime - (elapsed % this.frameInterval)
 
       const deltaTime = this.clock.getDelta()
       const elapsedTime = this.clock.getElapsedTime()
@@ -1038,20 +1048,64 @@
       this.updateBackgroundStars(elapsedTime)
       this.updateFloatingParticles(deltaTime, elapsedTime)
 
-      // 如果在过渡中，每帧都更新粒子颜色以确保平滑过渡
+      // 优化过渡期间的颜色更新：减少更新频率或分批更新
       if (
         this.isTransitioning &&
         this.accretionDisk &&
         this.transitionProgress < 1.0
       ) {
-        // 在过渡期间，每帧都更新颜色以确保平滑过渡
-        this.updateParticleColors()
+        const now = this.clock.getElapsedTime()
+        // 每隔一定时间更新一次颜色，而不是每帧都更新
+        if (now - this.lastColorUpdateTime >= this.colorUpdateInterval) {
+          this.updateParticleColorsBatched()
+          this.lastColorUpdateTime = now
+        }
       }
 
       this.renderer.render(this.scene, this.camera)
     }
 
-    // 更新粒子颜色（用于过渡）
+    // 更新粒子颜色（用于过渡）- 分批更新版本
+    updateParticleColorsBatched() {
+      if (!this.accretionDisk) return
+
+      const positions = this.accretionDisk.geometry.attributes.position.array
+      const colors = this.accretionDisk.geometry.attributes.customColor.array
+      const alphas = this.accretionDisk.geometry.attributes.alpha.array
+      const count = positions.length / 3
+      const innerRadius = CONFIG.ACCRETION_DISK_INNER
+      const outerRadius = CONFIG.ACCRETION_DISK_OUTER
+
+      // 分批更新：每次只更新一部分粒子，分散到多帧
+      const startIndex = this.colorUpdateBatchIndex
+      const endIndex = Math.min(
+        startIndex + this.colorUpdateBatchSize,
+        count
+      )
+
+      for (let i = startIndex; i < endIndex; i++) {
+        const radius = this.accretionData.radii[i]
+        const normalizedRadius =
+          (radius - innerRadius) / (outerRadius - innerRadius)
+        const color = this.getAccretionColor(normalizedRadius)
+        colors[i * 3] = color.r
+        colors[i * 3 + 1] = color.g
+        colors[i * 3 + 2] = color.b
+        alphas[i] = 0.3 + 0.7 * (1.0 - normalizedRadius)
+      }
+
+      // 更新批次索引，下次更新下一批
+      this.colorUpdateBatchIndex += this.colorUpdateBatchSize
+      if (this.colorUpdateBatchIndex >= count) {
+        this.colorUpdateBatchIndex = 0 // 循环回到开始
+      }
+
+      // 标记需要更新（即使只更新了部分，也需要刷新整个缓冲区）
+      this.accretionDisk.geometry.attributes.customColor.needsUpdate = true
+      this.accretionDisk.geometry.attributes.alpha.needsUpdate = true
+    }
+
+    // 更新粒子颜色（用于过渡）- 完整更新版本（保留作为备用）
     updateParticleColors() {
       if (!this.accretionDisk) return
 
@@ -1179,6 +1233,9 @@
       this.targetTheme = THEMES[themeIndex]
       this.isTransitioning = true
       this.transitionStartTime = this.clock ? this.clock.getElapsedTime() : 0
+      // 重置颜色更新批次索引，从头开始更新
+      this.colorUpdateBatchIndex = 0
+      this.lastColorUpdateTime = 0
       this.transitionDuration = this.targetTheme.transitionDuration
       this.transitionProgress = 0
 

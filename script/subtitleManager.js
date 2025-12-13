@@ -12,7 +12,7 @@
 
   // 配置
   const CONFIG = {
-    typingSpeed: 30, // 打字机速度（毫秒/字符）
+    typingSpeed: 15, // 打字机速度（毫秒/字符）
     maxHistoryLength: 1000, // 最大历史记录数
     storageKey: "subtitleHistory", // sessionStorage 键名
     storageStatsKey: "subtitleStats", // 统计信息键名
@@ -31,6 +31,9 @@
       this.currentText = ""
       this.currentSpeaker = null
       this.typingTimer = null
+      this.isTyping = false // 是否正在打字机效果
+      this.pendingText = null // 待显示的文本（当打字机效果进行时）
+      this.pendingSpeaker = null // 待显示的说话人
 
       // Web Speech API
       this.recognition = null
@@ -54,6 +57,7 @@
 
       // 已显示的累积文本缓存（用于去重，避免重复显示）
       this.displayedAccumulatedTexts = new Set()
+      this.lastReplyId = null // 上次的 reply_id
 
       // 标记 Web Speech API 是否正常工作
       // 优先使用 Web Speech API，后端识别作为备用
@@ -81,7 +85,6 @@
       this.bindEvents()
 
       this.isInitialized = true
-      console.log("[Subtitle] 字幕管理器初始化完成")
     }
 
     /**
@@ -150,13 +153,16 @@
           if (finalTranscript) {
             const text = finalTranscript.trim()
             if (text) {
+              // 清除中间结果缓存
               delete this.interimCache.user_interim
+              // 使用打字机效果显示最终结果
               this.addText(text, "user", true, { skipDuplicateCheck: true })
             }
           } else if (interimTranscript) {
             const text = interimTranscript.trim()
             if (text) {
-              this.addText(text, "user", false, { skipDuplicateCheck: false })
+              // 中间结果：使用打字机效果显示（实时更新）
+              this.addText(text, "user", false, { skipDuplicateCheck: true })
             }
           }
         }
@@ -209,7 +215,6 @@
         }
 
         this.speechSupported = true
-        console.log("[Subtitle] Web Speech API 初始化成功")
       } catch (error) {
         console.warn("[Subtitle] Web Speech API 初始化失败:", error)
         this.speechSupported = false
@@ -251,8 +256,6 @@
             }
             return result
           }
-
-          console.log("[Subtitle] 已绑定 dialogClient 事件")
         } else {
           // 如果 dialogClient 还未加载，延迟重试
           setTimeout(tryBindEvents, 100)
@@ -350,19 +353,27 @@
       const timestamp = Date.now()
 
       // 去重检查：对于中间结果，避免存储完全相同的文本
-      // 注意：即使 skipDuplicateCheck 为 true，对于中间结果也应该去重（避免重复显示）
+      // 但允许文本更新（因为中间结果会不断变化）
       if (!isFinal) {
         const cacheKey = `${speaker}_interim`
         const lastInterim = this.interimCache[cacheKey]
 
-        // 如果文本完全相同，只显示不存储（避免重复存储和显示）
-        if (lastInterim === trimmedText) {
+        // 如果文本完全相同且当前已显示，只显示不存储（避免重复存储和显示）
+        if (
+          lastInterim === trimmedText &&
+          this.currentText === trimmedText &&
+          this.currentSpeaker === speaker
+        ) {
           this.displayText(trimmedText, speaker, false)
           return
         }
 
         // 更新缓存（只保留最新的中间结果）
         this.interimCache[cacheKey] = trimmedText
+      } else {
+        // 最终结果到达时，清除对应的中间结果缓存
+        const cacheKey = `${speaker}_interim`
+        delete this.interimCache[cacheKey]
       }
 
       // 存储到历史记录
@@ -384,12 +395,47 @@
       // 显示逻辑
       const textToShow = text.trim()
 
-      // 对于用户语音的最终结果，如果当前显示的文本已经和最终文本相同，直接显示，不使用打字机效果
-      if (speaker === "user" && isFinal && this.currentText === textToShow) {
-        this.displayText(textToShow, speaker, true)
-      } else if (speaker === "assistant" || (speaker === "user" && isFinal)) {
-        this.typeText(textToShow, speaker, options)
+      // 用户和助手语音都使用打字机效果
+      if (speaker === "user" || speaker === "assistant") {
+        // 如果当前显示的文本已经是完整的目标文本，先清空再开始打字机效果
+        if (
+          this.currentText === textToShow &&
+          this.currentSpeaker === speaker &&
+          !this.isTyping
+        ) {
+          // 当前已显示完整文本，清空后重新开始打字机效果
+          this.currentText = ""
+          this.displayText("", speaker, false)
+        }
+
+        // 如果正在打字机效果，且新文本与当前不同
+        if (
+          this.isTyping &&
+          this.currentText !== textToShow &&
+          this.currentSpeaker === speaker
+        ) {
+          // 如果新文本是当前文本的扩展（累积文本更新），继续打字机效果
+          if (
+            textToShow.startsWith(this.currentText) &&
+            textToShow.length > this.currentText.length
+          ) {
+            // 累积文本更新：继续打字机效果，从当前位置继续
+            this.typeText(textToShow, speaker, options)
+          } else {
+            // 新文本完全不同，停止当前打字机效果，重新开始
+            if (this.typingTimer) {
+              clearTimeout(this.typingTimer)
+              this.typingTimer = null
+            }
+            this.isTyping = false
+            this.typeText(textToShow, speaker, options)
+          }
+        } else {
+          // 没有正在打字机效果，或者说话人不同，直接开始
+          this.typeText(textToShow, speaker, options)
+        }
       } else {
+        // 其他说话人：直接显示
         this.displayText(textToShow, speaker, false)
       }
     }
@@ -404,31 +450,62 @@
       this.getDOM()
       if (!this.textElement) return
 
-      if (this.typingTimer) {
-        clearTimeout(this.typingTimer)
-        this.typingTimer = null
-      }
+      // 打字机效果
+      const speed = options.typingSpeed || CONFIG.typingSpeed
+      const targetText = text // 保存目标文本，防止被覆盖
 
+      // 如果说话人改变，清空当前文本并停止之前的打字机效果
       if (this.currentSpeaker && this.currentSpeaker !== speaker) {
+        if (this.isTyping && this.typingTimer) {
+          clearTimeout(this.typingTimer)
+          this.typingTimer = null
+          this.isTyping = false
+        }
         this.currentText = ""
         this.displayText("", speaker, false)
       }
 
-      this.currentSpeaker = speaker
-
-      // 打字机效果
+      // 如果当前显示的文本是目标文本的前缀，从当前位置继续（累积文本更新）
+      // 否则，停止之前的打字机效果（如果有）并从头开始
       let index = 0
-      const speed = options.typingSpeed || CONFIG.typingSpeed
+      if (
+        this.currentText &&
+        this.currentSpeaker === speaker &&
+        targetText.startsWith(this.currentText)
+      ) {
+        // 当前文本是目标文本的前缀，从当前位置继续（累积文本更新）
+        // 停止旧的打字机效果（如果有），然后从当前位置继续
+        if (this.isTyping && this.typingTimer) {
+          clearTimeout(this.typingTimer)
+          this.typingTimer = null
+        }
+        index = this.currentText.length
+      } else {
+        // 文本完全不同，停止之前的打字机效果（如果有）并从头开始
+        if (this.isTyping && this.typingTimer) {
+          clearTimeout(this.typingTimer)
+          this.typingTimer = null
+          this.isTyping = false
+        }
+        this.currentText = ""
+        this.displayText("", speaker, false)
+        index = 0
+      }
+
+      this.currentSpeaker = speaker
+      this.isTyping = true
 
       const type = () => {
-        if (index < text.length) {
-          this.currentText = text.substring(0, index + 1)
+        if (index < targetText.length) {
+          this.currentText = targetText.substring(0, index + 1)
           this.displayText(this.currentText, speaker, false)
           this.typingTimer = setTimeout(type, speed)
           index++
         } else {
-          this.displayText(text, speaker, true)
+          // 打字机效果完成
+          this.displayText(targetText, speaker, true)
           this.typingTimer = null
+          this.isTyping = false
         }
       }
 
@@ -496,9 +573,6 @@
           // 保留最新的记录，删除最旧的
           const removeCount = this.history.length - CONFIG.maxHistoryLength
           this.history = this.history.slice(removeCount)
-          console.log(
-            `[Subtitle] 历史记录已清理，删除了 ${removeCount} 条旧记录`
-          )
         }
 
         // 保存历史记录
@@ -509,13 +583,6 @@
           CONFIG.storageStatsKey,
           JSON.stringify(this.stats)
         )
-
-        // 调试日志（仅在开发环境）
-        if (this.history.length % 10 === 0) {
-          console.log(
-            `[Subtitle] 已保存 ${this.history.length} 条历史记录到 sessionStorage`
-          )
-        }
       } catch (error) {
         console.warn("[Subtitle] 保存历史记录失败:", error)
         // sessionStorage 可能已满，尝试清理旧数据
@@ -583,9 +650,19 @@
         lastUpdate: null,
       }
       this.interimCache = {}
+      this.displayedAccumulatedTexts.clear()
+      this.lastReplyId = null
+      this.currentText = ""
+      this.currentSpeaker = null
+      if (this.typingTimer) {
+        clearTimeout(this.typingTimer)
+        this.typingTimer = null
+      }
+      this.isTyping = false
+      this.pendingText = null
+      this.pendingSpeaker = null
       sessionStorage.removeItem(CONFIG.storageKey)
       sessionStorage.removeItem(CONFIG.storageStatsKey)
-      console.log("[Subtitle] 历史记录已清空")
     }
 
     /**
@@ -652,33 +729,75 @@
       const text = message.text || message.accumulated_text || ""
       const isFinal = message.is_final !== false // 默认为 true
 
-      // 用户语音且 Web Speech API 正常工作时，忽略后端文本
-      if (speaker === "user" && this.webSpeechWorking) return
+      // 用户语音且 Web Speech API 正常工作时，优先使用 Web Speech API
+      // 但如果后端文本与当前显示不同且更长，可能是更准确的识别结果，允许更新
+      if (speaker === "user" && this.webSpeechWorking) {
+        // 如果后端文本比当前显示的文本更长或完全不同，可能是更准确的识别，允许更新
+        const backendText = text.trim()
+        const currentUserText =
+          this.currentSpeaker === "user" ? this.currentText : ""
+
+        // 如果后端文本明显不同且更长，可能是更准确的识别结果
+        if (
+          backendText.length > currentUserText.length + 5 ||
+          (backendText !== currentUserText && backendText.length > 10)
+        ) {
+          // 允许后端识别覆盖（可能是更准确的结果）
+        } else {
+          // 否则忽略后端文本，使用 Web Speech API 的结果
+          return
+        }
+      }
 
       if (!text?.trim()) return
 
       if (!this.isVisible) this.show()
 
-      // 助手语音：如果有累积文本，只显示累积文本（避免重复显示）
+      // 助手语音：如果有累积文本，优先显示累积文本（实时更新）
       if (speaker === "assistant" && message.accumulated_text) {
         const accumulatedText = message.accumulated_text.trim()
-        // 使用 reply_id 或文本内容作为去重键
+
+        // 如果累积文本与当前显示的文本完全相同，跳过（避免重复显示）
+        if (
+          this.currentText === accumulatedText &&
+          this.currentSpeaker === speaker
+        ) {
+          return
+        }
+
+        // 如果这是新的回复（不同的 reply_id），清空去重缓存和当前文本
+        if (message.reply_id) {
+          const lastReplyId = this.lastReplyId
+          if (lastReplyId && lastReplyId !== message.reply_id) {
+            // 新的回复，清空去重缓存和当前状态
+            this.displayedAccumulatedTexts.clear()
+            this.currentText = ""
+            this.currentSpeaker = null
+            // 停止当前打字机效果
+            if (this.typingTimer) {
+              clearTimeout(this.typingTimer)
+              this.typingTimer = null
+            }
+            this.isTyping = false
+          }
+          this.lastReplyId = message.reply_id
+        }
+
+        // 使用 reply_id 作为去重键（同一回复的累积文本允许更新）
         const dedupeKey = message.reply_id
           ? `assistant_${message.reply_id}`
           : `assistant_${accumulatedText}`
 
-        // 如果已经显示过，跳过
-        if (this.displayedAccumulatedTexts.has(dedupeKey)) {
-          return
-        }
+        // 如果累积文本比当前显示的文本更长，说明有新内容，需要更新
+        const shouldUpdate =
+          accumulatedText.length > this.currentText.length ||
+          this.currentText !== accumulatedText
 
-        // 标记为已显示
-        this.displayedAccumulatedTexts.add(dedupeKey)
-
-        // 只调用一次，传入累积文本
+        // 立即显示累积文本（实时更新，不等待打字机效果完成）
         this.addText(accumulatedText, speaker, true, {
           reply_id: message.reply_id,
           question_id: message.question_id,
+          accumulated_text: accumulatedText,
           skipDuplicateCheck: true,
         })
       } else {
@@ -705,11 +824,17 @@
         this.typingTimer = null
       }
 
+      // 清理状态
+      this.isTyping = false
+      this.pendingText = null
+      this.pendingSpeaker = null
+      this.currentText = ""
+      this.currentSpeaker = null
+
       // 隐藏容器
       this.hide()
 
       this.isInitialized = false
-      console.log("[Subtitle] 字幕管理器已销毁")
     }
   }
 
@@ -719,6 +844,4 @@
   // 导出到全局
   window.SubtitleManager = SubtitleManager
   window.subtitleManager = subtitleManager
-
-  console.log("[Subtitle] 字幕管理器模块已加载")
 })(window)

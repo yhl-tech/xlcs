@@ -385,9 +385,7 @@ function initPreviewCanvasInteractions() {
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
       introPreviewImage.style.display = ""
-      introPreviewImage.src = `./images/rorschach-blot-${
-        previewState.currentImageIndex + 1
-      }.webp`
+      introPreviewImage.src = `./images/rorschach-blot-1.webp`
     }
     // 重置画布尺寸并恢复状态
     if (introPreviewImage && previewCanvas) {
@@ -776,6 +774,7 @@ const postTestView = document.getElementById("post-test-view")
 const summaryView = document.getElementById("summary-view")
 const questionText = document.getElementById("question-text")
 const finishBtn = document.getElementById("finish-btn")
+const nextQuestionBtn = document.getElementById("next-question-btn")
 const nextBtn = document.getElementById("next-btn")
 const prevBtn = document.getElementById("prev-btn")
 const progressText = document.getElementById("progress-text")
@@ -2386,7 +2385,7 @@ function playRandomPrompt() {
 
 function resetInactivityTimer() {
   if (!inactivityActive) {
-    console.log("[不活动检测] 未启用，跳过定时器设置")
+    // 未启用时静默返回，避免频繁日志输出造成性能问题
     return
   }
   clearTimeout(inactivityTimer)
@@ -2487,6 +2486,9 @@ function setupEventListeners() {
   prevBtn.addEventListener("click", () => navigate(-1))
   nextBtn.addEventListener("click", () => navigate(1))
   finishBtn.addEventListener("click", finishAndSave)
+  if (nextQuestionBtn) {
+    nextQuestionBtn.addEventListener("click", goToNextQuestion)
+  }
 
   document.getElementById("zoom-in-btn").addEventListener("click", () => {
     console.log("[按钮事件] 放大按钮被点击，当前 zoom:", state.zoom)
@@ -2911,7 +2913,26 @@ function showPostTestView(options = {}) {
   finishBtn.textContent = "提交" //
   finishBtn.style.backgroundColor = "" // 重置按钮背景色
   finishBtn.disabled = false // 重置按钮禁用状态
+
+  // 重新获取按钮元素（防止页面刷新后元素丢失）
+  const nextBtn = document.getElementById("next-question-btn")
+  if (nextBtn) {
+    nextBtn.style.display = "none" // 隐藏下一页按钮
+    nextBtn.disabled = false // 重置按钮禁用状态
+  }
   questionText.textContent = "" // 清空问题文本
+
+  // 初始化答案数组格式（如果还没有初始化）
+  POST_TEST_QUESTIONS.forEach((q) => {
+    if (shouldDisplayQuestion(q)) {
+      if (
+        !state.postTestAnswers[q.key] ||
+        !Array.isArray(state.postTestAnswers[q.key])
+      ) {
+        state.postTestAnswers[q.key] = []
+      }
+    }
+  })
 
   for (let i = 0; i < state.totalImages; i++) {
     const item = document.createElement("div")
@@ -2929,10 +2950,6 @@ function showPostTestView(options = {}) {
 }
 
 async function askNextQuestion() {
-  document
-    .querySelectorAll(".grid-item.selected")
-    .forEach((el) => el.classList.remove("selected"))
-
   // 跳过 why 问题，找到下一个应该显示的问题
   let question = null
   while (currentQuestionIndex < POST_TEST_QUESTIONS.length) {
@@ -2953,6 +2970,12 @@ async function askNextQuestion() {
     questionText.textContent = ""
     questionText.style.background = "none"
     document.getElementById("post-test-grid").style.display = "none"
+
+    // 隐藏下一页按钮
+    const nextBtn = document.getElementById("next-question-btn")
+    if (nextBtn) {
+      nextBtn.style.display = "none"
+    }
 
     // 确保按钮元素存在
     if (!finishBtn) {
@@ -2988,110 +3011,130 @@ async function askNextQuestion() {
     return
   }
 
-  // 显示主问题的文本
+  // 显示主问题的文本（why问题不显示在页面上）
   questionText.textContent = question.text
   const gridContainer = document.getElementById("post-test-grid")
 
-  gridContainer.style.pointerEvents = "none"
+  // 先清除所有选中状态的视觉显示
+  document.querySelectorAll(".grid-item").forEach((el) => {
+    el.classList.remove("selected")
+  })
+
+  // 保持图片选择可用，不禁用
+  gridContainer.style.pointerEvents = "auto"
   gridContainer.style.marginTop = "10px"
 
-  // 播报主问题的文本
-  try {
-    const ttsQuery = buildTTSQuery(question.text)
-    await sendTextQuery(ttsQuery, { ensure: false })
+  // 获取下一页按钮元素（重新获取，防止页面刷新后丢失）
+  let nextQuestionButton = document.getElementById("next-question-btn")
 
-    // 估算 TTS 播放时间（每字约 300ms）
-    const estimatedDuration = Math.max(2000, question.text.length * 250)
-    await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
-  } catch (error) {
-    console.warn("[askNextQuestion] 主问题 TTS 播报失败:", error)
+  // 确保按钮容器也是可见的
+  const actionsContainer = document.querySelector(".post-test-actions")
+  if (actionsContainer) {
+    actionsContainer.style.display = "flex"
+    actionsContainer.style.visibility = "visible"
+    actionsContainer.style.opacity = "1"
   }
 
-  // 查找并播报对应的 why 问题（如果存在）
-  const whyQuestion = findWhyQuestion(question.key)
-  if (whyQuestion) {
-    try {
-      // 优化：在 why 问题播报前，确保连接状态良好，避免连接检查延迟
-      // 提前确保 TTS 连接就绪，避免 why 问题播报时的连接检查耗时
-      if (window.dialogClient) {
-        // 检查连接状态，如果连接正常且已初始化，则无需重新初始化
-        if (
-          !window.dialogClient.isConnected ||
-          !window.dialogClient.ws ||
-          window.dialogClient.ws.readyState !== WebSocket.OPEN
-        ) {
-          console.log(
-            "[askNextQuestion] Why 问题播报前，检测到连接异常，重新初始化"
-          )
-          await ensureTTSInit("audio")
-        } else if (!TTS.inited || TTS.currentMode !== "audio") {
-          // 连接正常但未初始化，快速初始化
-          console.log("[askNextQuestion] Why 问题播报前，快速初始化 TTS")
-          try {
-            const initMsg = JSON.stringify({
-              type: "init",
-              speaker: TTS.speaker,
-              mode: "audio",
-            })
-            window.dialogClient.ws && window.dialogClient.ws.send(initMsg)
-            TTS.inited = true
-            TTS.currentMode = "audio"
-          } catch (e) {
-            console.warn(
-              "[askNextQuestion] Why 问题播报前初始化失败，尝试完整初始化:",
-              e
-            )
-            await ensureTTSInit("audio")
-          }
-        }
-      }
+  // 显示下一页按钮（如果之前没获取到，再次尝试获取）
+  if (!nextQuestionButton) {
+    nextQuestionButton = document.getElementById("next-question-btn")
+  }
 
-      // 等待主问题的音频播放完成，避免 why 问题在队列中等待
-      // 检查音频队列和播放状态
-      if (window.dialogClient) {
-        const maxWaitTime = Math.max(3000, question.text.length * 300) // 最大等待时间
-        const startTime = Date.now()
-        const checkInterval = 100 // 每 100ms 检查一次
+  if (nextQuestionButton) {
+    // 强制显示按钮，使用!important确保覆盖所有样式
+    nextQuestionButton.style.setProperty("display", "inline-block", "important")
+    // 确保按钮可见
+    nextQuestionButton.style.setProperty("visibility", "visible", "important")
+    nextQuestionButton.style.setProperty("opacity", "1", "important")
+  }
 
-        while (
-          (window.dialogClient.isPlaying ||
-            (window.dialogClient.audioQueue &&
-              window.dialogClient.audioQueue.length > 0)) &&
-          Date.now() - startTime < maxWaitTime
-        ) {
-          await new Promise((resolve) => setTimeout(resolve, checkInterval))
-        }
-
-        // 额外等待一小段时间，确保音频完全播放完成
-        await new Promise((resolve) => setTimeout(resolve, 200))
-      }
-
-      // 播报 why 问题，此时连接已就绪，无需额外检查
-      const whyTtsQuery = buildTTSQuery(whyQuestion.text)
-      // 使用 ensure: false，因为我们已经提前确保了连接状态
-      await sendTextQuery(whyTtsQuery, { ensure: false })
-
-      // 估算 why 问题的 TTS 播放时间
-      const whyEstimatedDuration = Math.max(2000, whyQuestion.text.length * 300)
-      await new Promise((resolve) => setTimeout(resolve, whyEstimatedDuration))
-    } catch (error) {
-      console.warn("[askNextQuestion] Why 问题 TTS 播报失败:", error)
+  // 恢复当前问题的选中状态（从答案数组中恢复）
+  const questionKey = question.key
+  const selectedImages = state.postTestAnswers[questionKey] || []
+  document.querySelectorAll(".grid-item").forEach((el) => {
+    const index = parseInt(el.dataset.index)
+    const imageNumber = index + 1
+    if (selectedImages.includes(imageNumber)) {
+      el.classList.add("selected")
     }
-  }
+  })
 
-  // 播报完成后，启用图片选择（所有问题包括 mood 都需要选择图片）
-  gridContainer.style.pointerEvents = "auto"
+  // 查找why问题（如果存在）
+  const whyQuestion = findWhyQuestion(question.key)
+
+  // 合并主问题和why问题文本用于TTS播报（why问题不显示在页面）
+  const mainText = question.text
+  const whyText = whyQuestion ? whyQuestion.text : ""
+  const combinedText = whyText ? `${mainText} ${whyText}` : mainText
+
+  // 一次性播报合并后的文本（不等待播报完成，允许用户随时操作）
+  try {
+    const ttsQuery = buildTTSQuery(combinedText)
+    await sendTextQuery(ttsQuery, { ensure: false })
+    console.log(
+      "[askNextQuestion] 开始播报问题，当前问题索引:",
+      currentQuestionIndex
+    )
+  } catch (error) {
+    console.warn("[askNextQuestion] TTS 播报失败:", error)
+  }
 }
 
 function handleImageSelection(event) {
-  const selectedIndex = event.currentTarget.dataset.index
+  const selectedIndex = parseInt(event.currentTarget.dataset.index)
+  const imageNumber = selectedIndex + 1
   const questionKey = POST_TEST_QUESTIONS[currentQuestionIndex].key
-  state.postTestAnswers[questionKey] = parseInt(selectedIndex) + 1
 
-  document
-    .querySelectorAll(".grid-item.selected")
-    .forEach((el) => el.classList.remove("selected"))
-  event.currentTarget.classList.add("selected")
+  // 确保答案数组存在
+  if (!Array.isArray(state.postTestAnswers[questionKey])) {
+    state.postTestAnswers[questionKey] = []
+  }
+
+  const selectedImages = state.postTestAnswers[questionKey]
+
+  // Toggle选择状态：如果已选中则移除，未选中则添加
+  const index = selectedImages.indexOf(imageNumber)
+  if (index > -1) {
+    // 已选中，取消选择
+    selectedImages.splice(index, 1)
+    event.currentTarget.classList.remove("selected")
+  } else {
+    // 未选中，添加选择
+    selectedImages.push(imageNumber)
+    // 保持数组排序
+    selectedImages.sort((a, b) => a - b)
+    event.currentTarget.classList.add("selected")
+  }
+
+  // 保存会话快照
+  saveSessionSnapshot("post_test")
+}
+
+// 处理下一页按钮点击
+function goToNextQuestion() {
+  // 保存当前问题的答案
+  const questionKey = POST_TEST_QUESTIONS[currentQuestionIndex].key
+  saveSessionSnapshot("post_test")
+
+  // 清空上一个问题的 TTS 播报
+  if (
+    window.dialogClient &&
+    typeof window.dialogClient.stopPlayback === "function"
+  ) {
+    window.dialogClient.stopPlayback()
+    console.log("[goToNextQuestion] 已停止上一个问题的 TTS 播报")
+  }
+
+  // 清除所有选中状态的视觉显示（为下一个问题做准备）
+  document.querySelectorAll(".grid-item").forEach((el) => {
+    el.classList.remove("selected")
+  })
+
+  // 保持图片选择可用，不禁用
+  const gridContainer = document.getElementById("post-test-grid")
+  if (gridContainer) {
+    gridContainer.style.pointerEvents = "auto"
+  }
 
   // 递增到下一个问题，如果下一个是 why 问题则继续跳过
   currentQuestionIndex++
@@ -3102,10 +3145,8 @@ function handleImageSelection(event) {
     currentQuestionIndex++
   }
 
-  saveSessionSnapshot("post_test")
-
-  document.getElementById("post-test-grid").style.pointerEvents = "none"
-  setTimeout(askNextQuestion, 500)
+  // 立即显示下一个问题（不再延迟）
+  askNextQuestion()
 }
 
 // 完成和汇总
