@@ -2731,6 +2731,21 @@ function navigate(direction) {
       console.warn("[图片切换] BlackHoleBackground.switchTheme 不可用")
     }
 
+    // 如果是点击"下一张"按钮，且目标图片未浏览过，在图片渐隐时生成粒子效果
+    if (
+      direction === 1 &&
+      !isVisitedImage &&
+      state.stage === "test" &&
+      window.EnergyPillar &&
+      typeof window.EnergyPillar.spawnParticlesFromArea === "function" &&
+      rorschachImage
+    ) {
+      const imageRect = rorschachImage.getBoundingClientRect()
+      if (imageRect.width > 0 && imageRect.height > 0) {
+        window.EnergyPillar.spawnParticlesFromArea(imageRect)
+      }
+    }
+
     // 延迟加载图片，让用户能看到背景动画过渡效果和渐隐渐显效果
     setTimeout(() => {
       loadImage(state.currentIndex)

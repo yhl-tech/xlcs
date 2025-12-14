@@ -154,15 +154,26 @@
   }
 
   /**
-   * 生成粒子 (从指定位置飞向能量柱)
-   * @param {number} x - 画笔在页面上的X坐标
-   * @param {number} y - 画笔在页面上的Y坐标
+   * 创建粒子元素（内部辅助函数）
+   * @param {number} x - 粒子在页面上的X坐标
+   * @param {number} y - 粒子在页面上的Y坐标
+   * @param {boolean} shouldAddEnergy - 是否增加能量
+   * @param {Object} pillarPos - 能量柱位置（可选，用于性能优化）
+   * @param {number} pillarPos.centerX - 能量柱中心X坐标
+   * @param {number} pillarPos.bottomY - 能量柱底部Y坐标
    */
-  function spawnParticle(x, y) {
-    if (!elements.container) return
+  function createParticleElement(
+    x,
+    y,
+    shouldAddEnergy = true,
+    pillarPos = null
+  ) {
+    if (!elements.container) return null
 
-    // 增加能量
-    addEnergy()
+    // 如果需要，增加能量
+    if (shouldAddEnergy) {
+      addEnergy()
+    }
 
     // 创建粒子元素
     const particle = document.createElement("div")
@@ -172,10 +183,16 @@
     const colorIndex = Math.floor(Math.random() * CONFIG.PARTICLE_COLORS.length)
     particle.classList.add(CONFIG.PARTICLE_COLORS[colorIndex])
 
-    // 获取能量柱的位置
-    const pillarRect = elements.container.getBoundingClientRect()
-    const pillarCenterX = pillarRect.left + pillarRect.width / 2
-    const pillarBottomY = pillarRect.bottom - 30
+    // 获取能量柱的位置（如果未提供，则重新获取）
+    let pillarCenterX, pillarBottomY
+    if (pillarPos) {
+      pillarCenterX = pillarPos.centerX
+      pillarBottomY = pillarPos.bottomY
+    } else {
+      const pillarRect = elements.container.getBoundingClientRect()
+      pillarCenterX = pillarRect.left + pillarRect.width / 2
+      pillarBottomY = pillarRect.bottom - 30
+    }
 
     // 设置粒子初始位置（相对于视口）
     particle.style.position = "fixed"
@@ -199,6 +216,53 @@
         particle.parentNode.removeChild(particle)
       }
     }, 1500)
+
+    return particle
+  }
+
+  /**
+   * 生成粒子 (从指定位置飞向能量柱)
+   * @param {number} x - 画笔在页面上的X坐标
+   * @param {number} y - 画笔在页面上的Y坐标
+   */
+  function spawnParticle(x, y) {
+    createParticleElement(x, y, true)
+  }
+
+  /**
+   * 从指定区域批量生成粒子飞向能量柱（用于图片切换效果）
+   * @param {DOMRect} rect - 源区域的边界矩形
+   * @param {Object} options - 配置选项
+   * @param {number} options.count - 粒子数量（默认25-30随机）
+   * @param {number} options.stagger - 粒子生成间隔（ms，默认20）
+   */
+  function spawnParticlesFromArea(rect, options = {}) {
+    if (!initialized || !elements.container) return
+    if (!rect || rect.width <= 0 || rect.height <= 0) return
+
+    const {
+      count = Math.floor(Math.random() * 6) + 25, // 25-30 随机
+      stagger = 20, // 每个粒子间隔20ms
+    } = options
+
+    // 预先获取能量柱位置（性能优化：避免25-30次重复调用 getBoundingClientRect）
+    const pillarRect = elements.container.getBoundingClientRect()
+    const pillarPos = {
+      centerX: pillarRect.left + pillarRect.width / 2,
+      bottomY: pillarRect.bottom - 30,
+    }
+
+    // 分批生成粒子，错开时间让效果更自然
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        // 在区域内随机位置生成粒子
+        const x = rect.left + Math.random() * rect.width
+        const y = rect.top + Math.random() * rect.height
+
+        // 创建粒子并增加能量（传递预先获取的能量柱位置）
+        createParticleElement(x, y, true, pillarPos)
+      }, i * stagger)
+    }
   }
 
   /**
@@ -253,6 +317,7 @@
     reset,
     getEnergy,
     setEnergy,
+    spawnParticlesFromArea,
   }
 
   // DOM 加载完成后自动初始化并显示
