@@ -1032,7 +1032,21 @@
 
       if (!text?.trim()) return
 
-      if (!this.isVisible) this.show()
+      // 只在测试阶段显示字幕，介绍页和预览页不显示
+      const currentStage = window.state?.stage
+      if (currentStage === "test") {
+        // 测试阶段：如果字幕不可见，则显示
+        if (!this.isVisible) {
+          this.show()
+        }
+      } else {
+        // 非测试阶段（介绍页/预览页/后测试/汇总）：如果字幕可见，则隐藏
+        // 确保介绍页和预览页不会显示字幕
+        if (this.isVisible) {
+          this.hide()
+        }
+        return
+      }
 
       // 助手语音：如果有累积文本，优先显示累积文本（实时更新）
       if (speaker === "assistant" && message.accumulated_text) {
