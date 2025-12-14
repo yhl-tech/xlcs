@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分析报告生成中 - 罗夏墨迹测试</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+      background: #0a0e27;
+      color: #fff;
+    }
+
+    /* 星云背景画布 */
+    #nebula-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 矩阵数字雨画布 */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.3;
+    }
+
+    /* 词云画布 */
+    #wordcloud-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* 文本粒子汇聚画布 */
+    #text-particle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    /* 粒子汇聚画布 */
+    #particle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* 主容器 */
+    .main-container {
+      position: relative;
+      z-index: 6;
+      min-height: 100vh;
+      padding: 60px 20px 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* 标题区域 */
+    .header-section {
+      text-align: center;
+      margin-bottom: 50px;
+      animation: fadeInDown 1s ease-out;
+    }
+
+    .header-section h1 {
+      font-size: 42px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 15px;
+      text-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+    }
+
+    .status-text {
+      font-size: 18px;
+      color: #a0aec0;
+      letter-spacing: 2px;
+    }
+
+    /* 黑洞圆形进度条容器 */
+    .progress-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9;
+      animation: fadeIn 1.5s ease-out;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 黑洞主体 */
+    .blackhole {
+      position: relative;
+      width: 200px;
+      height: 200px;
+    }
+
+    /* 黑洞中心 - 深色核心 */
+    .blackhole-core {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle, #0a0e27 0%, #000 50%, #0a0e27 100%);
+      border-radius: 50%;
+      box-shadow:
+        0 0 30px 10px rgba(0, 0, 0, 0.8),
+        0 0 60px 20px rgba(10, 14, 39, 0.6),
+        inset 0 0 30px rgba(0, 0, 0, 1);
+      z-index: 3;
+      animation: coreBreath 1.5s ease-in-out infinite;
+      overflow: hidden;
+    }
+
+    /* 核心内数据流动效果 */
+    .core-data-stream {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      color: rgba(102, 126, 234, 0.6);
+      animation: dataFlicker 0.1s linear infinite;
+      overflow: hidden;
+    }
+
+    /* 能量波纹 */
+    .energy-wave {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(102, 126, 234, 0.5);
+      animation: waveExpand 2s ease-out infinite;
+      pointer-events: none;
+    }
+
+    .energy-wave:nth-child(8) {
+      animation-delay: 0s;
+    }
+    .energy-wave:nth-child(9) {
+      animation-delay: 0.5s;
+    }
+    .energy-wave:nth-child(10) {
+      animation-delay: 1s;
+    }
+    .energy-wave:nth-child(11) {
+      animation-delay: 1.5s;
+    }
+
+    /* 数据计数器 */
+    .data-counter {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: rgba(240, 147, 251, 0.8);
+      text-shadow: 0 0 10px rgba(240, 147, 251, 0.8);
+      z-index: 4;
+      white-space: nowrap;
+      animation: counterPulse 0.5s ease-in-out infinite;
+    }
+
+    /* 黑洞词云切换容器 */
+    .blackhole-words {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 160px;
+      height: 160px;
+      pointer-events: none;
+      z-index: 5;
+      overflow: visible;
+    }
+
+    /* 词云单词 */
+    .flying-word {
+      position: absolute;
+      font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+      white-space: nowrap;
+      opacity: 0;
+      transform-origin: center center;
+      animation: wordFlyIn 0.6s ease-out forwards;
+      text-shadow: 0 0 8px currentColor;
+      pointer-events: none;
+    }
+
+    /* 词云飞入动画 - 从外向内 */
+    @keyframes wordFlyIn {
+      0% {
+        opacity: 0;
+        transform: translate(var(--start-x), var(--start-y)) scale(1.5) rotate(var(--rotate));
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(0, 0) scale(0.3) rotate(0deg);
+      }
+    }
+
+    /* 词云淡入淡出 */
+    @keyframes wordPulse {
+      0% {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+      20% {
+        opacity: 1;
+        transform: scale(1.1);
+      }
+      80% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+    }
+
+    /* 中心词云显示 */
+    .center-word {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 0 0 10px #667eea, 0 0 20px #764ba2, 0 0 30px #f093fb;
+      opacity: 0;
+      animation: centerWordShow 0.5s ease-out forwards;
+      z-index: 6;
+      white-space: nowrap;
+    }
+
+    @keyframes centerWordShow {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(2);
+        filter: blur(10px);
+      }
+      50% {
+        opacity: 1;
+        filter: blur(0);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+        filter: blur(5px);
+      }
+    }
+
+    /* 处理指示器 */
+    .processing-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100px;
+      height: 100px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 2px dashed rgba(102, 126, 234, 0.3);
+      animation: indicatorSpin 3s linear infinite;
+      z-index: 1;
+    }
+
+    /* 数据火花效果容器 */
+    .spark-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .spark {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #f093fb;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #f093fb, 0 0 12px #667eea;
+      animation: sparkFly 1s ease-out infinite;
+    }
+
+    @keyframes waveExpand {
+      0% {
+        width: 60px;
+        height: 60px;
+        opacity: 0.8;
+      }
+      100% {
+        width: 250px;
+        height: 250px;
+        opacity: 0;
+      }
+    }
+
+    @keyframes dataFlicker {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+
+    @keyframes counterPulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        text-shadow: 0 0 10px rgba(240, 147, 251, 0.8);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        text-shadow: 0 0 20px rgba(240, 147, 251, 1), 0 0 30px rgba(102, 126, 234, 0.8);
+      }
+    }
+
+    @keyframes indicatorSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes sparkFly {
+      0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(var(--tx), var(--ty)) scale(0);
+        opacity: 0;
+      }
+    }
+
+    @keyframes coreBreath {
+      0%, 100% {
+        box-shadow:
+          0 0 30px 10px rgba(0, 0, 0, 0.8),
+          0 0 60px 20px rgba(10, 14, 39, 0.6),
+          inset 0 0 30px rgba(0, 0, 0, 1);
+        transform: translate(-50%, -50%) scale(1);
+      }
+      50% {
+        box-shadow:
+          0 0 50px 20px rgba(0, 0, 0, 0.9),
+          0 0 100px 40px rgba(10, 14, 39, 0.8),
+          0 0 150px 60px rgba(102, 126, 234, 0.2),
+          inset 0 0 50px rgba(0, 0, 0, 1);
+        transform: translate(-50%, -50%) scale(1.05);
+      }
+    }
+
+    /* 黑洞事件视界 - 发光边缘 */
+    .blackhole-horizon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, transparent 40%, rgba(102, 126, 234, 0.1) 60%, rgba(118, 75, 162, 0.2) 80%, transparent 100%);
+      box-shadow:
+        0 0 20px rgba(102, 126, 234, 0.3),
+        0 0 40px rgba(118, 75, 162, 0.2);
+      animation: horizonPulse 3s ease-in-out infinite;
+      z-index: 2;
+    }
+
+    /* 吸积盘 - 外环 */
+    .accretion-disk {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background:
+        linear-gradient(#0a0e27, #0a0e27) padding-box,
+        conic-gradient(from 0deg, #667eea, #764ba2, #f093fb, #667eea) border-box;
+      animation: diskRotate 8s linear infinite;
+      z-index: 1;
+    }
+
+    /* 吸积盘光晕 */
+    .accretion-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, transparent 35%, rgba(102, 126, 234, 0.1) 50%, rgba(240, 147, 251, 0.1) 70%, transparent 90%);
+      box-shadow:
+        0 0 40px rgba(102, 126, 234, 0.3),
+        0 0 80px rgba(118, 75, 162, 0.2),
+        0 0 120px rgba(240, 147, 251, 0.1);
+      animation: glowPulse 2s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    /* 旋转环 1 */
+    .orbit-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid;
+      animation: ringRotate 6s linear infinite;
+    }
+
+    .orbit-ring:nth-child(5) {
+      width: 120px;
+      height: 120px;
+      border-color: rgba(102, 126, 234, 0.3);
+      animation-duration: 4s;
+    }
+
+    .orbit-ring:nth-child(6) {
+      width: 150px;
+      height: 150px;
+      border-color: rgba(118, 75, 162, 0.2);
+      animation-duration: 6s;
+      animation-direction: reverse;
+    }
+
+    .orbit-ring:nth-child(7) {
+      width: 180px;
+      height: 180px;
+      border-color: rgba(240, 147, 251, 0.15);
+      animation-duration: 8s;
+    }
+
+    /* 进度文字 */
+    .progress-text {
+      margin-top: 30px;
+      font-size: 16px;
+      color: #e0e0e0;
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+      text-align: center;
+    }
+
+    /* 黑洞动画 */
+    @keyframes diskRotate {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes ringRotate {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes horizonPulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.05);
+        opacity: 1;
+      }
+    }
+
+    /* 计算指示器容器 */
+    .computation-indicators {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      width: 80%;
+      max-width: 800px;
+      pointer-events: none;
+    }
+
+    /* 扫描线效果 */
+    .scan-line {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg,
+        transparent,
+        rgba(102, 126, 234, 0.8),
+        transparent);
+      box-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+      animation: scanMove 3s linear infinite;
+      z-index: 7;
+    }
+
+    @keyframes scanMove {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    /* 数据流线 */
+    .data-stream {
+      position: fixed;
+      width: 1px;
+      height: 100px;
+      background: linear-gradient(180deg,
+        transparent,
+        rgba(240, 147, 251, 0.8),
+        transparent);
+      animation: dataFlow 2s linear infinite;
+      z-index: 7;
+    }
+
+    @keyframes dataFlow {
+      0% {
+        top: -100px;
+        opacity: 0;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        top: 100vh;
+        opacity: 0;
+      }
+    }
+
+    /* 计算百分比显示 - 隐藏，已用进度条替代 */
+    .calculation-percentage {
+      display: none;
+    }
+
+    /* 底部提示 */
+    .footer-hint {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+      animation: fadeIn 2s ease-out;
+    }
+
+    .footer-hint p {
+      color: #a0aec0;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .dots {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: #667eea;
+      border-radius: 50%;
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.3s; }
+    .dot:nth-child(3) { animation-delay: 0.6s; }
+
+    /* 动画定义 */
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 0.8;
+      }
+    }
+
+    @keyframes dotPulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.5);
+        opacity: 0.5;
+      }
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .header-section h1 {
+        font-size: 32px;
+      }
+
+      .data-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .data-card {
+        padding: 20px;
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <!-- 星云背景画布 -->
+  <canvas id="nebula-canvas"></canvas>
+
+  <!-- 矩阵数字雨画布 -->
+  <canvas id="matrix-canvas"></canvas>
+
+  <!-- 词云画布 -->
+  <canvas id="wordcloud-canvas"></canvas>
+
+  <!-- 文本粒子汇聚画布 -->
+  <canvas id="text-particle-canvas"></canvas>
+
+  <!-- 粒子汇聚画布 -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- 主容器 -->
+  <div class="main-container">
+    <!-- 标题区域 -->
+    <div class="header-section">
+      <h1>🧠 AI 深度分析中</h1>
+      <p class="status-text">正在解析您的心理特征数据</p>
+    </div>
+  </div>
+
+  <!-- 黑洞圆形进度条 -->
+  <div class="progress-container">
+    <div class="blackhole">
+      <!-- 外层光晕 -->
+      <div class="accretion-glow"></div>
+      <!-- 吸积盘 -->
+      <div class="accretion-disk"></div>
+      <!-- 处理指示器 -->
+      <div class="processing-indicator"></div>
+      <!-- 事件视界 -->
+      <div class="blackhole-horizon"></div>
+      <!-- 黑洞核心 -->
+      <div class="blackhole-core">
+        <div class="core-data-stream" id="core-stream"></div>
+      </div>
+      <!-- 数据计数器 -->
+      <div class="data-counter" id="data-counter">0</div>
+      <!-- 词云切换容器 -->
+      <div class="blackhole-words" id="blackhole-words"></div>
+      <!-- 轨道环 -->
+      <div class="orbit-ring"></div>
+      <div class="orbit-ring"></div>
+      <div class="orbit-ring"></div>
+      <!-- 能量波纹 -->
+      <div class="energy-wave"></div>
+      <div class="energy-wave"></div>
+      <div class="energy-wave"></div>
+      <div class="energy-wave"></div>
+      <!-- 火花容器 -->
+      <div class="spark-container" id="spark-container"></div>
+    </div>
+    <p class="progress-text">正在整合多维度数据...</p>
+  </div>
+
+  <!-- 计算百分比显示 -->
+  <div class="calculation-percentage" id="calc-percent">0%</div>
+
+  <!-- 扫描线 -->
+  <div class="scan-line"></div>
+
+  <!-- 数据流线（动态生成） -->
+  <div id="data-streams"></div>
+
+  <!-- 底部提示 -->
+  <div class="footer-hint">
+    <p>请耐心等待，AI 正在为您生成详细报告</p>
+    <div class="dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 星云背景效果 ====================
+    const nebulaCanvas = document.getElementById('nebula-canvas');
+    const nebulaCtx = nebulaCanvas.getContext('2d');
+
+    function resizeNebulaCanvas() {
+      nebulaCanvas.width = window.innerWidth;
+      nebulaCanvas.height = window.innerHeight;
+    }
+    resizeNebulaCanvas();
+    window.addEventListener('resize', resizeNebulaCanvas);
+
+    // 星云粒子
+    class NebulaParticle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * nebulaCanvas.width;
+        this.y = Math.random() * nebulaCanvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 0.3;
+        this.speedY = (Math.random() - 0.5) * 0.3;
+        this.opacity = Math.random() * 0.5 + 0.2;
+
+        // 随机颜色（紫色/蓝色系）
+        const colors = [
+          { r: 102, g: 126, b: 234 },  // #667eea
+          { r: 118, g: 75, b: 162 },   // #764ba2
+          { r: 240, g: 147, b: 251 },  // #f093fb
+        ];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+
+        // 边界检测
+        if (this.x < 0 || this.x > nebulaCanvas.width) this.speedX *= -1;
+        if (this.y < 0 || this.y > nebulaCanvas.height) this.speedY *= -1;
+
+        // 闪烁效果
+        this.opacity += (Math.random() - 0.5) * 0.02;
+        this.opacity = Math.max(0.1, Math.min(0.7, this.opacity));
+      }
+
+      draw() {
+        nebulaCtx.beginPath();
+        nebulaCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        nebulaCtx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
+        nebulaCtx.fill();
+
+        // 光晕效果
+        const gradient = nebulaCtx.createRadialGradient(
+          this.x, this.y, 0,
+          this.x, this.y, this.size * 4
+        );
+        gradient.addColorStop(0, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity * 0.5})`);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        nebulaCtx.beginPath();
+        nebulaCtx.arc(this.x, this.y, this.size * 4, 0, Math.PI * 2);
+        nebulaCtx.fillStyle = gradient;
+        nebulaCtx.fill();
+      }
+    }
+
+    // 创建星云粒子
+    const nebulaParticles = [];
+    for (let i = 0; i < 150; i++) {
+      nebulaParticles.push(new NebulaParticle());
+    }
+
+    function animateNebula() {
+      // 半透明清屏，实现拖尾效果
+      nebulaCtx.fillStyle = 'rgba(10, 14, 39, 0.05)';
+      nebulaCtx.fillRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
+
+      // 更新和绘制所有粒子
+      nebulaParticles.forEach(particle => {
+        particle.update();
+        particle.draw();
+      });
+
+      requestAnimationFrame(animateNebula);
+    }
+    animateNebula();
+
+    // ==================== 矩阵数字雨效果 ====================
+    const matrixCanvas = document.getElementById('matrix-canvas');
+    const matrixCtx = matrixCanvas.getContext('2d');
+
+    function resizeMatrixCanvas() {
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+    }
+    resizeMatrixCanvas();
+
+    const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+    const fontSize = 14;
+    const columns = Math.floor(matrixCanvas.width / fontSize);
+    const drops = Array(columns).fill(1);
+
+    function drawMatrix() {
+      matrixCtx.fillStyle = 'rgba(10, 14, 39, 0.05)';
+      matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+
+      matrixCtx.fillStyle = '#667eea';
+      matrixCtx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+
+        matrixCtx.fillText(text, x, y);
+
+        if (y > matrixCanvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+
+    setInterval(drawMatrix, 50);
+
+    // ==================== 文本粒子汇聚效果 ====================
+    const textParticleCanvas = document.getElementById('text-particle-canvas');
+    const textParticleCtx = textParticleCanvas.getContext('2d');
+
+    function resizeTextParticleCanvas() {
+      textParticleCanvas.width = window.innerWidth;
+      textParticleCanvas.height = window.innerHeight;
+    }
+    resizeTextParticleCanvas();
+
+    // 从原数据中提取文本片段
+    const textFragments = [
+      // 测试者信息
+      '男性', '25岁', '本科', '工程师', '28分钟',
+      '10图版', '47次回答', '23分42秒', '156次旋转', '89次缩放',
+      // 对话片段
+      '蝴蝶', '翅膀张开', '对称的图案', '平衡',
+      '两个人', '跳舞', '庆祝', '欢快',
+      '蝙蝠', '夜行动物', '神秘',
+      '动物', '爬树', '熊', '猫科', '协调',
+      // 分析关键词
+      '心理特征', '性格分析', '认知模式', '情感倾向',
+      '思维方式', '创造力', '想象力', '社交性',
+      '稳定性', '开放性', '严谨性', '外向性',
+    ];
+
+    class TextParticle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        // 从四个边缘随机生成
+        const side = Math.floor(Math.random() * 4);
+        switch(side) {
+          case 0: this.x = Math.random() * textParticleCanvas.width; this.y = -20; break;
+          case 1: this.x = textParticleCanvas.width + 20; this.y = Math.random() * textParticleCanvas.height; break;
+          case 2: this.x = Math.random() * textParticleCanvas.width; this.y = textParticleCanvas.height + 20; break;
+          case 3: this.x = -20; this.y = Math.random() * textParticleCanvas.height; break;
+        }
+
+        this.targetX = textParticleCanvas.width / 2;
+        this.targetY = textParticleCanvas.height / 2;
+
+        this.text = textFragments[Math.floor(Math.random() * textFragments.length)];
+        this.fontSize = 12 + Math.random() * 8;
+        this.speed = 1 + Math.random() * 2;
+        this.opacity = 0;
+        this.maxOpacity = 0.6 + Math.random() * 0.4;
+
+        const colors = [
+          { r: 102, g: 126, b: 234 },
+          { r: 118, g: 75, b: 162 },
+          { r: 240, g: 147, b: 251 },
+        ];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      update() {
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 10) {
+          this.x += (dx / distance) * this.speed;
+          this.y += (dy / distance) * this.speed;
+
+          // 淡入
+          if (this.opacity < this.maxOpacity) {
+            this.opacity += 0.02;
+          }
+        } else {
+          // 到达中心后淡出并重置
+          this.opacity -= 0.03;
+          if (this.opacity <= 0) {
+            this.reset();
+          }
+        }
+      }
+
+      draw() {
+        if (this.opacity <= 0) return;
+
+        textParticleCtx.save();
+        textParticleCtx.font = `${this.fontSize}px "Microsoft YaHei", sans-serif`;
+        textParticleCtx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
+        textParticleCtx.textAlign = 'center';
+        textParticleCtx.textBaseline = 'middle';
+        textParticleCtx.fillText(this.text, this.x, this.y);
+        textParticleCtx.restore();
+      }
+    }
+
+    const textParticles = [];
+    for (let i = 0; i < 50; i++) {
+      textParticles.push(new TextParticle());
+    }
+
+    function animateTextParticles() {
+      textParticleCtx.clearRect(0, 0, textParticleCanvas.width, textParticleCanvas.height);
+
+      textParticles.forEach(particle => {
+        particle.update();
+        particle.draw();
+      });
+
+      requestAnimationFrame(animateTextParticles);
+    }
+    animateTextParticles();
+
+    // ==================== 动态百分比计算 ====================
+    const calcPercentElem = document.getElementById('calc-percent');
+    let currentPercent = 0;
+    let targetPercent = 0;
+
+    function updatePercentage() {
+      targetPercent = Math.min(100, targetPercent + Math.random() * 3);
+
+      if (currentPercent < targetPercent) {
+        currentPercent += (targetPercent - currentPercent) * 0.1;
+      }
+
+      calcPercentElem.textContent = `${Math.floor(currentPercent)}%`;
+
+      if (currentPercent < 99) {
+        setTimeout(updatePercentage, 100 + Math.random() * 200);
+      }
+    }
+    updatePercentage();
+
+    // ==================== 动态数据流线 ====================
+    const dataStreamsContainer = document.getElementById('data-streams');
+
+    function createDataStream() {
+      const stream = document.createElement('div');
+      stream.className = 'data-stream';
+      stream.style.left = `${Math.random() * 100}%`;
+      stream.style.animationDelay = `${Math.random() * 2}s`;
+      stream.style.animationDuration = `${1.5 + Math.random()}s`;
+      dataStreamsContainer.appendChild(stream);
+
+      setTimeout(() => {
+        stream.remove();
+      }, 3000);
+    }
+
+    setInterval(createDataStream, 300);
+
+    // ==================== 词云效果 ====================
+    const wordcloudCanvas = document.getElementById('wordcloud-canvas');
+    const wordcloudCtx = wordcloudCanvas.getContext('2d');
+
+    function resizeWordcloudCanvas() {
+      wordcloudCanvas.width = window.innerWidth;
+      wordcloudCanvas.height = window.innerHeight;
+    }
+    resizeWordcloudCanvas();
+    window.addEventListener('resize', resizeWordcloudCanvas);
+
+    // 词云数据 - 从测试者信息和对话记录中提取
+    const wordCloudData = [
+      // 测试者信息关键词
+      { text: '25岁', weight: 3, type: 'info' },
+      { text: '男性', weight: 3, type: 'info' },
+      { text: '本科', weight: 2.5, type: 'info' },
+      { text: '工程师', weight: 3, type: 'info' },
+      { text: '28分钟', weight: 2, type: 'info' },
+
+      // 对话记录关键词（高频词）
+      { text: '蝴蝶', weight: 5, type: 'keyword' },
+      { text: '翅膀', weight: 3.5, type: 'keyword' },
+      { text: '对称', weight: 3, type: 'keyword' },
+      { text: '平衡', weight: 3.5, type: 'keyword' },
+      { text: '跳舞', weight: 4, type: 'keyword' },
+      { text: '庆祝', weight: 3, type: 'keyword' },
+      { text: '欢快', weight: 3.5, type: 'keyword' },
+      { text: '蝙蝠', weight: 4.5, type: 'keyword' },
+      { text: '夜行', weight: 2.5, type: 'keyword' },
+      { text: '神秘', weight: 4, type: 'keyword' },
+      { text: '动物', weight: 4, type: 'keyword' },
+      { text: '爬树', weight: 3, type: 'keyword' },
+      { text: '协调', weight: 3, type: 'keyword' },
+      { text: '图案', weight: 2.5, type: 'keyword' },
+      { text: '姿态', weight: 2.5, type: 'keyword' },
+
+      // 情感词汇
+      { text: '感觉', weight: 2, type: 'emotion' },
+      { text: '想到', weight: 2, type: 'emotion' },
+      { text: '看到', weight: 2, type: 'emotion' },
+    ];
+
+    // 词云粒子类
+    class WordCloudParticle {
+      constructor(wordData) {
+        this.text = wordData.text;
+        this.weight = wordData.weight;
+        this.type = wordData.type;
+
+        // 根据权重计算字体大小
+        this.fontSize = 14 + this.weight * 8; // 14-54px
+
+        // 颜色（根据类型）
+        this.color = this.getColorByType();
+
+        // 初始化位置
+        this.reset();
+      }
+
+      reset() {
+        // 从边缘随机生成
+        const side = Math.floor(Math.random() * 4);
+        const centerX = wordcloudCanvas.width / 2;
+        const centerY = wordcloudCanvas.height / 2;
+
+        switch(side) {
+          case 0: this.x = Math.random() * wordcloudCanvas.width; this.y = -50; break;
+          case 1: this.x = wordcloudCanvas.width + 50; this.y = Math.random() * wordcloudCanvas.height; break;
+          case 2: this.x = Math.random() * wordcloudCanvas.width; this.y = wordcloudCanvas.height + 50; break;
+          case 3: this.x = -50; this.y = Math.random() * wordcloudCanvas.height; break;
+        }
+
+        // 目标位置是中心点
+        this.targetX = centerX;
+        this.targetY = centerY;
+
+        // 计算初始角度（用于旋转路径）
+        this.angle = Math.atan2(this.y - centerY, this.x - centerX);
+
+        // 到中心的初始距离
+        const dx = this.x - centerX;
+        const dy = this.y - centerY;
+        this.distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+
+        // 吸入速度（越重的词吸入越慢，显示时间更长）
+        this.speed = 0.3 + Math.random() * 0.3;
+
+        // 透明度
+        this.opacity = 0;
+        this.baseOpacity = 0.4 + Math.random() * 0.3;
+
+        // 个体旋转
+        this.rotation = (Math.random() - 0.5) * 0.3;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.002;
+
+        // 漂浮参数
+        this.floatOffsetX = 0;
+        this.floatOffsetY = 0;
+        this.floatSpeedX = (Math.random() - 0.5) * 0.2;
+        this.floatSpeedY = (Math.random() - 0.5) * 0.2;
+        this.floatRange = 10 + Math.random() * 15;
+      }
+
+      getColorByType() {
+        switch(this.type) {
+          case 'info':
+            return { r: 102, g: 126, b: 234 }; // 蓝色 - 信息类
+          case 'keyword':
+            return { r: 240, g: 147, b: 251 }; // 粉色 - 关键词
+          case 'emotion':
+            return { r: 118, g: 75, b: 162 }; // 紫色 - 情感词
+          default:
+            return { r: 200, g: 200, b: 200 }; // 灰白色
+        }
+      }
+
+      update() {
+        const centerX = wordcloudCanvas.width / 2;
+        const centerY = wordcloudCanvas.height / 2;
+
+        // 计算当前到中心的距离
+        const dx = this.x - centerX;
+        const dy = this.y - centerY;
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+        // 向中心移动（吸入效果）
+        if (currentDistance > 30) {
+          // 缓慢向中心靠近
+          this.x -= (dx / currentDistance) * this.speed;
+          this.y -= (dy / currentDistance) * this.speed;
+
+          // 根据距离计算亮度：越靠近中心越亮
+          const maxDistance = Math.max(wordcloudCanvas.width, wordcloudCanvas.height) * 0.5;
+          const brightnessBoost = 1 + (1 - currentDistance / maxDistance) * 1.5; // 最高2.5倍亮度
+          this.opacity = Math.min(1, this.baseOpacity * brightnessBoost);
+        } else {
+          // 到达中心，淡出后重置
+          this.opacity -= 0.05;
+          if (this.opacity <= 0) {
+            this.reset();
+          }
+        }
+
+        // 个体旋转
+        this.rotation += this.rotationSpeed;
+
+        // 漂浮效果
+        this.floatOffsetX += this.floatSpeedX;
+        this.floatOffsetY += this.floatSpeedY;
+        if (Math.abs(this.floatOffsetX) > this.floatRange) this.floatSpeedX *= -1;
+        if (Math.abs(this.floatOffsetY) > this.floatRange) this.floatSpeedY *= -1;
+      }
+
+      draw() {
+        if (this.opacity <= 0) return;
+
+        wordcloudCtx.save();
+
+        // 应用位置和漂浮偏移
+        const drawX = this.x + this.floatOffsetX;
+        const drawY = this.y + this.floatOffsetY;
+
+        wordcloudCtx.translate(drawX, drawY);
+        wordcloudCtx.rotate(this.rotation);
+
+        // 设置字体
+        wordcloudCtx.font = `${this.fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif`;
+        wordcloudCtx.textAlign = 'center';
+        wordcloudCtx.textBaseline = 'middle';
+
+        // 光晕效果（越靠近中心光晕越强）
+        const glowIntensity = this.opacity * 15;
+        wordcloudCtx.shadowColor = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
+        wordcloudCtx.shadowBlur = glowIntensity;
+
+        // 绘制文字
+        wordcloudCtx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
+        wordcloudCtx.fillText(this.text, 0, 0);
+
+        wordcloudCtx.restore();
+      }
+    }
+
+    // 创建词云粒子
+    const wordCloudParticles = [];
+    wordCloudData.forEach(wordData => {
+      // 根据权重决定出现次数（权重越高，粒子越多）
+      const count = Math.ceil(wordData.weight / 2);
+      for (let i = 0; i < count; i++) {
+        wordCloudParticles.push(new WordCloudParticle(wordData));
+      }
+    });
+
+    // 词云整体旋转角度
+    let wordCloudRotation = 0;
+    const rotationSpeed = 0.002; // 旋转速度
+
+    function animateWordCloud() {
+      wordcloudCtx.clearRect(0, 0, wordcloudCanvas.width, wordcloudCanvas.height);
+
+      // 保存画布状态
+      wordcloudCtx.save();
+
+      // 将画布中心移到屏幕中心，然后旋转
+      wordcloudCtx.translate(wordcloudCanvas.width / 2, wordcloudCanvas.height / 2);
+      wordcloudCtx.rotate(wordCloudRotation);
+      wordcloudCtx.translate(-wordcloudCanvas.width / 2, -wordcloudCanvas.height / 2);
+
+      wordCloudParticles.forEach(particle => {
+        particle.update();
+        particle.draw();
+      });
+
+      // 恢复画布状态
+      wordcloudCtx.restore();
+
+      // 更新旋转角度
+      wordCloudRotation += rotationSpeed;
+
+      requestAnimationFrame(animateWordCloud);
+    }
+    animateWordCloud();
+
+    // ==================== 粒子汇聚效果 ====================
+    const particleCanvas = document.getElementById('particle-canvas');
+    const particleCtx = particleCanvas.getContext('2d');
+
+    function resizeParticleCanvas() {
+      particleCanvas.width = window.innerWidth;
+      particleCanvas.height = window.innerHeight;
+    }
+    resizeParticleCanvas();
+    window.addEventListener('resize', resizeParticleCanvas);
+
+    // 汇聚粒子
+    class ConvergingParticle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        // 从四周边缘生成
+        const side = Math.floor(Math.random() * 4);
+        switch(side) {
+          case 0: // 顶部
+            this.x = Math.random() * particleCanvas.width;
+            this.y = -10;
+            break;
+          case 1: // 右侧
+            this.x = particleCanvas.width + 10;
+            this.y = Math.random() * particleCanvas.height;
+            break;
+          case 2: // 底部
+            this.x = Math.random() * particleCanvas.width;
+            this.y = particleCanvas.height + 10;
+            break;
+          case 3: // 左侧
+            this.x = -10;
+            this.y = Math.random() * particleCanvas.height;
+            break;
+        }
+
+        this.targetX = particleCanvas.width / 2;
+        this.targetY = particleCanvas.height / 2;
+        this.size = Math.random() * 3 + 1;
+        this.speed = Math.random() * 2 + 1;
+        this.opacity = Math.random() * 0.5 + 0.3;
+
+        const colors = [
+          { r: 102, g: 126, b: 234 },
+          { r: 118, g: 75, b: 162 },
+          { r: 240, g: 147, b: 251 },
+        ];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      update() {
+        // 向中心移动
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 5) {
+          this.x += (dx / distance) * this.speed;
+          this.y += (dy / distance) * this.speed;
+        } else {
+          // 到达中心后重置
+          this.reset();
+        }
+
+        // 淡入效果
+        if (distance < 200) {
+          this.opacity = (distance / 200) * 0.8;
+        }
+      }
+
+      draw() {
+        particleCtx.beginPath();
+        particleCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        particleCtx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
+        particleCtx.fill();
+      }
+    }
+
+    // 创建汇聚粒子
+    const convergingParticles = [];
+    for (let i = 0; i < 80; i++) { // 减少数量，避免遮挡词云
+      convergingParticles.push(new ConvergingParticle());
+    }
+
+    function animateParticles() {
+      particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+      convergingParticles.forEach(particle => {
+        particle.update();
+        particle.draw();
+      });
+
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    // ==================== 进度条动态文本更新 ====================
+    const progressTexts = [
+      "性格特质分析中...",
+      "情绪稳定性评估中...",
+      "人际关系模式分析中...",
+      "认知风格评估中...",
+      "压力应对策略分析中...",
+      "自我认知维度评估中...",
+      "情感表达模式分析中...",
+      "行为倾向评估中...",
+      "心理防御机制分析中...",
+      "内在动机评估中...",
+      "社交适应性分析中...",
+      "创造性思维评估中...",
+      "整合多维度分析结果...",
+      "生成个性化报告..."
+    ];
+
+    let textIndex = 0;
+    const progressTextElement = document.querySelector('.progress-text');
+
+    setInterval(() => {
+      textIndex = (textIndex + 1) % progressTexts.length;
+      progressTextElement.style.opacity = '0';
+
+      setTimeout(() => {
+        progressTextElement.textContent = progressTexts[textIndex];
+        progressTextElement.style.opacity = '1';
+      }, 300);
+    }, 3000);
+
+    // 添加过渡效果
+    progressTextElement.style.transition = 'opacity 0.3s ease';
+
+    // ==================== 中心数据计算动画 ====================
+    const coreStream = document.getElementById('core-stream');
+    const dataCounter = document.getElementById('data-counter');
+    const sparkContainer = document.getElementById('spark-container');
+
+    // 数据流字符
+    const dataChars = '01αβγδεζηθικλμνξοπρστυφχψω∑∏∫∂∇≈≠≤≥±×÷√∞';
+
+    // 更新核心数据流
+    function updateCoreStream() {
+      let streamText = '';
+      for (let i = 0; i < 8; i++) {
+        streamText += dataChars[Math.floor(Math.random() * dataChars.length)];
+      }
+      coreStream.textContent = streamText;
+    }
+    setInterval(updateCoreStream, 50);
+
+    // 数据计数器 - 快速增长的数字
+    let dataCount = 0;
+    let dataCountSpeed = 1;
+
+    function updateDataCounter() {
+      // 随机增加计数，模拟数据处理
+      dataCount += Math.floor(Math.random() * 100 * dataCountSpeed);
+
+      // 格式化数字显示
+      let displayNum;
+      if (dataCount >= 1000000) {
+        displayNum = (dataCount / 1000000).toFixed(1) + 'M';
+      } else if (dataCount >= 1000) {
+        displayNum = (dataCount / 1000).toFixed(1) + 'K';
+      } else {
+        displayNum = dataCount.toString();
+      }
+
+      dataCounter.textContent = displayNum;
+
+      // 随着时间推移，增加速度（模拟计算加速）
+      dataCountSpeed = Math.min(10, dataCountSpeed + 0.01);
+    }
+    setInterval(updateDataCounter, 80);
+
+    // 创建火花效果
+    function createSpark() {
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+
+      // 随机位置在中心附近
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 20 + Math.random() * 30;
+      const startX = 100 + Math.cos(angle) * distance;
+      const startY = 100 + Math.sin(angle) * distance;
+
+      spark.style.left = startX + 'px';
+      spark.style.top = startY + 'px';
+
+      // 向外飞出的方向
+      const flyAngle = angle + (Math.random() - 0.5) * 0.5;
+      const flyDistance = 30 + Math.random() * 50;
+      spark.style.setProperty('--tx', Math.cos(flyAngle) * flyDistance + 'px');
+      spark.style.setProperty('--ty', Math.sin(flyAngle) * flyDistance + 'px');
+
+      // 随机颜色
+      const colors = ['#667eea', '#764ba2', '#f093fb', '#fff'];
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      // 随机大小
+      const size = 2 + Math.random() * 4;
+      spark.style.width = size + 'px';
+      spark.style.height = size + 'px';
+
+      // 随机动画时长
+      spark.style.animationDuration = (0.5 + Math.random() * 0.5) + 's';
+
+      sparkContainer.appendChild(spark);
+
+      // 移除火花
+      setTimeout(() => spark.remove(), 1000);
+    }
+
+    // 定期创建火花
+    setInterval(createSpark, 100);
+
+    // ==================== 黑洞词云快速切换动画 ====================
+    const blackholeWords = document.getElementById('blackhole-words');
+
+    // 词云数据
+    const flyingWords = [
+      '蝴蝶', '翅膀', '对称', '平衡', '跳舞', '庆祝', '欢快', '蝙蝠',
+      '夜行', '神秘', '动物', '爬树', '协调', '图案', '姿态', '感觉',
+      '想到', '看到', '25岁', '男性', '本科', '工程师', '心理特征',
+      '性格分析', '认知模式', '情感倾向', '思维方式', '创造力',
+      '想象力', '社交性', '稳定性', '开放性', '严谨性', '外向性'
+    ];
+
+    // 颜色数组
+    const wordColors = ['#667eea', '#764ba2', '#f093fb', '#a855f7', '#ec4899', '#06b6d4'];
+
+    // 创建飞入的词云
+    function createFlyingWord() {
+      const word = document.createElement('div');
+      word.className = 'flying-word';
+      word.textContent = flyingWords[Math.floor(Math.random() * flyingWords.length)];
+
+      // 随机颜色
+      word.style.color = wordColors[Math.floor(Math.random() * wordColors.length)];
+
+      // 随机字体大小
+      const fontSize = 10 + Math.random() * 14;
+      word.style.fontSize = fontSize + 'px';
+
+      // 随机起始位置（从外围飞入）
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 80 + Math.random() * 40;
+      const startX = Math.cos(angle) * distance;
+      const startY = Math.sin(angle) * distance;
+
+      // 设置 CSS 变量
+      word.style.setProperty('--start-x', startX + 'px');
+      word.style.setProperty('--start-y', startY + 'px');
+      word.style.setProperty('--rotate', (Math.random() - 0.5) * 60 + 'deg');
+
+      // 定位到中心
+      word.style.left = '50%';
+      word.style.top = '50%';
+      word.style.transform = 'translate(-50%, -50%)';
+
+      // 随机动画时长 (0.4-0.7秒)
+      const duration = 0.4 + Math.random() * 0.3;
+      word.style.animationDuration = duration + 's';
+
+      blackholeWords.appendChild(word);
+
+      // 动画结束后移除
+      setTimeout(() => word.remove(), duration * 1000);
+    }
+
+    // 创建中心闪现的词
+    function createCenterWord() {
+      const word = document.createElement('div');
+      word.className = 'center-word';
+      word.textContent = flyingWords[Math.floor(Math.random() * flyingWords.length)];
+
+      // 随机动画时长 (0.4-0.6秒)
+      const duration = 0.4 + Math.random() * 0.2;
+      word.style.animationDuration = duration + 's';
+
+      blackholeWords.appendChild(word);
+
+      // 动画结束后移除
+      setTimeout(() => word.remove(), duration * 1000);
+    }
+
+    // 批量创建词云
+    function createWordBurst() {
+      // 创建 3-5 个飞入的词
+      const count = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => createFlyingWord(), i * 50);
+      }
+
+      // 偶尔显示中心词
+      if (Math.random() > 0.6) {
+        setTimeout(createCenterWord, 100);
+      }
+    }
+
+    // 快速切换词云 (每 200-400ms)
+    function scheduleWordBurst() {
+      createWordBurst();
+      const nextDelay = 200 + Math.random() * 200;
+      setTimeout(scheduleWordBurst, nextDelay);
+    }
+
+    // 启动词云动画
+    setTimeout(scheduleWordBurst, 1000);
+
+    // ==================== 动态增强效果 ====================
+    // 随着词云汇聚，增强动画效果
+    let intensityLevel = 1;
+
+    function updateIntensity() {
+      // 缓慢增加强度
+      intensityLevel = Math.min(3, intensityLevel + 0.005);
+
+      // 更新吸积盘旋转速度
+      const disk = document.querySelector('.accretion-disk');
+      if (disk) {
+        disk.style.animationDuration = (8 / intensityLevel) + 's';
+      }
+
+      // 更新能量波速度
+      const waves = document.querySelectorAll('.energy-wave');
+      waves.forEach((wave, index) => {
+        wave.style.animationDuration = (2 / intensityLevel) + 's';
+      });
+
+      // 更新处理指示器
+      const indicator = document.querySelector('.processing-indicator');
+      if (indicator) {
+        indicator.style.animationDuration = (3 / intensityLevel) + 's';
+      }
+    }
+    setInterval(updateIntensity, 500);
+
+    // ==================== 响应式处理 ====================
+    window.addEventListener('resize', () => {
+      resizeNebulaCanvas();
+      resizeMatrixCanvas();
+      resizeWordcloudCanvas();
+      resizeTextParticleCanvas();
+      resizeParticleCanvas();
+    });
+  </script>
+</body>
+</html>
