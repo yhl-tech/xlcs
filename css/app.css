@@ -1263,6 +1263,19 @@ html {
   transform: translateY(0);
 }
 
+.intro-driver-popover .driver-next-btn,
+.intro-driver-popover .driver-prev-btn,
+.intro-driver-popover [data-action="next"],
+.intro-driver-popover [data-action="prev"] {
+  display: none !important;
+}
+
+/* 确保关闭按钮显示 */
+.intro-driver-popover .driver-popover-close-btn,
+.intro-driver-popover .driver-close-btn {
+  display: block !important;
+}
+
 .intro-driver-popover .driver-popover-arrow {
   width: 0;
   height: 0;
@@ -1273,9 +1286,78 @@ html {
 
 .intro-driver-popover .driver-popover-arrow-side-right,
 .intro-driver-popover .driver-popover-arrow-side-left {
-  top: 50% !important;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.intro-driver-popover
+  .driver-popover-arrow-side-right.driver-popover-arrow-align-start,
+.intro-driver-popover
+  .driver-popover-arrow-side-left.driver-popover-arrow-align-start {
+  top: 20px !important;
   bottom: auto !important;
-  transform: translateY(-50%) !important;
+  transform: none !important;
+}
+
+.intro-step-2-popover
+  .driver-popover-arrow-side-right.driver-popover-arrow-align-end,
+.intro-step-2-popover
+  .driver-popover-arrow-side-left.driver-popover-arrow-align-end {
+  top: 95px !important;
+  bottom: auto !important;
+  transform: none !important;
+}
+
+.intro-step-3-popover
+  .driver-popover-arrow-side-right.driver-popover-arrow-align-end,
+.intro-step-3-popover
+  .driver-popover-arrow-side-left.driver-popover-arrow-align-end {
+  top: auto !important;
+  bottom: 25px !important;
+  transform: none !important;
+}
+
+.intro-driver-popover[data-step="2"]
+  .driver-popover-arrow-side-right.driver-popover-arrow-align-end,
+.intro-driver-popover[data-step="2"]
+  .driver-popover-arrow-side-left.driver-popover-arrow-align-end {
+  top: 95px !important;
+  bottom: auto !important;
+  transform: none !important;
+}
+
+.intro-driver-popover[data-step="3"]
+  .driver-popover-arrow-side-right.driver-popover-arrow-align-end,
+.intro-driver-popover[data-step="3"]
+  .driver-popover-arrow-side-left.driver-popover-arrow-align-end {
+  top: auto !important;
+  bottom: 25px !important;
+  transform: none !important;
+}
+
+.intro-driver-popover
+  .driver-popover-arrow.driver-popover-arrow-side-right.driver-popover-arrow-align-end.intro-step-2,
+.intro-driver-popover
+  .driver-popover-arrow.driver-popover-arrow-side-left.driver-popover-arrow-align-end.intro-step-2 {
+  top: 95px !important;
+  bottom: auto !important;
+  transform: none !important;
+}
+
+.intro-driver-popover
+  .driver-popover-arrow.driver-popover-arrow-side-right.driver-popover-arrow-align-end.intro-step-3,
+.intro-driver-popover
+  .driver-popover-arrow.driver-popover-arrow-side-left.driver-popover-arrow-align-end.intro-step-3 {
+  top: auto !important;
+  bottom: 25px !important;
+  transform: none !important;
+}
+.driver-popover-title {
+  font-size: 14px;
+}
+.driver-popover-description {
+  font-size: 12px;
 }
 
 .intro-driver-popover .driver-popover-arrow-side-right {
