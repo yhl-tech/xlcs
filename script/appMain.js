@@ -33,6 +33,7 @@ import {
   startOperationReactionTest,
   detectDrawingAction,
 } from "./operationReactionTest.js"
+import { waitingReportManager } from "./waitingReport.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -772,6 +773,7 @@ const rorschachImage = document.getElementById("rorschach-image")
 const canvas = document.getElementById("drawing-canvas")
 const postTestView = document.getElementById("post-test-view")
 const summaryView = document.getElementById("summary-view")
+const waitingReportView = document.getElementById("waiting-report-view")
 const questionText = document.getElementById("question-text")
 const finishBtn = document.getElementById("finish-btn")
 const nextQuestionBtn = document.getElementById("next-question-btn")
@@ -2979,7 +2981,7 @@ async function askNextQuestion() {
   // 如果没有找到可显示的问题，说明所有问题都已处理完毕
   if (!question || currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
     const finishText =
-      "好的，再次感谢您的时间，你可以点击按钮，结束测试，测试报告的分析将会交给 AI 进行分析，为时大约1～2天，报告会以通知形式告知您。"
+      "好的，再次感谢您的时间，测试报告的分析将会交给 AI 进行分析，为时大约1～2天，报告会以通知形式告知您。"
 
     // 不显示文案，移除背景色
     questionText.textContent = ""
@@ -2992,37 +2994,40 @@ async function askNextQuestion() {
       nextBtn.style.display = "none"
     }
 
-    // 确保按钮元素存在
-    if (!finishBtn) {
-      console.error("[askNextQuestion] finishBtn 元素未找到")
-      return
+    // 隐藏完成按钮
+    if (finishBtn) {
+      finishBtn.style.display = "none"
     }
 
-    // 先设置按钮为禁用状态，再显示按钮
-    finishBtn.setAttribute("disabled", "disabled")
-    finishBtn.style.display = "inline-block"
-    // 禁用时设置灰色背景，避免绿色影响体验
-    finishBtn.style.backgroundColor = "#9ca3af"
-    finishBtn.style.cursor = "not-allowed"
-    console.log("[askNextQuestion] 按钮已设置为禁用状态，开始播报")
+    // 立即显示等待报告页面
+    console.log("[askNextQuestion] 显示等待报告页面，同时播报结束语")
+    console.log("[askNextQuestion] 结束文案:", finishText)
+    showWaitingReportOnly()
 
-    // 播报结束文案
-    try {
-      const ttsQuery = buildTTSQuery(finishText)
-      await sendTextQuery(ttsQuery, { ensure: false })
+    // 播报结束文案（不阻塞）
+    ;(async () => {
+      try {
+        console.log("[askNextQuestion] 准备发送 TTS 播报请求")
+        const ttsQuery = buildTTSQuery(finishText)
+        console.log("[askNextQuestion] TTS Query:", ttsQuery)
+        await sendTextQuery(ttsQuery, { ensure: false })
+        console.log("[askNextQuestion] TTS 播报请求已发送")
 
-      // 估算 TTS 播放时间（每字约 300ms）
-      const estimatedDuration = Math.max(2000, finishText.length * 220)
-      await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
-    } catch (error) {
-      console.warn("[askNextQuestion] 结束文案 TTS 播报失败:", error)
-    }
+        // 估算 TTS 播放时间（每字约 220-250ms）
+        const estimatedDuration = Math.max(2000, finishText.length * 220)
+        console.log("[askNextQuestion] 等待播报完成，预计时长:", estimatedDuration, "ms")
+        await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
 
-    // 播报完成后启用完成按钮，恢复绿色背景
-    finishBtn.removeAttribute("disabled")
-    finishBtn.style.backgroundColor = "" // 恢复 CSS 中定义的绿色背景
-    finishBtn.style.cursor = "pointer"
-    console.log("[askNextQuestion] 播报完成，按钮已启用")
+        // 播报完成后再断开连接和提交数据
+        console.log("[askNextQuestion] 播报完成，开始提交数据")
+        finishAndSaveData()
+      } catch (error) {
+        console.error("[askNextQuestion] 结束文案 TTS 播报失败:", error)
+        // 即使播报失败，也要提交数据
+        finishAndSaveData()
+      }
+    })()
+
     return
   }
 
@@ -3270,7 +3275,205 @@ function finishAndSave() {
     })()
   }
 
-  showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
+  showWaitingReport()
+}
+
+// 只处理数据提交和清理（不处理视图切换）
+function finishAndSaveData() {
+  // 断开TTS连接
+  if (window.dialogClient) {
+    window.dialogClient.disconnect()
+    console.log("[测试完成] TTS连接已断开")
+  }
+
+  if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+    state.mediaRecorder.stop()
+  }
+
+  // 导出交互追踪数据
+  if (window.InteractionTracker) {
+    try {
+      // 在停止追踪前，确保结束所有未完成的轨迹
+      if (state.currentIndex >= 0 && state.currentIndex < state.totalImages) {
+        window.InteractionTracker._updateCurrentPlate(state.currentIndex)
+      }
+      window.InteractionTracker.stop()
+
+      // 输出所有版图的统计信息（完整数据）
+      window.InteractionTracker.printAllPlatesStatistics()
+
+      const interactionData = window.InteractionTracker.exportJSON({
+        pretty: true,
+        includeStats: true,
+        includeMetadata: true,
+      })
+      console.log("[交互追踪数据]", JSON.parse(interactionData))
+
+      // 获取旋转次数统计数据
+      const rotationCounts = window.InteractionTracker.getRotationCounts()
+      console.log("[旋转次数统计]", rotationCounts)
+
+      // 获取画笔轨迹数据
+      const drawingTracks = window.InteractionTracker.getDrawingTracks()
+      console.log("[画笔轨迹数据]", drawingTracks)
+
+      // 获取音频时间戳统计数据
+      const audioTimestamps = window.InteractionTracker.getAudioTimestamps()
+      console.log("[音频时间戳统计（相对时间）]", audioTimestamps)
+
+      // 获取绝对时间戳统计数据
+      const absoluteTimestamps =
+        window.InteractionTracker.getAbsoluteTimestamps()
+      console.log("[绝对时间戳统计]", absoluteTimestamps)
+    } catch (error) {
+      console.error("[交互追踪] 导出数据失败:", error)
+    }
+  }
+
+  // 调用接口提交数据到服务器
+  if (window.submitTestDataToServer && window.InteractionTracker) {
+    // 使用异步方式提交，不阻塞页面显示
+    ;(async () => {
+      try {
+        console.log("[API] 开始提交数据到服务器...")
+
+        // 获取音频数据（作为备用，submitAllData 会优先从 AudioRecorder 获取）
+        let audioBlob = null
+        if (state.audioBlob) {
+          audioBlob = state.audioBlob
+        } else if (state.audioChunks && state.audioChunks.length > 0) {
+          audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+        }
+
+        // 调用接口提交数据
+        const result = await window.submitTestDataToServer(
+          window.InteractionTracker,
+          audioBlob,
+          state.postTestAnswers
+        )
+
+        console.log("[API] 数据提交成功:", result)
+      } catch (error) {
+        console.error("[API] 提交数据失败:", error)
+      }
+    })()
+  }
+}
+
+// 只显示等待报告页面（不启动倒计时）
+function showWaitingReportOnly() {
+  console.log("[showWaitingReportOnly] 显示等待报告页面")
+
+  // 隐藏其他视图
+  infoScreen.style.display = "none"
+  mainContent.style.display = "none"
+  controlsBar.style.display = "none"
+  postTestView.style.display = "none"
+  summaryView.style.display = "none"
+
+  // 保持字幕显示（等待报告时需要显示语音播报字幕）
+  // 字幕会在语音播报完成后自动隐藏
+
+  // 隐藏背景动画
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 隐藏能量柱
+  const energyPillarContainer = document.getElementById("energy-pillar-container")
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
+
+  // 确保 image-container 隐藏
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "none"
+  }
+
+  // 显示等待报告视图
+  appWindow.style.display = "flex"
+  waitingReportView.style.display = "block"
+
+  // 启动等待报告动画
+  waitingReportManager.start()
+
+  // 15秒后跳转到汇总页面
+  setTimeout(() => {
+    console.log("[showWaitingReportOnly] 准备跳转到汇总页面")
+
+    // 停止动画
+    waitingReportManager.stop()
+
+    // 隐藏字幕（跳转前确保字幕被隐藏）
+    if (window.subtitleManager) {
+      window.subtitleManager.hide()
+    }
+
+    // 隐藏等待报告视图
+    waitingReportView.style.display = "none"
+
+    // 显示汇总页面
+    showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
+  }, 15000)
+}
+
+function showWaitingReport() {
+  console.log("[showWaitingReport] 显示等待报告页面")
+
+  // 隐藏其他视图
+  infoScreen.style.display = "none"
+  mainContent.style.display = "none"
+  controlsBar.style.display = "none"
+  postTestView.style.display = "none"
+  summaryView.style.display = "none"
+
+  // 隐藏字幕
+  if (window.subtitleManager) {
+    window.subtitleManager.hide()
+  }
+
+  // 隐藏背景动画
+  const bgContainer = document.getElementById("blackhole-bg-container")
+  if (bgContainer) {
+    bgContainer.style.display = "none"
+  }
+
+  // 隐藏能量柱
+  const energyPillarContainer = document.getElementById("energy-pillar-container")
+  if (energyPillarContainer) {
+    energyPillarContainer.style.display = "none"
+    energyPillarContainer.classList.remove("visible")
+  }
+
+  // 确保 image-container 隐藏
+  const imageContainer = document.getElementById("image-container")
+  if (imageContainer) {
+    imageContainer.style.display = "none"
+  }
+
+  // 显示等待报告视图
+  appWindow.style.display = "flex"
+  waitingReportView.style.display = "block"
+
+  // 启动等待报告动画
+  waitingReportManager.start()
+
+  // 15秒后跳转到汇总页面（可以改为轮询报告状态）
+  setTimeout(() => {
+    console.log("[showWaitingReport] 准备跳转到汇总页面")
+
+    // 停止动画
+    waitingReportManager.stop()
+
+    // 隐藏等待报告视图
+    waitingReportView.style.display = "none"
+
+    // 显示汇总页面
+    showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
+  }, 15000)
 }
 
 function showSummary(options = {}) {
@@ -4786,4 +4989,11 @@ document.addEventListener("DOMContentLoaded", () => {
       playWelcomeMessage()
     }
   }, 1000)
+
+  // // 开发调试：直接进入 mood 问题
+  // setTimeout(() => {
+  //   showPostTestView()
+  //   currentQuestionIndex = 8
+  //   askNextQuestion()
+  // }, 100)
 })

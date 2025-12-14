@@ -1,0 +1,606 @@
+/* 等待报告生成页面样式 */
+
+/* 星云背景画布 */
+#nebula-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* 矩阵数字雨画布 */
+#matrix-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* 词云画布 */
+#wordcloud-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 文本粒子汇聚画布 */
+#text-particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* 粒子汇聚画布 */
+#particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* 主容器 */
+.waiting-report-main-container {
+  position: relative;
+  z-index: 6;
+  min-height: 100vh;
+  padding: 60px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 标题区域 */
+.waiting-report-header {
+  text-align: center;
+  margin-bottom: 50px;
+  animation: fadeInDown 1s ease-out;
+}
+
+.waiting-report-header h1 {
+  font-size: 42px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 15px;
+  text-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+}
+
+.waiting-report-status-text {
+  font-size: 18px;
+  color: #a0aec0;
+  letter-spacing: 2px;
+}
+
+/* 黑洞圆形进度条容器 */
+.waiting-report-progress-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+  animation: fadeIn 1.5s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 黑洞主体 */
+.waiting-report-blackhole {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+
+/* 黑洞中心 - 深色核心 */
+.waiting-report-blackhole-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, #0a0e27 0%, #000 50%, #0a0e27 100%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 30px 10px rgba(0, 0, 0, 0.8),
+    0 0 60px 20px rgba(10, 14, 39, 0.6),
+    inset 0 0 30px rgba(0, 0, 0, 1);
+  z-index: 3;
+  animation: coreBreath 1.5s ease-in-out infinite;
+  overflow: hidden;
+}
+
+/* 核心内数据流动效果 */
+.waiting-report-core-data-stream {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  color: rgba(102, 126, 234, 0.6);
+  animation: dataFlicker 0.1s linear infinite;
+  overflow: hidden;
+}
+
+/* 能量波纹 */
+.waiting-report-energy-wave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(102, 126, 234, 0.5);
+  animation: waveExpand 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.waiting-report-energy-wave:nth-child(8) {
+  animation-delay: 0s;
+}
+.waiting-report-energy-wave:nth-child(9) {
+  animation-delay: 0.5s;
+}
+.waiting-report-energy-wave:nth-child(10) {
+  animation-delay: 1s;
+}
+.waiting-report-energy-wave:nth-child(11) {
+  animation-delay: 1.5s;
+}
+
+/* 数据计数器 */
+.waiting-report-data-counter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: rgba(240, 147, 251, 0.8);
+  text-shadow: 0 0 10px rgba(240, 147, 251, 0.8);
+  z-index: 4;
+  white-space: nowrap;
+  animation: counterPulse 0.5s ease-in-out infinite;
+}
+
+/* 黑洞词云切换容器 */
+.waiting-report-blackhole-words {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 160px;
+  height: 160px;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+
+/* 词云单词 */
+.waiting-report-flying-word {
+  position: absolute;
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  white-space: nowrap;
+  opacity: 0;
+  transform-origin: center center;
+  animation: wordFlyIn 0.6s ease-out forwards;
+  text-shadow: 0 0 8px currentColor;
+  pointer-events: none;
+}
+
+/* 词云飞入动画 - 从外向内 */
+@keyframes wordFlyIn {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), var(--start-y)) scale(1.5) rotate(var(--rotate));
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3) rotate(0deg);
+  }
+}
+
+/* 中心词云显示 */
+.waiting-report-center-word {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 10px #667eea, 0 0 20px #764ba2, 0 0 30px #f093fb;
+  opacity: 0;
+  animation: centerWordShow 0.5s ease-out forwards;
+  z-index: 6;
+  white-space: nowrap;
+}
+
+@keyframes centerWordShow {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2);
+    filter: blur(10px);
+  }
+  50% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+    filter: blur(5px);
+  }
+}
+
+/* 处理指示器 */
+.waiting-report-processing-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 100px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px dashed rgba(102, 126, 234, 0.3);
+  animation: indicatorSpin 3s linear infinite;
+  z-index: 1;
+}
+
+/* 数据火花效果容器 */
+.waiting-report-spark-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.waiting-report-spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #f093fb;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #f093fb, 0 0 12px #667eea;
+  animation: sparkFly 1s ease-out infinite;
+}
+
+@keyframes waveExpand {
+  0% {
+    width: 60px;
+    height: 60px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 250px;
+    height: 250px;
+    opacity: 0;
+  }
+}
+
+@keyframes dataFlicker {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes counterPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    text-shadow: 0 0 10px rgba(240, 147, 251, 0.8);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    text-shadow: 0 0 20px rgba(240, 147, 251, 1), 0 0 30px rgba(102, 126, 234, 0.8);
+  }
+}
+
+@keyframes indicatorSpin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes sparkFly {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes coreBreath {
+  0%, 100% {
+    box-shadow:
+      0 0 30px 10px rgba(0, 0, 0, 0.8),
+      0 0 60px 20px rgba(10, 14, 39, 0.6),
+      inset 0 0 30px rgba(0, 0, 0, 1);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 50px 20px rgba(0, 0, 0, 0.9),
+      0 0 100px 40px rgba(10, 14, 39, 0.8),
+      0 0 150px 60px rgba(102, 126, 234, 0.2),
+      inset 0 0 50px rgba(0, 0, 0, 1);
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+/* 黑洞事件视界 - 发光边缘 */
+.waiting-report-blackhole-horizon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, rgba(102, 126, 234, 0.1) 60%, rgba(118, 75, 162, 0.2) 80%, transparent 100%);
+  box-shadow:
+    0 0 20px rgba(102, 126, 234, 0.3),
+    0 0 40px rgba(118, 75, 162, 0.2);
+  animation: horizonPulse 3s ease-in-out infinite;
+  z-index: 2;
+}
+
+/* 吸积盘 - 外环 */
+.waiting-report-accretion-disk {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#0a0e27, #0a0e27) padding-box,
+    conic-gradient(from 0deg, #667eea, #764ba2, #f093fb, #667eea) border-box;
+  animation: diskRotate 8s linear infinite;
+  z-index: 1;
+}
+
+/* 吸积盘光晕 */
+.waiting-report-accretion-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 35%, rgba(102, 126, 234, 0.1) 50%, rgba(240, 147, 251, 0.1) 70%, transparent 90%);
+  box-shadow:
+    0 0 40px rgba(102, 126, 234, 0.3),
+    0 0 80px rgba(118, 75, 162, 0.2),
+    0 0 120px rgba(240, 147, 251, 0.1);
+  animation: glowPulse 2s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* 旋转环 */
+.waiting-report-orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid;
+  animation: ringRotate 6s linear infinite;
+}
+
+.waiting-report-orbit-ring:nth-child(5) {
+  width: 120px;
+  height: 120px;
+  border-color: rgba(102, 126, 234, 0.3);
+  animation-duration: 4s;
+}
+
+.waiting-report-orbit-ring:nth-child(6) {
+  width: 150px;
+  height: 150px;
+  border-color: rgba(118, 75, 162, 0.2);
+  animation-duration: 6s;
+  animation-direction: reverse;
+}
+
+.waiting-report-orbit-ring:nth-child(7) {
+  width: 180px;
+  height: 180px;
+  border-color: rgba(240, 147, 251, 0.15);
+  animation-duration: 8s;
+}
+
+/* 进度文字 */
+.waiting-report-progress-text {
+  margin-top: 30px;
+  font-size: 16px;
+  color: #e0e0e0;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+  text-align: center;
+  transition: opacity 0.3s ease;
+}
+
+/* 黑洞动画 */
+@keyframes diskRotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes ringRotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes horizonPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* 扫描线效果 */
+.waiting-report-scan-line {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(102, 126, 234, 0.8),
+    transparent);
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+  animation: scanMove 3s linear infinite;
+  z-index: 7;
+}
+
+@keyframes scanMove {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
+/* 数据流线 */
+.waiting-report-data-stream {
+  position: fixed;
+  width: 1px;
+  height: 100px;
+  background: linear-gradient(180deg,
+    transparent,
+    rgba(240, 147, 251, 0.8),
+    transparent);
+  animation: dataFlow 2s linear infinite;
+  z-index: 7;
+}
+
+@keyframes dataFlow {
+  0% {
+    top: -100px;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100vh;
+    opacity: 0;
+  }
+}
+
+/* 底部提示 */
+.waiting-report-footer-hint {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  text-align: center;
+  animation: fadeIn 2s ease-out;
+}
+
+.waiting-report-footer-hint p {
+  color: #a0aec0;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.waiting-report-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.waiting-report-dot {
+  width: 8px;
+  height: 8px;
+  background: #667eea;
+  border-radius: 50%;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.waiting-report-dot:nth-child(2) { animation-delay: 0.3s; }
+.waiting-report-dot:nth-child(3) { animation-delay: 0.6s; }
+
+/* 动画定义 */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .waiting-report-header h1 {
+    font-size: 32px;
+  }
+}

@@ -1990,9 +1990,10 @@ html {
 
 /* 控制栏 */
 .subtitle-container {
+  position: relative;
   width: 100%;
   min-height: 50px;
-  z-index: 10;
+  z-index: 100;
 }
 
 .subtitle-content {

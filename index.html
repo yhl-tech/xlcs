@@ -13,6 +13,7 @@
     />
     <link rel="stylesheet" href="./css/app.css" />
     <link rel="stylesheet" href="./css/intro-preview-background.css" />
+    <link rel="stylesheet" href="./css/waiting-report.css" />
   </head>
 
   <body>
@@ -240,7 +241,7 @@
 
       <div id="post-test-view" style="display: none">
         <div class="post-test-header">
-        <h2>📊 测试总结与反思</h2>
+        <h2>综合性格测试</h2>
           <button id="next-question-btn" style="display: none">下一页</button>
         </div>
         <p id="question-text"></p>
@@ -253,6 +254,83 @@
       <div id="summary-view" style="display: none">
         <h2>📈 完整测试汇总</h2>
         <div id="summary-grid" class="image-grid"></div>
+      </div>
+
+      <!-- 等待报告生成视图 -->
+      <div id="waiting-report-view" style="display: none">
+        <!-- 星云背景画布 -->
+        <canvas id="nebula-canvas"></canvas>
+
+        <!-- 矩阵数字雨画布 -->
+        <canvas id="matrix-canvas"></canvas>
+
+        <!-- 词云画布 -->
+        <canvas id="wordcloud-canvas"></canvas>
+
+        <!-- 文本粒子汇聚画布 -->
+        <canvas id="text-particle-canvas"></canvas>
+
+        <!-- 粒子汇聚画布 -->
+        <canvas id="particle-canvas"></canvas>
+
+        <!-- 主容器 -->
+        <div class="waiting-report-main-container">
+          <!-- 标题区域 -->
+          <div class="waiting-report-header">
+            <h1>🧠 AI 深度分析中</h1>
+            <p class="waiting-report-status-text">正在解析您的心理特征数据</p>
+          </div>
+        </div>
+
+        <!-- 黑洞圆形进度条 -->
+        <div class="waiting-report-progress-container">
+          <div class="waiting-report-blackhole">
+            <!-- 外层光晕 -->
+            <div class="waiting-report-accretion-glow"></div>
+            <!-- 吸积盘 -->
+            <div class="waiting-report-accretion-disk"></div>
+            <!-- 处理指示器 -->
+            <div class="waiting-report-processing-indicator"></div>
+            <!-- 事件视界 -->
+            <div class="waiting-report-blackhole-horizon"></div>
+            <!-- 黑洞核心 -->
+            <div class="waiting-report-blackhole-core">
+              <div class="waiting-report-core-data-stream" id="core-stream"></div>
+            </div>
+            <!-- 数据计数器 -->
+            <div class="waiting-report-data-counter" id="data-counter">0</div>
+            <!-- 词云切换容器 -->
+            <div class="waiting-report-blackhole-words" id="blackhole-words"></div>
+            <!-- 轨道环 -->
+            <div class="waiting-report-orbit-ring"></div>
+            <div class="waiting-report-orbit-ring"></div>
+            <div class="waiting-report-orbit-ring"></div>
+            <!-- 能量波纹 -->
+            <div class="waiting-report-energy-wave"></div>
+            <div class="waiting-report-energy-wave"></div>
+            <div class="waiting-report-energy-wave"></div>
+            <div class="waiting-report-energy-wave"></div>
+            <!-- 火花容器 -->
+            <div class="waiting-report-spark-container" id="spark-container"></div>
+          </div>
+          <p class="waiting-report-progress-text">正在整合多维度数据...</p>
+        </div>
+
+        <!-- 扫描线 -->
+        <div class="waiting-report-scan-line"></div>
+
+        <!-- 数据流线（动态生成） -->
+        <div id="data-streams"></div>
+
+        <!-- 底部提示 -->
+        <div class="waiting-report-footer-hint">
+          <p>请耐心等待，AI 正在为您生成详细报告</p>
+          <div class="waiting-report-dots">
+            <div class="waiting-report-dot"></div>
+            <div class="waiting-report-dot"></div>
+            <div class="waiting-report-dot"></div>
+          </div>
+        </div>
       </div>
 
       <!-- 字幕显示区域 -->
@@ -384,6 +462,9 @@
 
     <!-- 字幕管理器 -->
     <script type="module" src="./script/subtitleManager.js"></script>
+
+    <!-- 等待报告动画管理器 -->
+    <script type="module" src="./script/waitingReport.js"></script>
 
     <!-- Main workflow script (modularized) -->
     <script type="module" src="./script/appMain.js"></script>
