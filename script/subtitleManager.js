@@ -386,23 +386,10 @@
         // 最终结果到达时，清除对应的中间结果缓存
         const cacheKey = `${speaker}_interim`
         delete this.interimCache[cacheKey]
+
+        // 存储到历史记录（只存储最终结果，按角色去重）
+        this.storeToHistory(trimmedText, speaker, timestamp, options)
       }
-
-      // 存储到历史记录
-      this.history.push({
-        id: `${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp,
-        speaker,
-        text: trimmedText,
-        isFinal,
-        duration: options.duration || 0,
-        reply_id: options.reply_id || null,
-        question_id: options.question_id || null,
-        accumulated_text: options.accumulated_text || null,
-      })
-
-      this.updateStats(speaker)
-      this.saveHistory()
 
       // 显示逻辑
       const textToShow = text.trim()
@@ -723,6 +710,99 @@
       if (speaker === "user" || speaker === "assistant") {
         this.stats[`${speaker}Messages`]++
       }
+    }
+
+    /**
+     * 存储到历史记录（只存储最终结果，按角色去重）
+     * @param {string} text - 文本内容
+     * @param {string} speaker - 说话人
+     * @param {number} timestamp - 时间戳
+     * @param {object} options - 额外选项
+     * @returns {boolean} 是否实际存储了记录
+     */
+    storeToHistory(text, speaker, timestamp, options = {}) {
+      const trimmedText = text.trim()
+      if (!trimmedText) {
+        return false
+      }
+
+      // 查找该 speaker 的最后一条记录
+      let lastIndex = -1
+      for (let i = this.history.length - 1; i >= 0; i--) {
+        if (this.history[i].speaker === speaker) {
+          lastIndex = i
+          break
+        }
+      }
+
+      let shouldStore = true
+      let shouldUpdate = false
+
+      if (lastIndex >= 0) {
+        const lastRecord = this.history[lastIndex]
+        const lastText = lastRecord.text || ""
+
+        // 如果新文本与上一条完全相同，跳过存储
+        if (trimmedText === lastText) {
+          shouldStore = false
+        }
+        // 如果新文本是上一条的前缀扩展，替换上一条
+        else if (
+          trimmedText.startsWith(lastText) &&
+          trimmedText.length > lastText.length
+        ) {
+          shouldUpdate = true
+        }
+      }
+
+      if (shouldUpdate) {
+        // 替换上一条记录（保留原有字段，只更新文本相关字段）
+        const lastRecord = this.history[lastIndex]
+        lastRecord.text = trimmedText
+        lastRecord.timestamp = timestamp
+        lastRecord.id = `${timestamp}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`
+        lastRecord.stored = true
+        // 更新其他字段（如果提供了）
+        if (options.duration !== undefined) {
+          lastRecord.duration = options.duration
+        }
+        if (options.reply_id !== undefined) {
+          lastRecord.reply_id = options.reply_id
+        }
+        if (options.question_id !== undefined) {
+          lastRecord.question_id = options.question_id
+        }
+        if (options.accumulated_text !== undefined) {
+          lastRecord.accumulated_text = options.accumulated_text
+        }
+        // 更新统计并保存
+        this.updateStats(speaker)
+        this.saveHistory()
+        return true
+      } else if (shouldStore) {
+        // 新增记录
+        this.history.push({
+          id: `${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp,
+          speaker,
+          text: trimmedText,
+          isFinal: true,
+          stored: true, // 新增字段：标识这是存储的最终版本
+          duration: options.duration || 0,
+          reply_id: options.reply_id || null,
+          question_id: options.question_id || null,
+          accumulated_text: options.accumulated_text || null,
+        })
+        // 更新统计并保存
+        this.updateStats(speaker)
+        this.saveHistory()
+        return true
+      }
+
+      // 没有存储（重复记录）
+      return false
     }
 
     /**
