@@ -1,7 +1,18 @@
 /* 等待报告生成页面样式 */
 
 /* 等待报告主视图 - 铺满屏幕，背景透明 */
-
+#waiting-report-view {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: transparent !important;
+  z-index: 10000 !important;
+  overflow: hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+}
 
 /* 星云背景画布 */
 #nebula-canvas {
