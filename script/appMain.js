@@ -4991,9 +4991,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1000)
 
   // 开发调试：直接进入 mood 问题
-  setTimeout(() => {
-    showPostTestView()
-    currentQuestionIndex = 8
-    askNextQuestion()
-  }, 100)
+  // setTimeout(() => {
+  //   showPostTestView()
+  //   currentQuestionIndex = 0
+  //   askNextQuestion()
+  // }, 100)
 })
