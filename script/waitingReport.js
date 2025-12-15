@@ -510,7 +510,7 @@ export class WaitingReportManager {
         this.text = wordData.text;
         this.weight = wordData.weight;
         this.type = wordData.type;
-        this.fontSize = 14 + this.weight * 8;
+        this.fontSize = 12 + this.weight * 5;
         this.color = this.getColorByType();
         this.reset();
       }
@@ -529,11 +529,11 @@ export class WaitingReportManager {
 
         this.targetX = centerX;
         this.targetY = centerY;
-        this.speed = 0.3 + Math.random() * 0.3;
+        this.speed = 0.5 + Math.random() * 0.5;
         this.opacity = 0;
         this.baseOpacity = 0.4 + Math.random() * 0.3;
         this.rotation = (Math.random() - 0.5) * 0.3;
-        this.rotationSpeed = (Math.random() - 0.5) * 0.002;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.004;
       }
 
       getColorByType() {
@@ -571,7 +571,7 @@ export class WaitingReportManager {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
-        ctx.font = `${this.fontSize}px -apple-system, "Microsoft YaHei", sans-serif`;
+        ctx.font = `600 ${this.fontSize}px -apple-system, "Microsoft YaHei", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
@@ -662,7 +662,7 @@ export class WaitingReportManager {
         if (this.opacity <= 0) return;
 
         ctx.save();
-        ctx.font = `${this.fontSize}px "Microsoft YaHei", sans-serif`;
+        ctx.font = `500 ${this.fontSize}px "Microsoft YaHei", sans-serif`;
         ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.opacity})`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -922,7 +922,7 @@ export class WaitingReportManager {
       word.style.top = '50%';
       word.style.transform = 'translate(-50%, -50%)';
 
-      const duration = 0.4 + Math.random() * 0.3;
+      const duration = 0.3 + Math.random() * 0.2;
       word.style.animationDuration = duration + 's';
 
       blackholeWords.appendChild(word);
@@ -934,7 +934,7 @@ export class WaitingReportManager {
       word.className = 'waiting-report-center-word';
       word.textContent = flyingWords[Math.floor(Math.random() * flyingWords.length)];
 
-      const duration = 0.4 + Math.random() * 0.2;
+      const duration = 0.3 + Math.random() * 0.15;
       word.style.animationDuration = duration + 's';
 
       blackholeWords.appendChild(word);

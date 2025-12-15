@@ -3417,7 +3417,7 @@ function showWaitingReportOnly() {
 
     // 显示汇总页面
     showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
-  }, 15000)
+  }, 12000)
 }
 
 function showWaitingReport() {
@@ -3473,7 +3473,7 @@ function showWaitingReport() {
 
     // 显示汇总页面
     showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
-  }, 15000)
+  }, 12000)
 }
 
 function showSummary(options = {}) {
@@ -3891,12 +3891,12 @@ function renderSummaryReportSection(container, grid, statusInfo) {
   const retestBtn = document.createElement("button")
   retestBtn.id = "restart-test-btn"
   retestBtn.type = "button"
-  retestBtn.textContent = "🔁 重新测试"
+  retestBtn.textContent = "重新测试"
   retestBtn.addEventListener("click", handleRetestClick)
   reportCard.appendChild(retestBtn)
 
   const title = document.createElement("h3")
-  title.textContent = "✅ 感谢您的参与！"
+  title.textContent = "感谢您的参与！"
   reportCard.appendChild(title)
 
   const message = document.createElement("p")
@@ -4990,7 +4990,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }, 1000)
 
-  // // 开发调试：直接进入 mood 问题
+  // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
   //   showPostTestView()
   //   currentQuestionIndex = 8

@@ -1,5 +1,8 @@
 /* 等待报告生成页面样式 */
 
+/* 等待报告主视图 - 铺满屏幕，背景透明 */
+
+
 /* 星云背景画布 */
 #nebula-canvas {
   position: fixed;
@@ -205,12 +208,15 @@
 .waiting-report-flying-word {
   position: absolute;
   font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  font-weight: 600;
   white-space: nowrap;
   opacity: 0;
   transform-origin: center center;
   animation: wordFlyIn 0.6s ease-out forwards;
   text-shadow: 0 0 8px currentColor;
   pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 词云飞入动画 - 从外向内 */
@@ -242,6 +248,8 @@
   animation: centerWordShow 0.5s ease-out forwards;
   z-index: 6;
   white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes centerWordShow {
