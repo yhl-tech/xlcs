@@ -2888,7 +2888,10 @@ function loadImage(index) {
     // 只更新索引，不记录时间戳（因为已经记录过了）
     window.InteractionTracker._updateCurrentPlate(index)
   }
-  updateTransform({ zoom: 1, rotation: 0 }, true)
+  // 切换到新图版时，重置缩放、旋转和拖拽偏移，让图片回到居中初始位置
+  panOffsetX = 0
+  panOffsetY = 0
+  updateTransform({ zoom: 1, rotation: 0, offsetX: 0, offsetY: 0 }, true)
 
   // 切换图版时立即清除画布（避免显示上一张图的轨迹）
   clearCanvas()
