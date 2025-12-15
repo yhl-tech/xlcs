@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="./css/app.css" />
     <link rel="stylesheet" href="./css/intro-preview-background.css" />
     <link rel="stylesheet" href="./css/waiting-report.css" />
+    <link rel="stylesheet" href="./css/question-progress.css" />
   </head>
 
   <body>
@@ -249,6 +250,17 @@
         <div class="finish">
           <button id="finish-btn" style="display: none">提交</button>
         </div>
+
+        <!-- 问题进度柱 -->
+        <div id="question-progress-pillar-container">
+          <div id="question-progress-particles"></div>
+          <div id="question-progress-pillar">
+            <div id="question-progress-pillar-bg"></div>
+            <div id="question-progress-fill">
+              <div id="question-progress-ripple"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="summary-view" style="display: none">
@@ -467,6 +479,9 @@
 
     <!-- 等待报告动画管理器 -->
     <script type="module" src="./script/waitingReport.js"></script>
+
+    <!-- 问题进度柱管理 -->
+    <script type="module" src="./script/questionProgress.js"></script>
 
     <!-- Main workflow script (modularized) -->
     <script type="module" src="./script/appMain.js"></script>

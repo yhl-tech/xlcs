@@ -28,6 +28,11 @@ const isProduction =
   (import.meta.env?.PROD === true || import.meta.env?.MODE === "production")
 import { DEV_CONFIG } from "./config.js"
 import { initDeviceCheck, isDeviceCheckReady } from "./deviceCheck.js"
+import {
+  updateQuestionProgress,
+  initQuestionProgressPillar,
+  hideQuestionProgressPillar,
+} from "./questionProgress.js"
 import { startIntroGuide, destroyIntroGuide } from "./driverGuide.js"
 import {
   startOperationReactionTest,
@@ -89,7 +94,7 @@ const REPORT_PROCESSING_STATUSES = new Set([
 
 const DEFAULT_REPORT_WAITING_STATUS = {
   status: "processing",
-  message: "测试后大约 1~2 天会收到测试报告，请耐心等待。",
+  message: "测试后大约 3~4 小时会生成测试报告，请耐心等待。",
 }
 
 const SKIP_REPORT_REDIRECT_FLAG = "xlcs_skip_report_redirect"
@@ -2962,6 +2967,10 @@ function showPostTestView(options = {}) {
     grid.appendChild(item)
   }
   currentQuestionIndex = restoredSnapshot?.payload?.currentQuestionIndex ?? 0
+
+  // 初始化问题进度柱
+  initQuestionProgressPillar()
+
   askNextQuestion()
   saveSessionSnapshot("stage_change", { immediate: true })
 }
@@ -2981,7 +2990,7 @@ async function askNextQuestion() {
   // 如果没有找到可显示的问题，说明所有问题都已处理完毕
   if (!question || currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
     const finishText =
-      "好的，再次感谢您的时间，测试报告的分析将会交给 AI 进行分析，为时大约1～2天，报告会以通知形式告知您。"
+      "再次感谢您的时间，测试报告将会交给模型进行分析，为时大约3～4小时, 请您耐心等待"
 
     // 不显示文案，移除背景色
     questionText.textContent = ""
@@ -2998,6 +3007,9 @@ async function askNextQuestion() {
     if (finishBtn) {
       finishBtn.style.display = "none"
     }
+
+    // 隐藏问题进度柱
+    hideQuestionProgressPillar()
 
     // 立即显示等待报告页面
     console.log("[askNextQuestion] 显示等待报告页面，同时播报结束语")
@@ -3164,6 +3176,10 @@ function goToNextQuestion() {
   ) {
     currentQuestionIndex++
   }
+
+  // 更新问题进度柱
+  const totalQuestions = POST_TEST_QUESTIONS.length
+  updateQuestionProgress(currentQuestionIndex, totalQuestions)
 
   // 立即显示下一个问题（不再延迟）
   askNextQuestion()
