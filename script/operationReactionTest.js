@@ -3,6 +3,8 @@
  * 在预览窗口引导用户完成6个基本操作：放大、缩小、左转、右转、画笔、擦除
  */
 
+import { initTrajectoryGuide } from "./trajectoryGuide.js"
+
 // 操作步骤配置
 const OPERATION_STEPS = [
   {
@@ -32,7 +34,7 @@ const OPERATION_STEPS = [
   {
     id: "pen",
     action: "pen",
-    text: "请点击绿色画笔，跟随图中的轨迹进行画画",
+    text: "请点击绿色画笔，按照图中的轨迹画画",
     buttonSelector: '[data-action="pen"]',
     // 画笔操作需要特殊处理：需要先切换到绿色，然后检测是否有绘画操作
     requiresColorSwitch: true,
@@ -56,6 +58,60 @@ let testState = {
   blinkingIntervals: new Map(), // 存储闪烁动画定时器
   drawingDetected: false, // 用于检测画笔操作
   originalButtonStates: new Map(), // 保存按钮原始状态
+}
+
+// 预览窗口轨迹引导控制器（懒初始化）
+let previewTrajectoryGuide = null
+
+/**
+ * 初始化预览窗口的轨迹引导控制器（仅在需要时调用一次）
+ * 使用预览画布和 previewState，失败时静默降级
+ */
+function initPreviewTrajectoryGuideIfNeeded() {
+  if (previewTrajectoryGuide) {
+    return previewTrajectoryGuide
+  }
+
+  try {
+    const canvas = document.querySelector(".test-preview-canvas")
+    if (!canvas) {
+      console.warn("[操作反应测试] 未找到预览画布，跳过轨迹引导初始化")
+      return null
+    }
+    const ctx = canvas.getContext("2d")
+    if (!ctx) {
+      console.warn("[操作反应测试] 无法获取预览画布上下文，跳过轨迹引导初始化")
+      return null
+    }
+
+    // 优先使用全局的预览状态对象
+    const state = window.previewState || {
+      zoom: 1,
+      rotation: 0,
+      tool: "pen",
+      drawing: false,
+    }
+
+    previewTrajectoryGuide = initTrajectoryGuide({
+      canvas,
+      ctx,
+      state,
+      // 语音播报仍由 playTTS 负责，这里不做任何播报
+      onShow: null,
+      // 预览画布的用户内容由 appMain 管理，这里不做额外重绘
+      onRedraw: null,
+    })
+
+    if (!previewTrajectoryGuide) {
+      console.warn("[操作反应测试] 轨迹引导初始化失败")
+      return null
+    }
+
+    return previewTrajectoryGuide
+  } catch (error) {
+    console.warn("[操作反应测试] 初始化轨迹引导时出错:", error)
+    return null
+  }
 }
 
 /**
@@ -132,6 +188,14 @@ async function executeOperationSteps() {
  * @param {Object} step - 操作步骤配置
  */
 async function executeStep(step) {
+  // 对画笔步骤：在播报前显示轨迹引导圈
+  if (step.requiresDrawing) {
+    const guide = initPreviewTrajectoryGuideIfNeeded()
+    if (guide && typeof guide.show === "function") {
+      guide.show()
+    }
+  }
+
   // 1. 播报操作指令
   await playTTS(step.text)
 
@@ -209,6 +273,15 @@ function waitForUserAction(step) {
       const checkDrawing = () => {
         if (testState.drawingDetected) {
           testState.drawingDetected = false
+
+          // 用户完成绘画后，淡出轨迹引导圈
+          if (
+            previewTrajectoryGuide &&
+            typeof previewTrajectoryGuide.hide === "function"
+          ) {
+            previewTrajectoryGuide.hide()
+          }
+
           resolve()
         } else {
           setTimeout(checkDrawing, 100)
@@ -609,6 +682,14 @@ function cleanup() {
   // 清除闪烁动画定时器
   testState.blinkingIntervals.forEach((interval) => clearInterval(interval))
   testState.blinkingIntervals.clear()
+
+  // 清理预览轨迹引导状态
+  if (
+    previewTrajectoryGuide &&
+    typeof previewTrajectoryGuide.clear === "function"
+  ) {
+    previewTrajectoryGuide.clear()
+  }
 
   // 重置状态
   testState.isRunning = false
