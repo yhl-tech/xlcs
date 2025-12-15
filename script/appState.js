@@ -217,7 +217,7 @@ export const state = {
   zoom: 1,
   rotation: 0,
   drawing: false,
-  tool: "pen",
+  tool: "none",
   color: "#ef4444", // 红色（默认）
   canvasStates: new Array(10).fill(null),
   isSpeaking: false,

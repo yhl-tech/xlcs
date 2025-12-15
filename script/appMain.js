@@ -39,6 +39,7 @@ import {
   detectDrawingAction,
 } from "./operationReactionTest.js"
 import { waitingReportManager } from "./waitingReport.js"
+import { initImagePan } from "./imagePan.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -800,6 +801,43 @@ const basicInfoErrorElements = BASIC_INFO_FIELDS.reduce((acc, field) => {
   return acc
 }, {})
 canvas.style.transform = CANVAS_BASE_TRANSFORM
+
+// 图片平移偏移量（仅在当前会话中使用，不参与快照）
+let panOffsetX = 0
+let panOffsetY = 0
+
+// 图片平移控制器（来自 imagePan 模块）
+let imagePanController = null
+
+// 是否已经通过“放大/缩小”与图片进行过缩放交互
+// 仅用于控制：在用户首次使用缩放前，不启用拖拽平移
+let hasInteractedWithZoom = false
+
+// 根据当前工具与缩放状态更新画布光标样式
+function updateCanvasCursor() {
+  if (!canvas) return
+  if (state.tool === "pen" || state.tool === "eraser") {
+    // 绘图模式下使用十字光标
+    canvas.style.cursor = "crosshair"
+  } else if (hasInteractedWithZoom) {
+    // 只要用户使用过缩放，且当前不是画笔/橡皮，就提示可以拖拽查看图片
+    canvas.style.cursor = "grab"
+  } else {
+    // 其他情况使用默认光标
+    canvas.style.cursor = "default"
+  }
+}
+
+// 退出当前绘图工具（用于在缩放时与画笔/橡皮互斥）
+function exitDrawingTools() {
+  // 将工具状态切回“无工具”，只保留颜色设置
+  state.tool = "none"
+  const penBtn = document.getElementById("pen-tool")
+  const eraserBtn = document.getElementById("eraser-tool")
+  if (penBtn) penBtn.classList.remove("selected")
+  if (eraserBtn) eraserBtn.classList.remove("selected")
+  updateCanvasCursor()
+}
 
 function getBasicInfoInputMap() {
   return BASIC_INFO_FIELDS.reduce((acc, field) => {
@@ -2117,6 +2155,9 @@ function initTest(restoredSnapshot = null) {
     console.log("[initTest] image-container 已显示")
   }
 
+  // 初始化或重置图片平移状态
+  panOffsetX = 0
+  panOffsetY = 0
   loadImage(state.currentIndex)
   if (isRestored) {
     updateTransform({ zoom: state.zoom, rotation: state.rotation }, true)
@@ -2148,6 +2189,37 @@ function initTest(restoredSnapshot = null) {
   if (rorschachImage.complete && rorschachImage.naturalWidth > 0) {
     resizeCanvas()
     loadCanvasState(state.currentIndex)
+  }
+
+  // 初始化图片平移交互（只需初始化一次）
+  if (!imagePanController) {
+    const imageContainer = document.getElementById("image-container")
+    if (rorschachImage && imageContainer) {
+      const getPanOffset = () => ({ x: panOffsetX, y: panOffsetY })
+      const setPanOffset = ({ x, y }) => {
+        panOffsetX = typeof x === "number" ? x : 0
+        panOffsetY = typeof y === "number" ? y : 0
+        updateTransform(
+          {
+            zoom: state.zoom,
+            rotation: state.rotation,
+            offsetX: panOffsetX,
+            offsetY: panOffsetY,
+          },
+          true
+        )
+      }
+
+      imagePanController = initImagePan({
+        imageElement: rorschachImage,
+        containerElement: imageContainer,
+        getZoom: () => state.zoom,
+        getCurrentTool: () => state.tool,
+        getPanOffset,
+        setPanOffset,
+        canStartPan: () => hasInteractedWithZoom,
+      })
+    }
   }
 
   if (state.stage === "test") {
@@ -2499,12 +2571,24 @@ function setupEventListeners() {
 
   document.getElementById("zoom-in-btn").addEventListener("click", () => {
     console.log("[按钮事件] 放大按钮被点击，当前 zoom:", state.zoom)
+    // 放大时退出画笔/橡皮工具，切换为“查看/拖拽图片”模式
+    exitDrawingTools()
+    hasInteractedWithZoom = true
     updateTransform({ zoom: state.zoom * 1.2 })
+    if (imagePanController && imagePanController.handleZoomOrResize) {
+      imagePanController.handleZoomOrResize()
+    }
     resetInactivityTimer()
   })
   document.getElementById("zoom-out-btn").addEventListener("click", () => {
     console.log("[按钮事件] 缩小按钮被点击，当前 zoom:", state.zoom)
+    // 缩小时同样退出画笔/橡皮工具，保持缩放与绘图互斥
+    exitDrawingTools()
+    hasInteractedWithZoom = true
     updateTransform({ zoom: Math.max(0.2, state.zoom / 1.2) })
+    if (imagePanController && imagePanController.handleZoomOrResize) {
+      imagePanController.handleZoomOrResize()
+    }
     resetInactivityTimer()
   })
   document.getElementById("rotate-left-btn").addEventListener("click", () => {
@@ -3027,7 +3111,11 @@ async function askNextQuestion() {
 
         // 估算 TTS 播放时间（每字约 220-250ms）
         const estimatedDuration = Math.max(2000, finishText.length * 220)
-        console.log("[askNextQuestion] 等待播报完成，预计时长:", estimatedDuration, "ms")
+        console.log(
+          "[askNextQuestion] 等待播报完成，预计时长:",
+          estimatedDuration,
+          "ms"
+        )
         await new Promise((resolve) => setTimeout(resolve, estimatedDuration))
 
         // 播报完成后再断开连接和提交数据
@@ -3397,7 +3485,9 @@ function showWaitingReportOnly() {
   }
 
   // 隐藏能量柱
-  const energyPillarContainer = document.getElementById("energy-pillar-container")
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
   if (energyPillarContainer) {
     energyPillarContainer.style.display = "none"
     energyPillarContainer.classList.remove("visible")
@@ -3458,7 +3548,9 @@ function showWaitingReport() {
   }
 
   // 隐藏能量柱
-  const energyPillarContainer = document.getElementById("energy-pillar-container")
+  const energyPillarContainer = document.getElementById(
+    "energy-pillar-container"
+  )
   if (energyPillarContainer) {
     energyPillarContainer.style.display = "none"
     energyPillarContainer.classList.remove("visible")
@@ -4270,6 +4362,12 @@ function updateTransform(newTransforms = {}, force = false) {
     if (typeof newTransforms.rotation === "number") {
       state.rotation = newTransforms.rotation
     }
+    if (typeof newTransforms.offsetX === "number") {
+      panOffsetX = newTransforms.offsetX
+    }
+    if (typeof newTransforms.offsetY === "number") {
+      panOffsetY = newTransforms.offsetY
+    }
   } else {
     if (typeof newTransforms.zoom === "number") {
       state.zoom = newTransforms.zoom
@@ -4277,9 +4375,19 @@ function updateTransform(newTransforms = {}, force = false) {
     if (typeof newTransforms.rotation === "number") {
       state.rotation = newTransforms.rotation
     }
+    if (typeof newTransforms.offsetX === "number") {
+      panOffsetX = newTransforms.offsetX
+    }
+    if (typeof newTransforms.offsetY === "number") {
+      panOffsetY = newTransforms.offsetY
+    }
   }
 
-  const transformValue = `scale(${state.zoom}) rotate(${state.rotation}deg)`
+  const translateValue =
+    panOffsetX || panOffsetY
+      ? `translate(${panOffsetX}px, ${panOffsetY}px) `
+      : ""
+  const transformValue = `${translateValue}scale(${state.zoom}) rotate(${state.rotation}deg)`
 
   // 同步更新图片和画布的变换，确保它们在同一调用栈中更新
   // 注意：保持与 main.js 相同的更新顺序和方式
@@ -4296,6 +4404,9 @@ function updateTransform(newTransforms = {}, force = false) {
   } else {
     console.warn("[updateTransform] canvas 元素不存在")
   }
+
+  // 缩放或旋转变化后，同步更新光标状态
+  updateCanvasCursor()
 
   const elapsed = performance.now() - startTime
 }
@@ -4454,6 +4565,7 @@ function selectTool(tool) {
     .classList.toggle("selected", tool === "eraser")
   // 确保一键擦除按钮不被选中
   document.getElementById("clear-all-tool").classList.remove("selected")
+  updateCanvasCursor()
 }
 
 // 添加专门处理一键擦除按钮选中状态的函数
@@ -4489,7 +4601,6 @@ function selectColor(color) {
   document.querySelectorAll(".color-option").forEach((opt) => {
     opt.classList.toggle("selected", opt.dataset.color === color)
   })
-  selectTool("pen")
   // 确保一键擦除按钮不被选中
   document.getElementById("clear-all-tool").classList.remove("selected")
 }
