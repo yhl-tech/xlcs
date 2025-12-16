@@ -4910,6 +4910,25 @@ function setupAuthControls() {
       }
     })
   }
+
+  // 测试提交按钮
+  // const testSubmitBtn = document.getElementById("test-submit-btn")
+  // if (testSubmitBtn) {
+  //   testSubmitBtn.addEventListener("click", async () => {
+  //     console.log("[测试] 点击测试提交按钮")
+  //     try {
+  //       const result = await window.submitTestDataToServer(
+  //         window.InteractionTracker,
+  //         state.audioBlob
+  //       )
+  //       console.log("[测试] submitTestDataToServer 结果:", result)
+  //       alert("测试完成，请查看控制台")
+  //     } catch (error) {
+  //       console.error("[测试] submitTestDataToServer 错误:", error)
+  //       alert("测试失败: " + error.message)
+  //     }
+  //   })
+  // }
 }
 
 async function routeToReportSummaryIfAvailable() {

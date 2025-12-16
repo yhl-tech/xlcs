@@ -830,6 +830,8 @@
      */
     async uploadMedia(file, userId = null) {
       console.log("[API] uploadMedia 参数:", { fileType: file?.type, fileName: file?.name, userId })
+     
+      
 
       // 确保文件有正确的文件名和类型
       let fileToUpload = file
@@ -893,6 +895,7 @@
       }
 
       // 验证文件类型
+      console.log("上传文件名:", userId, fileToUpload.name)
       const fileName = fileToUpload.name.toLowerCase()
       const isValidFormat =
         fileName.endsWith(".mp3") || fileName.endsWith(".mp4")
