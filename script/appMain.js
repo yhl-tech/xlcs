@@ -128,25 +128,64 @@ if (window.dialogClient) {
   window.dialogClient.onDisconnect = () => {
     TTS.inited = false
     TTS.currentMode = null
+    TTS.currentPhase = null
   }
 }
 
-async function ensureTTSInit(mode = "audio") {
+// 根据当前应用阶段推断默认的对话 phase
+function getCurrentDiagPhase() {
+  if (TTS.currentPhase) {
+    return TTS.currentPhase
+  }
+  switch (state.stage) {
+    case "intro":
+      return "pretest"
+    case "test":
+      return "intest"
+    case "post":
+    case "summary":
+      return "posttest"
+    default:
+      return null
+  }
+}
+
+async function ensureTTSInit(mode = "audio", phase = null) {
   if (!window.dialogClient) {
     throw new Error("dialogClient 未加载")
   }
 
+  // 如果调用方未显式指定 phase，则根据当前阶段或已有状态推断
+  if (!phase) {
+    phase = getCurrentDiagPhase()
+  }
+
   // 修复：确保连接状态干净，避免文案过长导致的状态异常
   if (window.dialogClient.isConnected) {
-    // 检查模式是否匹配
-    if (TTS.inited && TTS.currentMode === mode) {
+    // 检查模式与阶段是否都匹配
+    if (
+      TTS.inited &&
+      TTS.currentMode === mode &&
+      (TTS.currentPhase || null) === (phase || null)
+    ) {
       return
     }
-    // 模式不匹配，需要重新初始化
-    console.log("[TTS] 模式不匹配，重新初始化")
+    // 模式或阶段不匹配，需要重新初始化
+    console.log(
+      "[TTS] 配置不匹配，重新初始化",
+      "mode:",
+      TTS.currentMode,
+      "->",
+      mode,
+      "phase:",
+      TTS.currentPhase,
+      "->",
+      phase
+    )
     window.dialogClient.disconnect()
     TTS.inited = false
     TTS.currentMode = null
+    TTS.currentPhase = null
     // 等待连接完全关闭
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
@@ -158,16 +197,17 @@ async function ensureTTSInit(mode = "audio") {
   }
 
   try {
-    const initMsg = JSON.stringify({ type: "init", speaker: TTS.speaker, mode })
-    window.dialogClient.ws && window.dialogClient.ws.send(initMsg)
+    window.dialogClient.sendInitMessage(TTS.speaker, mode, phase || null)
     TTS.inited = true
     TTS.currentMode = mode
-    console.log("[TTS] 初始化完成，模式:", mode)
+    TTS.currentPhase = phase || null
+    console.log("[TTS] 初始化完成，模式:", mode, "阶段:", TTS.currentPhase)
   } catch (e) {
     console.warn("发送 TTS 初始化失败：", e)
     // 即使初始化消息发送失败，也标记为已初始化以避免阻塞
     TTS.inited = true
     TTS.currentMode = mode
+    TTS.currentPhase = phase || null
   }
 }
 
@@ -181,14 +221,16 @@ async function sendTTSText(
   if (!window.dialogClient.isConnected) {
     await window.dialogClient.connect()
   }
-  const msg = JSON.stringify({
-    type: "tts_text",
+
+  // 获取当前阶段（如果 opts 中没有指定）
+  const phase = opts.phase || TTS.currentPhase || null
+
+  window.dialogClient.sendTTSText(String(text || ""), {
     start: Boolean(opts.start),
     end: Boolean(opts.end),
     is_user_querying: Boolean(opts.is_user_querying),
-    content: String(text || ""),
+    phase: phase,
   })
-  window.dialogClient.ws && window.dialogClient.ws.send(msg)
 }
 
 async function sendTextQuery(text, { ensure = true } = {}) {
@@ -225,20 +267,10 @@ async function sendTextQuery(text, { ensure = true } = {}) {
     }
   }
 
-  const msg = JSON.stringify({
-    type: "text_query",
-    content: String(text || ""),
-  })
+  // 获取当前阶段（自动推断）
+  const phase = TTS.currentPhase || getCurrentDiagPhase()
 
-  // 添加发送前检查
-  if (
-    window.dialogClient.ws &&
-    window.dialogClient.ws.readyState === WebSocket.OPEN
-  ) {
-    window.dialogClient.ws && window.dialogClient.ws.send(msg)
-  } else {
-    throw new Error("WebSocket连接不可用，无法发送消息")
-  }
+  window.dialogClient.sendTextQuery(String(text || ""), phase)
 }
 
 // 暴露 sendTextQuery 和 buildTTSQuery 到全局，供其他模块使用
@@ -1174,6 +1206,7 @@ function buildSessionSnapshot(reason = "manual") {
     tts: {
       inited: TTS.inited,
       currentMode: TTS.currentMode,
+      currentPhase: TTS.currentPhase || null,
     },
     audio: {
       hasMediaRecorder: Boolean(state.mediaRecorder),
@@ -1370,6 +1403,18 @@ function applySnapshotToState(snapshot) {
   state.isSpeaking = false
   state.sessionVersion = latestSnapshotVersion
   state.completed = Boolean(snapshot.completed)
+
+  // 尝试恢复 TTS 阶段信息（仅用于调试和日志，不强制依赖）
+  if (snapshot.payload?.tts) {
+    const ttsPayload = snapshot.payload.tts
+    TTS.inited = Boolean(ttsPayload.inited)
+    TTS.currentMode = ttsPayload.currentMode || null
+    TTS.currentPhase = ttsPayload.currentPhase || null
+  } else {
+    TTS.inited = false
+    TTS.currentMode = null
+    TTS.currentPhase = null
+  }
 
   return true
 }
@@ -1800,8 +1845,9 @@ async function prepareIntroExperience({ resume = false } = {}) {
       await new Promise((resolve) => setTimeout(resolve, 200))
     }
 
-    // 重新连接并初始化（此时仍在用户交互上下文中）
-    await ensureTTSInit("audio")
+    // 重新连接并初始化（此时仍在用户交互上下文中，phase 为测试前）
+    TTS.currentPhase = "pretest"
+    await ensureTTSInit("audio", "pretest")
 
     // 此时仍在用户点击"开始测试"的交互上下文中
     if (window.dialogClient) {
@@ -1939,7 +1985,9 @@ async function enterTestExperience({
 
       while (retryCount < maxRetries) {
         try {
-          await ensureTTSInit("audio")
+          // 测试阶段使用 intest phase
+          TTS.currentPhase = "intest"
+          await ensureTTSInit("audio", "intest")
           break
         } catch (error) {
           retryCount++
@@ -3107,6 +3155,8 @@ async function askNextQuestion() {
     ;(async () => {
       try {
         console.log("[askNextQuestion] 准备发送 TTS 播报请求")
+        // 测试后阶段使用 posttest phase
+        TTS.currentPhase = "posttest"
         const ttsQuery = buildTTSQuery(finishText)
         console.log("[askNextQuestion] TTS Query:", ttsQuery)
         await sendTextQuery(ttsQuery, { ensure: false })
@@ -4731,8 +4781,9 @@ async function playWelcomeMessage() {
   const welcomeText = getWelcomeText()
 
   try {
-    // 确保TTS已初始化
-    await ensureTTSInit("audio")
+    // 欢迎语属于测试前阶段，使用 pretest phase；确保TTS已初始化
+    TTS.currentPhase = "pretest"
+    await ensureTTSInit("audio", "pretest")
 
     // 构造播报查询
     const welcomeQuery = buildTTSQuery(welcomeText)
@@ -5007,8 +5058,10 @@ async function checkLoginAndInit() {
         // 填充到 state.basicInfoDraft
         if (basicInfo.sex) state.basicInfoDraft.sex = basicInfo.sex
         if (basicInfo.age) state.basicInfoDraft.age = String(basicInfo.age)
-        if (basicInfo.education) state.basicInfoDraft.education = basicInfo.education
-        if (basicInfo.occupation) state.basicInfoDraft.occupation = basicInfo.occupation
+        if (basicInfo.education)
+          state.basicInfoDraft.education = basicInfo.education
+        if (basicInfo.occupation)
+          state.basicInfoDraft.occupation = basicInfo.occupation
         if (basicInfo.mood) state.basicInfoDraft.mood = basicInfo.mood
         // 应用到表单
         applyBasicInfoDraftToInputs()

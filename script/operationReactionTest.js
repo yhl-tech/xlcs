@@ -58,6 +58,7 @@ let testState = {
   blinkingIntervals: new Map(), // 存储闪烁动画定时器
   drawingDetected: false, // 用于检测画笔操作
   originalButtonStates: new Map(), // 保存按钮原始状态
+  ttsPlayCount: 0, // 记录 TTS 播报次数
 }
 
 // 预览窗口轨迹引导控制器（懒初始化）
@@ -129,6 +130,7 @@ export async function startOperationReactionTest(onComplete = null) {
   testState.currentStepIndex = -1
   testState.completionCallback = onComplete
   testState.drawingDetected = false
+  testState.ttsPlayCount = 0
 
   try {
     // 第一步：播报介绍文本
@@ -443,6 +445,68 @@ function switchToColor(colorName) {
 }
 
 /**
+ * 确保 dialogClient 连接正常（仅在必要时重连）
+ * @returns {Promise<boolean>} 连接是否成功
+ */
+async function ensureDialogClientConnected() {
+  if (!window.dialogClient) {
+    console.warn("[操作反应测试] dialogClient 不存在")
+    return false
+  }
+
+  // 检查连接状态
+  const isConnected = window.dialogClient.isConnected
+  const wsReady = window.dialogClient.ws?.readyState === WebSocket.OPEN
+
+  // 如果已连接且 WebSocket 状态正常，直接返回
+  if (isConnected && wsReady) {
+    console.log("[操作反应测试] 连接已就绪，复用现有连接")
+    return true
+  }
+
+  // 需要重连
+  try {
+    // 如果已连接但 WebSocket 状态异常，先断开
+    if (isConnected) {
+      console.log("[操作反应测试] 检测到连接状态异常，断开重连...")
+      try {
+        window.dialogClient.disconnect()
+        // 等待连接完全关闭（减少等待时间）
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      } catch (e) {
+        console.warn("[操作反应测试] 断开连接时出错:", e)
+      }
+    }
+
+    // 重新连接
+    console.log("[操作反应测试] 连接 dialogClient...")
+    await window.dialogClient.connect()
+    console.log("[操作反应测试] dialogClient 连接成功")
+
+    // 发送初始化消息
+    if (
+      window.dialogClient.ws &&
+      window.dialogClient.ws.readyState === WebSocket.OPEN
+    ) {
+      const initMsg = JSON.stringify({
+        type: "init",
+        speaker: "zh_female_vv_jupiter_bigtts",
+        mode: "audio",
+      })
+      window.dialogClient.ws.send(initMsg)
+      console.log("[操作反应测试] TTS 初始化消息已发送")
+      // 减少初始化等待时间
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+
+    return true
+  } catch (error) {
+    console.error("[操作反应测试] TTS 连接/初始化失败:", error)
+    return false
+  }
+}
+
+/**
  * 播放TTS语音
  * @param {string} text - 要播报的文本
  */
@@ -457,45 +521,45 @@ async function playTTS(text) {
         console.log("[操作反应测试] 使用 playAudio 播报")
         console.log("[操作反应测试] 完整文本:", text)
 
-        // 播报前先断开再连接，确保连接状态干净
-        if (window.dialogClient) {
-          console.log("[操作反应测试] 播报前断开现有连接...")
-          try {
-            // 如果已连接，先断开
-            if (window.dialogClient.isConnected) {
-              window.dialogClient.disconnect()
-              console.log("[操作反应测试] 已断开连接")
-              // 等待连接完全关闭
-              await new Promise((resolve) => setTimeout(resolve, 200))
-            }
-
-            // 重新连接
-            console.log("[操作反应测试] 重新连接 dialogClient...")
-            await window.dialogClient.connect()
-            console.log("[操作反应测试] dialogClient 连接成功")
-
-            // 发送初始化消息
-            if (
-              window.dialogClient.ws &&
-              window.dialogClient.ws.readyState === WebSocket.OPEN
-            ) {
-              const initMsg = JSON.stringify({
-                type: "init",
-                speaker: "zh_female_vv_jupiter_bigtts",
-                mode: "audio",
+        // 确保音频上下文已创建并激活（在发送文本前）
+        try {
+          if (window.dialogClient) {
+            // 确保音频上下文已创建
+            if (!window.dialogClient.audioContext) {
+              console.log("[操作反应测试] 创建音频上下文")
+              const sampleRate =
+                window.dialogClient.config?.outputAudio?.sampleRate || 24000
+              window.dialogClient.audioContext = new (window.AudioContext ||
+                window.webkitAudioContext)({
+                sampleRate: sampleRate,
               })
-              window.dialogClient.ws.send(initMsg)
-              console.log("[操作反应测试] TTS 初始化消息已发送")
-              // 等待初始化完成
-              await new Promise((resolve) => setTimeout(resolve, 100))
             }
-          } catch (error) {
-            console.error("[操作反应测试] TTS 连接/初始化失败:", error)
+
+            // 确保音频上下文已激活
+            if (window.dialogClient.audioContext) {
+              if (window.dialogClient.audioContext.state === "suspended") {
+                console.log("[操作反应测试] 激活音频上下文")
+                await window.dialogClient.audioContext.resume()
+              }
+              console.log(
+                "[操作反应测试] 音频上下文状态:",
+                window.dialogClient.audioContext.state
+              )
+            }
+
+            // 记录连接状态
+            console.log("[操作反应测试] 连接状态:", {
+              isConnected: window.dialogClient.isConnected,
+              wsReady: window.dialogClient.ws?.readyState === WebSocket.OPEN,
+              wsState: window.dialogClient.ws?.readyState,
+            })
           }
+        } catch (error) {
+          console.warn("[操作反应测试] 音频上下文检查失败:", error)
         }
 
-        // 估算播放时间（每字约 300ms，但至少 2 秒）
-        const estimatedDuration = Math.max(2000, text.length * 220)
+        // 估算播放时间（每字约 300ms，但至少 2.5 秒，增加缓冲时间）
+        const estimatedDuration = Math.max(2500, text.length * 300)
         console.log(`[操作反应测试] 预计播放时间: ${estimatedDuration}ms`)
 
         let resolved = false
@@ -507,71 +571,188 @@ async function playTTS(text) {
           }
         }
 
-        // 调用 playAudio，传入回调
+        // 等待前一个播报完全完成（包括音频队列清空）
+        if (window.dialogClient) {
+          const maxWaitTime = 3000 // 最多等待 3 秒
+          const startWaitTime = Date.now()
+          while (
+            (window.dialogClient.isPlaying ||
+              (window.dialogClient.audioQueue &&
+                window.dialogClient.audioQueue.length > 0)) &&
+            Date.now() - startWaitTime < maxWaitTime
+          ) {
+            console.log("[操作反应测试] 等待前一个播报完成...", {
+              isPlaying: window.dialogClient.isPlaying,
+              queueLength: window.dialogClient.audioQueue?.length || 0,
+            })
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+          if (Date.now() - startWaitTime >= maxWaitTime) {
+            console.warn("[操作反应测试] 等待前一个播报超时，继续发送新请求")
+          } else {
+            console.log("[操作反应测试] 前一个播报已完成")
+          }
+
+          // 如果不是第一次播报，强制重新初始化 TTS 连接（解决服务端状态异常问题）
+          // 已注释：服务端已修复接收循环自动恢复问题，不再需要客户端强制重连
+          if (testState.ttsPlayCount > 0) {
+            console.log(
+              "[操作反应测试] 重新初始化 TTS 连接以确保服务端状态正常"
+            )
+            try {
+              // 断开现有连接
+              if (window.dialogClient.isConnected) {
+                window.dialogClient.disconnect()
+                await new Promise((resolve) => setTimeout(resolve, 200))
+              }
+              // 重新连接
+              await window.dialogClient.connect()
+              // 重新发送初始化消息
+              if (
+                window.dialogClient.ws &&
+                window.dialogClient.ws.readyState === WebSocket.OPEN
+              ) {
+                const initMsg = JSON.stringify({
+                  type: "init",
+                  speaker: "zh_female_vv_jupiter_bigtts",
+                  mode: "audio",
+                })
+                window.dialogClient.ws.send(initMsg)
+                console.log("[操作反应测试] TTS 重新初始化消息已发送")
+                await new Promise((resolve) => setTimeout(resolve, 100))
+              }
+            } catch (error) {
+              console.error("[操作反应测试] TTS 重新初始化失败:", error)
+            }
+          } else {
+            // 第一次播报，只等待一小段时间
+            await new Promise((resolve) => setTimeout(resolve, 200))
+          }
+
+          // 等待一小段时间，确保前一个播报完成
+          await new Promise((resolve) => setTimeout(resolve, 200))
+
+          // 增加播报计数
+          testState.ttsPlayCount++
+        }
+
+        // 记录开始时间和初始状态
+        const startTime = Date.now()
+        const initialQueueLength = window.dialogClient?.audioQueue?.length || 0
+        console.log("[操作反应测试] 初始音频队列长度:", initialQueueLength)
+
+        // 调用 playAudio（不依赖其回调，因为回调可能不准确）
         try {
           await window.playAudio(
             text,
-            () => {
-              console.log("[操作反应测试] playAudio 回调触发")
-              doResolve()
-            },
+            null, // 不使用回调，改为监听实际播放状态
             {
               onError: (error) => {
                 console.error("[操作反应测试] playAudio 失败:", error)
-                doResolve()
+                // 即使失败也等待最小时间
+                setTimeout(() => doResolve(), 1000)
               },
             }
           )
           console.log("[操作反应测试] playAudio 调用完成")
+
+          // 监听实际播放状态
+          let playbackStarted = false
+          let audioDataReceived = false
+          const checkPlaybackStatus = () => {
+            const elapsed = Date.now() - startTime
+            const dialogClient = window.dialogClient
+
+            // 检查是否收到音频数据
+            if (!audioDataReceived && dialogClient) {
+              const currentQueueLength = dialogClient.audioQueue?.length || 0
+              if (currentQueueLength > initialQueueLength) {
+                audioDataReceived = true
+                console.log(
+                  "[操作反应测试] 检测到音频数据已接收，队列长度:",
+                  currentQueueLength
+                )
+              }
+            }
+
+            // 检查音频是否已开始播放
+            if (!playbackStarted && dialogClient && dialogClient.isPlaying) {
+              playbackStarted = true
+              console.log("[操作反应测试] 检测到音频开始播放")
+            }
+
+            // 如果发送后 1 秒内没有收到音频数据，可能是连接问题
+            if (elapsed > 1000 && !audioDataReceived && !playbackStarted) {
+              console.warn(
+                "[操作反应测试] 警告：发送文本后 1 秒内未收到音频数据"
+              )
+              console.warn("[操作反应测试] 连接状态:", {
+                isConnected: dialogClient?.isConnected,
+                wsReady: dialogClient?.ws?.readyState === WebSocket.OPEN,
+                audioContextState: dialogClient?.audioContext?.state,
+                queueLength: dialogClient?.audioQueue?.length || 0,
+              })
+            }
+
+            // 如果已经过了估算时间，直接完成（防止无限等待）
+            if (elapsed >= estimatedDuration) {
+              console.log(
+                `[操作反应测试] 达到估算时间（${elapsed}ms），完成播报`
+              )
+              if (!audioDataReceived && !playbackStarted) {
+                console.warn(
+                  "[操作反应测试] 警告：整个播报过程中未检测到音频数据或播放"
+                )
+              }
+              doResolve()
+              return
+            }
+
+            // 如果音频已开始播放，检查是否播放完成
+            if (playbackStarted) {
+              const isStillPlaying = dialogClient?.isPlaying || false
+              const hasQueueData = dialogClient?.audioQueue?.length > 0 || false
+
+              if (!isStillPlaying && !hasQueueData) {
+                // 播放已完成，但再等待一小段时间确保音频完全结束
+                const waitAfterFinish = 300
+                console.log(
+                  `[操作反应测试] 播放已完成，等待 ${waitAfterFinish}ms 后完成（总等待 ${elapsed}ms）`
+                )
+                setTimeout(() => doResolve(), waitAfterFinish)
+                return
+              }
+            }
+
+            // 继续检查
+            setTimeout(checkPlaybackStatus, 200)
+          }
+
+          // 延迟开始检查，给音频一些时间开始播放
+          setTimeout(() => {
+            checkPlaybackStatus()
+          }, 500)
+
+          // 设置最大超时（防止无限等待）
+          setTimeout(() => {
+            console.log("[操作反应测试] 达到最大等待时间，强制完成")
+            doResolve()
+          }, estimatedDuration + 2000) // 额外增加 2 秒缓冲
         } catch (error) {
           console.error("[操作反应测试] playAudio 调用异常:", error)
-          doResolve()
+          // 即使出错也等待最小时间
+          setTimeout(() => doResolve(), 1000)
         }
-
-        // 设置超时作为备用（防止回调未触发）
-        setTimeout(() => {
-          console.log("[操作反应测试] 播报超时，强制完成")
-          doResolve()
-        }, estimatedDuration) // 额外增加 2 秒缓冲
       } else if (
         window.dialogClient &&
         typeof window.sendTextQuery === "function" &&
         typeof window.buildTTSQuery === "function"
       ) {
         console.log("[操作反应测试] 使用 sendTextQuery 播报")
-        // 播报前先断开再连接，确保连接状态干净
-        try {
-          console.log("[操作反应测试] 播报前断开现有连接...")
-          // 如果已连接，先断开
-          if (window.dialogClient.isConnected) {
-            window.dialogClient.disconnect()
-            console.log("[操作反应测试] 已断开连接")
-            // 等待连接完全关闭
-            await new Promise((resolve) => setTimeout(resolve, 200))
-          }
-
-          // 重新连接
-          console.log("[操作反应测试] 重新连接 dialogClient...")
-          await window.dialogClient.connect()
-          console.log("[操作反应测试] dialogClient 连接成功")
-
-          // 发送初始化消息
-          if (
-            window.dialogClient.ws &&
-            window.dialogClient.ws.readyState === WebSocket.OPEN
-          ) {
-            const initMsg = JSON.stringify({
-              type: "init",
-              speaker: "zh_female_vv_jupiter_bigtts",
-              mode: "audio",
-            })
-            window.dialogClient.ws.send(initMsg)
-            console.log("[操作反应测试] TTS 初始化消息已发送")
-            // 等待初始化完成
-            await new Promise((resolve) => setTimeout(resolve, 100))
-          }
-        } catch (error) {
-          console.error("[操作反应测试] dialogClient 连接失败:", error)
+        // 确保连接正常（仅在必要时重连）
+        const connected = await ensureDialogClientConnected()
+        if (!connected) {
+          console.error("[操作反应测试] dialogClient 连接失败")
           resolve()
           return
         }
@@ -696,6 +877,7 @@ function cleanup() {
   testState.currentStepIndex = -1
   testState.drawingDetected = false
   testState.completionCallback = null
+  testState.ttsPlayCount = 0
 
   console.log("[操作反应测试] 资源已清理")
 }

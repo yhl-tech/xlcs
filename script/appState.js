@@ -11,8 +11,8 @@ export const CANVAS_BASE_TRANSFORM = "translate(-50%, -50%)"
 export const SESSION_VERSION = 1
 export const SESSION_SAVE_DEBOUNCE = 600
 
-export const INACTIVITY_THRESHOLD_1 = 10000
-export const INACTIVITY_THRESHOLD_2 = 20000
+export const INACTIVITY_THRESHOLD_1 = 60000
+export const INACTIVITY_THRESHOLD_2 = 120000
 export const NEXT_BUTTON_COOLDOWN = 1 //冷却时间
 
 // 测试过程中的提示语配置
@@ -254,6 +254,8 @@ export const TTS = {
   speaker: "zh_female_vv_jupiter_bigtts",
   inited: false,
   currentMode: null,
+  // 当前对话阶段：pretest（测试前）、intest（测试中）、posttest（测试后）
+  currentPhase: null,
 }
 
 // TTS播报提示词模板（用于确保AI只朗读指定内容，不添加额外解释）

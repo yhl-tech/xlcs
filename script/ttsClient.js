@@ -469,7 +469,85 @@ import { getWebSocketUrl } from "./config.js"
       }
     }
 
-    async sendTextQuery(text) {
+    /**
+     * 发送初始化消息
+     * @param {string} speaker - 说话人
+     * @param {string} mode - 模式 (audio/text)
+     * @param {string|null} phase - 阶段 (pretest/intest/posttest)
+     */
+    sendInitMessage(speaker, mode, phase = null) {
+      if (
+        !this.isConnected ||
+        !this.ws ||
+        this.ws.readyState !== WebSocket.OPEN
+      ) {
+        throw new Error("WebSocket未连接，无法发送初始化消息")
+      }
+
+      const payload = {
+        type: "init",
+        speaker: speaker,
+        mode: mode,
+      }
+      if (phase) {
+        payload.phase = phase
+      }
+
+      const message = JSON.stringify(payload)
+      try {
+        console.log("[Dialog] 发送初始化消息:", payload)
+      } catch (e) {
+        console.log("[Dialog] 发送初始化消息（原始）:", message)
+      }
+      this.ws.send(message)
+    }
+
+    /**
+     * 发送 TTS 文本消息
+     * @param {string} content - 文本内容
+     * @param {Object} options - 选项
+     * @param {boolean} options.start - 是否开始
+     * @param {boolean} options.end - 是否结束
+     * @param {boolean} options.is_user_querying - 是否用户查询
+     * @param {string|null} options.phase - 阶段 (pretest/intest/posttest)
+     */
+    sendTTSText(content, options = {}) {
+      const {
+        start = true,
+        end = true,
+        is_user_querying = false,
+        phase = null,
+      } = options
+
+      if (
+        !this.isConnected ||
+        !this.ws ||
+        this.ws.readyState !== WebSocket.OPEN
+      ) {
+        throw new Error("WebSocket未连接，无法发送TTS文本")
+      }
+
+      const payload = {
+        type: "tts_text",
+        start: Boolean(start),
+        end: Boolean(end),
+        is_user_querying: Boolean(is_user_querying),
+        content: String(content || ""),
+      }
+      if (phase) {
+        payload.phase = phase
+      }
+
+      const message = JSON.stringify(payload)
+      try {
+        console.log("[Dialog] 发送TTS文本消息:", payload)
+      } catch (e) {
+        console.log("[Dialog] 发送TTS文本消息（原始）:", message)
+      }
+      this.ws.send(message)
+    }
+
+    async sendTextQuery(text, phase = null) {
       // 修复：添加连接状态检查和自动重连机制
       if (
         !this.isConnected ||
@@ -484,13 +562,21 @@ import { getWebSocketUrl } from "./config.js"
         }
       }
 
-      const message = JSON.stringify({
+      const payload = {
         type: "text_query",
-        content: text,
-      })
+        content: String(text || ""),
+      }
+      if (phase) {
+        payload.phase = phase
+      }
 
+      const message = JSON.stringify(payload)
+      try {
+        console.log("[Dialog] 发送文本查询:", payload)
+      } catch (e) {
+        console.log("[Dialog] 发送文本查询（原始）:", message)
+      }
       this.ws.send(message)
-      console.log("[Dialog] 发送文本查询:", text)
     }
 
     disconnect() {
