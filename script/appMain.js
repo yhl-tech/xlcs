@@ -4978,6 +4978,28 @@ async function checkLoginAndInit() {
     setSkipReportRedirectFlag(false)
   }
 
+  // 获取用户基本信息并填充表单
+  try {
+    const userInfo = window.auth.getUserInfo()
+    if (userInfo?.username) {
+      const response = await window.API.getBasicInfo(userInfo.username)
+      if (response?.code === 0 && response?.data) {
+        const basicInfo = response.data
+        // 填充到 state.basicInfoDraft
+        if (basicInfo.sex) state.basicInfoDraft.sex = basicInfo.sex
+        if (basicInfo.age) state.basicInfoDraft.age = String(basicInfo.age)
+        if (basicInfo.education) state.basicInfoDraft.education = basicInfo.education
+        if (basicInfo.occupation) state.basicInfoDraft.occupation = basicInfo.occupation
+        if (basicInfo.mood) state.basicInfoDraft.mood = basicInfo.mood
+        // 应用到表单
+        applyBasicInfoDraftToInputs()
+        console.log("[AppMain] 已填充用户基本信息:", basicInfo)
+      }
+    }
+  } catch (error) {
+    console.warn("[AppMain] 获取用户基本信息失败:", error)
+  }
+
   // 已登录：先显示全屏加载状态，再根据下载报告接口结果决定是否跳转报告页
   showReportCheckLoading()
   try {

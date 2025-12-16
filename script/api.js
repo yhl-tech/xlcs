@@ -39,60 +39,30 @@
       Accept: "application/json",
       "User-Id": getUserInfoFromStorage(),
     },
-    analyzeApiKey: "",
   }
 
-  const TENANT_TOKEN_STORAGE_KEY = "tenantAccessToken"
-  const DEFAULT_TENANT_CREDENTIALS = {
-    username: "dongrixinyu",
-    password: "12345678",
-  }
-
-  function getStoredTenantToken() {
-    if (typeof localStorage === "undefined") {
-      return ""
-    }
+  /**
+   * 保存文件到本地（下载）
+   * @param {Blob|File} fileData - 文件数据
+   * @param {string} fileName - 文件名
+   */
+  function saveFileToLocal(fileData, fileName) {
     try {
-      return localStorage.getItem(TENANT_TOKEN_STORAGE_KEY) || ""
+      const blob = fileData instanceof Blob ? fileData : new Blob([fileData])
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      console.log("[API] 文件已保存到本地:", fileName)
     } catch (error) {
-      console.warn("[API] 读取租户 token 失败:", error)
-      return ""
+      console.warn("[API] 保存文件到本地失败:", fileName, error)
     }
   }
 
-  function storeTenantToken(token) {
-    if (typeof localStorage === "undefined") {
-      return
-    }
-    try {
-      if (token) {
-        localStorage.setItem(TENANT_TOKEN_STORAGE_KEY, token)
-      } else {
-        localStorage.removeItem(TENANT_TOKEN_STORAGE_KEY)
-      }
-    } catch (error) {
-      console.warn("[API] 保存租户 token 失败:", error)
-    }
-  }
-
-  function applyAnalyzeApiKey(token) {
-    if (!token) {
-      return
-    }
-    API_CONFIG.analyzeApiKey = token
-    const client = (typeof window !== "undefined" && window.apiClient) || null
-    if (client?.axiosInstance) {
-      client.axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`
-    }
-  }
-
-  function setTenantToken(token) {
-    if (!token) {
-      return
-    }
-    applyAnalyzeApiKey(token)
-    storeTenantToken(token)
-  }
 
   /**
    * API 客户端类
@@ -143,15 +113,17 @@
 
           const requestUrl = config.url || ""
           const isUserLoginRequest = requestUrl.includes("/user_login")
-          const isTenantLoginRequest = requestUrl.includes("/admin_login")
           const hasCustomAuthorization = !!config.headers.Authorization
 
           // 登录相关请求不自动附加 Authorization
-          if (isUserLoginRequest || isTenantLoginRequest) {
+          if (isUserLoginRequest) {
             delete config.headers.Authorization
           } else if (!hasCustomAuthorization) {
-            // 默认使用 analyzeApiKey
-            config.headers.Authorization = `Bearer ${API_CONFIG.analyzeApiKey}`
+            // 使用用户登录的 token
+            const userToken = localStorage.getItem("token") || ""
+            if (userToken) {
+              config.headers.Authorization = `Bearer ${userToken}`
+            }
           }
 
           // 处理 USER_ID：如果接口header传参中有USER_ID，则使用接口header传参中的USER_ID
@@ -485,50 +457,10 @@
   if (typeof window !== "undefined") {
     window.apiClient = apiClient
   }
-  const cachedTenantToken = getStoredTenantToken()
-  if (cachedTenantToken) {
-    applyAnalyzeApiKey(cachedTenantToken)
-  }
-
   /**
    * 业务接口方法
    */
   const API = {
-    /**
-     * 租户登录（管理员登录），用于刷新 analyzeApiKey
-     * @param {Object} credentials - 自定义租户凭证
-     * @returns {Promise<{success: boolean, message?: string, data?: Object, error?: Error}>}
-     */
-    async tenantLogin(credentials = DEFAULT_TENANT_CREDENTIALS) {
-      const payload = {
-        username: credentials?.username || DEFAULT_TENANT_CREDENTIALS.username,
-        password: credentials?.password || DEFAULT_TENANT_CREDENTIALS.password,
-      }
-
-      try {
-        const response = await apiClient.post("/rorschach/admin_login", payload)
-        if (response.code === 0 && response.data?.access_token) {
-          setTenantToken(response.data.access_token)
-          return {
-            success: true,
-            data: response,
-          }
-        }
-        return {
-          success: false,
-          message: response.msg || "租户登录失败",
-          data: response,
-        }
-      } catch (error) {
-        console.error("[API] 租户登录失败:", error)
-        return {
-          success: false,
-          message: error.message || "租户登录请求失败",
-          error,
-        }
-      }
-    },
-
     /**
      * 提交完整的测试数据（包括交互数据、音频、时间戳等）
      * @param {Object} testData - 完整的测试数据
@@ -551,7 +483,7 @@
       }
 
       return apiClient.axiosInstance.post(
-        "/rorschach/analyze/get_basic_info",
+        "/rorschach/user/get_basic_info",
         requestData
       )
     },
@@ -612,6 +544,9 @@
       // 添加文件到 FormData
       formData.append("file", file, "rotate.json")
 
+      // 保存文件到本地
+      // saveFileToLocal(blob, `rotate_${userId}_${Date.now()}.json`)
+
       // 验证 FormData
       console.log("[API] FormData验证:", {
         hasFile: formData.has("file"),
@@ -621,7 +556,7 @@
         fileSize: file.size,
       })
 
-      return apiClient.post("/rorschach/analyze/upload_rotate", formData)
+      return apiClient.post("/rorschach/user/upload_rotate", formData)
     },
 
     /**
@@ -660,6 +595,9 @@
       // 添加文件到 FormData
       formData.append("file", file, "scale.json")
 
+      // 保存文件到本地
+      // saveFileToLocal(blob, `scale_${userId}_${Date.now()}.json`)
+
       // 验证 FormData
       console.log("[API] Zoom FormData验证:", {
         hasFile: formData.has("file"),
@@ -669,7 +607,7 @@
         fileSize: file.size,
       })
 
-      return apiClient.post("/rorschach/analyze/upload_scale", formData)
+      return apiClient.post("/rorschach/user/upload_scale", formData)
     },
 
     /**
@@ -809,6 +747,9 @@
       // 添加文件到 FormData
       formData.append("file", file, "mouse_track.json")
 
+      // 保存文件到本地
+      // saveFileToLocal(blob, `mouse_track_${userId}_${Date.now()}.json`)
+
       // 添加 user_id 到 FormData（对应 Python 的 data 参数）
       formData.append("user_id", userId)
 
@@ -822,7 +763,7 @@
       })
 
       // 修正 URL 拼写image.png错误，并在 headers 中设置 User-Id
-      return apiClient.post("/rorschach/analyze/upload_mouse_track", formData, {
+      return apiClient.post("/rorschach/user/upload_mouse_track", formData, {
         headers: {
           "User-Id": userId,
         },
@@ -867,6 +808,9 @@
       // 添加文件到 FormData
       formData.append("file", file, "video_clip.json")
 
+      // 保存文件到本地
+      // saveFileToLocal(blob, `video_clip_${userId}_${Date.now()}.json`)
+
       // 验证 FormData
       console.log("[API] SegTime FormData验证:", {
         hasFile: formData.has("file"),
@@ -875,7 +819,7 @@
         userIdValue: formData.get("user_id"),
       })
 
-      return apiClient.post("/rorschach/analyze/upload_seg_time", formData)
+      return apiClient.post("/rorschach/user/upload_seg_time", formData)
     },
 
     /**
@@ -885,6 +829,8 @@
      * @returns {Promise} 请求Promise
      */
     async uploadMedia(file, userId = null) {
+      console.log("[API] uploadMedia 参数:", { fileType: file?.type, fileName: file?.name, userId })
+
       // 确保文件有正确的文件名和类型
       let fileToUpload = file
 
@@ -909,8 +855,9 @@
           extension = ".mp3"
         }
 
-        // 创建 File 对象
-        const fileName = file.name || `audio${extension}`
+        // 创建 File 对象，使用 userId 命名
+        const fileName = userId ? `${userId}${extension}` : `audio${extension}`
+        console.log("[API] uploadMedia 创建文件名:", { userId, extension, fileName })
         fileToUpload = new File([file], fileName, {
           type: file.type || "audio/mpeg",
         })
@@ -956,7 +903,11 @@
       const formData = new FormData()
       formData.append("file", fileToUpload)
 
-      return apiClient.post("/rorschach/analyze/upload_media", formData)
+      // 保存文件到本地
+      const mediaFileName = `media_${userId || "unknown"}_${Date.now()}_${fileToUpload.name}`
+      // saveFileToLocal(fileToUpload, mediaFileName)
+
+      return apiClient.post("/rorschach/user/upload_media", formData)
     },
 
     /**
@@ -1280,7 +1231,7 @@
         }
 
         const response = await apiClient.post(
-          "/rorschach/analyze/set_basic_info",
+          "/rorschach/user/set_basic_info",
           requestData
         )
         return response
@@ -1292,79 +1243,24 @@
 
     /**
      * 验证用户 token 是否有效
-     * 通过调用需要认证的接口验证 token
      * @returns {Promise<{valid: boolean, cleared: boolean}>} valid表示token是否有效，cleared表示是否清除了存储
      */
     async validateToken() {
-      let tenantToken = ""
+      let token = ""
       try {
         if (typeof localStorage !== "undefined") {
-          tenantToken = localStorage.getItem("tenantAccessToken") || ""
+          token = localStorage.getItem("token") || ""
         }
       } catch (error) {
-        console.warn("[API] 读取租户 token 失败:", error)
+        console.warn("[API] 读取 token 失败:", error)
         return { valid: false, cleared: false }
       }
 
-      if (!tenantToken) {
+      if (!token) {
         return { valid: false, cleared: false }
       }
 
-      let userId = ""
-      try {
-        if (typeof localStorage !== "undefined") {
-          const userInfoStr = localStorage.getItem("userInfo")
-          if (userInfoStr) {
-            const userInfo = JSON.parse(userInfoStr)
-            userId = userInfo?.username || userInfo?.phone || ""
-          }
-        }
-      } catch (error) {
-        console.warn("[API] 读取用户信息失败:", error)
-        return { valid: false, cleared: false }
-      }
-
-      if (!userId) {
-        return { valid: false, cleared: false }
-      }
-
-      try {
-        const response = await apiClient.post(
-          "/rorschach/analyze/get_basic_info",
-          {
-            user_id: userId,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${tenantToken}`,
-            },
-          }
-        )
-
-        return { valid: true, cleared: false }
-      } catch (error) {
-        console.log("error", error)
-
-        if (error.status === 401 || error.response?.status === 401) {
-          console.warn("[API] 租户 Token 已过期或无效（401），清除本地存储")
-          try {
-            if (typeof localStorage !== "undefined") {
-              localStorage.removeItem("token")
-              localStorage.removeItem("userInfo")
-              localStorage.removeItem("tenantAccessToken")
-            }
-          } catch (clearError) {
-            console.warn("[API] 清除本地存储失败:", clearError)
-          }
-          return { valid: false, cleared: true }
-        }
-
-        console.warn(
-          "[API] Token 验证失败，但可能是网络或业务问题，不清除 token:",
-          error
-        )
-        return { valid: false, cleared: false }
-      }
+      return { valid: true, cleared: false }
     },
   }
 

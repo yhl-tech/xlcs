@@ -113,27 +113,6 @@
           this.setToken(response.data.access_token)
           this.setUserInfo({ phone: phone, username: phone })
 
-          // 用户登录成功后，执行租户登录以刷新 analyzeApiKey
-          if (window.API && typeof window.API.tenantLogin === "function") {
-            const tenantResult = await window.API.tenantLogin()
-            if (!tenantResult?.success) {
-              const tenantMessage =
-                tenantResult?.message || "租户登录失败，请稍后重试"
-              this.clearToken()
-              if (
-                window.apiClient &&
-                typeof window.apiClient.clearAuthToken === "function"
-              ) {
-                window.apiClient.clearAuthToken()
-              }
-              return {
-                success: false,
-                message: tenantMessage,
-                data: response,
-              }
-            }
-          }
-
           return {
             success: true,
             data: response,
@@ -220,27 +199,6 @@
           // 登录成功，保存 token 和用户信息
           this.setToken(response.data.access_token)
           this.setUserInfo({ username: username })
-
-          // 用户登录成功后，执行租户登录以刷新 analyzeApiKey
-          if (window.API && typeof window.API.tenantLogin === "function") {
-            const tenantResult = await window.API.tenantLogin()
-            if (!tenantResult?.success) {
-              const tenantMessage =
-                tenantResult?.message || "租户登录失败，请稍后重试"
-              this.clearToken()
-              if (
-                window.apiClient &&
-                typeof window.apiClient.clearAuthToken === "function"
-              ) {
-                window.apiClient.clearAuthToken()
-              }
-              return {
-                success: false,
-                message: tenantMessage,
-                data: response,
-              }
-            }
-          }
 
           return {
             success: true,
@@ -343,19 +301,9 @@
     }
 
     /**
-     * 清除所有本地存储（包括token、userInfo、tenant_token、session等）
+     * 清除所有本地存储（包括token、userInfo等）
      */
     clearAllStorage() {
-      // 清除租户token
-      try {
-        if (typeof localStorage !== "undefined") {
-          localStorage.removeItem("tenantAccessToken")
-        }
-      } catch (error) {
-        console.warn("[Auth] 清除租户token失败:", error)
-      }
-
-      // 最后清除认证相关的存储（token和userInfo）
       this.clearToken()
     }
 

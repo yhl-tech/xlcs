@@ -1014,26 +1014,6 @@
                 window.auth.setToken(response.data.access_token)
                 window.auth.setUserInfo({ username: username })
 
-                // 注册成功后，执行租户登录以刷新 analyzeApiKey
-                try {
-                  if (
-                    window.API &&
-                    typeof window.API.tenantLogin === "function"
-                  ) {
-                    const tenantResult = await window.API.tenantLogin()
-                    if (!tenantResult?.success) {
-                      console.warn(
-                        "[注册] 租户登录失败:",
-                        tenantResult?.message
-                      )
-                      // 租户登录失败不影响注册成功，但会记录警告
-                    }
-                  }
-                } catch (error) {
-                  console.warn("[注册] 租户登录异常:", error)
-                  // 租户登录异常不影响注册成功，但会记录警告
-                }
-
                 // 延迟1秒后跳转到主页
                 setTimeout(() => {
                   window.location.href = "./index.html"
