@@ -735,7 +735,7 @@
       const blob = new Blob([jsonString], { type: "application/json" })
       console.log("[API] DrawingTracks Blob大小:", blob.size, "bytes")
 
-      const file = new File([blob], "mouse_track.json", {
+      const file = new File([blob], "trajectory.json", {
         type: "application/json",
       })
       console.log("[API] DrawingTracks File对象:", {
@@ -745,10 +745,10 @@
       })
 
       // 添加文件到 FormData
-      formData.append("file", file, "mouse_track.json")
+      formData.append("file", file, "trajectory.json")
 
       // 保存文件到本地
-      // saveFileToLocal(blob, `mouse_track_${userId}_${Date.now()}.json`)
+      saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
 
       // 添加 user_id 到 FormData（对应 Python 的 data 参数）
       formData.append("user_id", userId)
@@ -763,7 +763,7 @@
       })
 
       // 修正 URL 拼写image.png错误，并在 headers 中设置 User-Id
-      return apiClient.post("/rorschach/user/upload_mouse_track", formData, {
+      return apiClient.post("/rorschach/user/upload_trajectory", formData, {
         headers: {
           "User-Id": userId,
         },
@@ -940,7 +940,7 @@
         }
 
         const response = await apiClient.post(
-          "/rorschach/user/get_report",
+          "/rorschach/user/get_report_new",
           { user_id: userId },
           {
             responseType: "blob",
@@ -1097,6 +1097,46 @@
           error.status || 0,
           { originalError: error }
         )
+      }
+    },
+
+    /**
+     * 检查用户是否已提交过测试数据
+     * @param {string} userId - 用户ID
+     * @returns {Promise} 请求Promise
+     */
+    async checkUploadFilesStatus(userId) {
+      if (!userId) {
+        throw new Error("用户ID不能为空")
+      }
+
+      try {
+        const token =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("token")
+            : null
+
+        const headers = {}
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`
+        }
+
+        const response = await apiClient.post(
+          "/rorschach/user/get_upload_files_status",
+          {
+            user_id: userId,
+          },
+          {
+            headers: headers,
+          }
+        )
+        console.log("[API] 检查上传文件状态:", response)
+
+        return response
+      } catch (error) {
+        console.error("[API] 检查上传文件状态失败:", error)
+        throw error
       }
     },
 

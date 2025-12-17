@@ -4986,25 +4986,47 @@ function setupAuthControls() {
 }
 
 async function routeToReportSummaryIfAvailable() {
-  if (!window.API || typeof window.API.checkReportStatus !== "function") {
+  if (!window.API) {
     return false
   }
   const userId = getCurrentUserId()
   if (!userId) {
     return false
   }
+
   try {
-    const response = await window.API.checkReportStatus(userId)
-
-    const statusInfo = buildReportStatusFromResponse(response)
-
-    if (!statusInfo) {
+    // 1. 先检查用户是否已提交过测试数据
+    if (typeof window.API.checkUploadFilesStatus === "function") {
+      const uploadStatus = await window.API.checkUploadFilesStatus(userId)
+    
+      // 如果用户未提交数据（data 不为 true），不跳转
+      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+        return false
+      }
+    } else {
+      // 接口不存在，不跳转
       return false
     }
+
+    // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
+    let statusInfo = null
+    if (typeof window.API.checkReportStatus === "function") {
+      const response = await window.API.checkReportStatus(userId)
+
+      statusInfo = buildReportStatusFromResponse(response)
+    }
+
+    // 3. 如果没有状态信息，使用默认等待状态
+    if (!statusInfo) {
+      statusInfo = {
+        status: "processing",
+        message: "报告生成中，请稍候...",
+        uploaded: true,
+      }
+    }
+
     latestReportStatus = statusInfo
-
     showSummary({ reportStatus: statusInfo })
-
     return true
   } catch (error) {
     console.warn("[Report] 检查报告状态失败:", error)
