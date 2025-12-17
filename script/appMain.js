@@ -4511,7 +4511,9 @@ function startDrawing(e) {
     window.InteractionTracker &&
     window.InteractionTracker._trackDrawingStart
   ) {
-    window.InteractionTracker._trackDrawingStart(lastX, lastY)
+    // 获取颜色名称
+    const colorName = COLOR_REVERSE_MAP[state.color] || "red"
+    window.InteractionTracker._trackDrawingStart(lastX, lastY, colorName)
   }
 
   // 触发能量柱粒子效果（仅画笔模式）
@@ -4983,6 +4985,36 @@ function setupAuthControls() {
   //     }
   //   })
   // }
+
+  // 测试轨迹上传按钮
+  const testTracksBtn = document.getElementById("test-tracks-btn")
+  if (testTracksBtn) {
+    testTracksBtn.addEventListener("click", async () => {
+      console.log("[测试] 点击测试轨迹上传按钮")
+      try {
+        const userId = getCurrentUserId()
+        if (!userId) {
+          alert("请先登录")
+          return
+        }
+
+        const drawingTracks = window.InteractionTracker?.getDrawingTracks?.()
+        console.log("[测试] 获取到的轨迹数据:", drawingTracks)
+
+        if (!drawingTracks || Object.keys(drawingTracks).length === 0) {
+          alert("没有轨迹数据可上传")
+          return
+        }
+
+        const result = await window.API.uploadDrawingTracks(drawingTracks, userId)
+        console.log("[测试] uploadDrawingTracks 结果:", result)
+        alert("轨迹上传成功，请查看控制台")
+      } catch (error) {
+        console.error("[测试] uploadDrawingTracks 错误:", error)
+        alert("轨迹上传失败: " + error.message)
+      }
+    })
+  }
 }
 
 async function routeToReportSummaryIfAvailable() {

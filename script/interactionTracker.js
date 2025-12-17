@@ -20,9 +20,12 @@
       }
 
       // 当前绘制的轨迹状态
-      this.currentTrack = null // 当前轨迹的点数组
+      this.currentTrack = null // 当前轨迹的线段数组
       this.currentTrackStartTime = null // 当前轨迹开始时间
       this.currentTrackPlateKey = null // 当前轨迹所属的图版键（用于确保轨迹记录到正确的图版）
+      this.currentTrackColor = null // 当前轨迹的颜色
+      this.lastDrawingPoint = null // 上一个绘制点 { x, y }
+      this.strokeCountByPlate = {} // 每个图版的笔画计数 { "1": 0, "2": 1, ... }
 
       // 配置选项
       this.config = {
@@ -118,6 +121,21 @@
         return Date.now()
       }
       return null
+    }
+
+    /**
+     * 获取完整时间戳字符串
+     * @returns {string} 格式: "YYYY-MM-DD HH:mm:ss"
+     */
+    _getFullTimestamp() {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, "0")
+      const day = String(now.getDate()).padStart(2, "0")
+      const hours = String(now.getHours()).padStart(2, "0")
+      const minutes = String(now.getMinutes()).padStart(2, "0")
+      const seconds = String(now.getSeconds()).padStart(2, "0")
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     }
 
     /**
@@ -591,8 +609,9 @@
      * 开始追踪画笔轨迹
      * @param {number} x - 起始x坐标
      * @param {number} y - 起始y坐标
+     * @param {string} color - 画笔颜色（如 "red", "green", "blue"）
      */
-    trackDrawingStart(x, y) {
+    trackDrawingStart(x, y, color = "red") {
       if (!this.config.trackDrawing || this.status !== "active") {
         return
       }
@@ -600,13 +619,15 @@
       const plateKey = this._getCurrentPlateKey()
 
       // 初始化当前轨迹，并保存图版键（确保轨迹记录到正确的图版）
-      this.currentTrack = [[x, y]]
+      this.currentTrack = [] // 存储线段数组
       this.currentTrackStartTime = Date.now()
       this.currentTrackPlateKey = plateKey // 保存开始绘制时的图版键
+      this.currentTrackColor = color // 保存颜色
+      this.lastDrawingPoint = { x, y } // 保存起始点
     }
 
     /**
-     * 记录画笔轨迹中的点
+     * 记录画笔轨迹中的点（线段格式）
      * @param {number} x - x坐标
      * @param {number} y - y坐标
      */
@@ -614,13 +635,27 @@
       if (
         !this.config.trackDrawing ||
         this.status !== "active" ||
-        !this.currentTrack
+        !this.currentTrack ||
+        !this.lastDrawingPoint
       ) {
         return
       }
 
-      // 添加点到最后
-      this.currentTrack.push([x, y])
+      // 记录线段：从上一个点到当前点
+      const segment = {
+        coords: [
+          this.lastDrawingPoint.x,
+          this.lastDrawingPoint.y,
+          x,
+          y,
+        ],
+        color: this.currentTrackColor || "red",
+        time: this._getFullTimestamp(),
+      }
+      this.currentTrack.push(segment)
+
+      // 更新上一个点
+      this.lastDrawingPoint = { x, y }
     }
 
     /**
@@ -637,27 +672,32 @@
 
       // 使用保存的图版键，而不是重新获取（确保轨迹记录到开始绘制时的图版）
       const plateKey = this.currentTrackPlateKey || this._getCurrentPlateKey()
-      const timeKey = this._formatTime(this.currentTrackStartTime)
 
       // 如果当前图版的轨迹数据是0，初始化为对象
       if (this.data.drawingTracks[plateKey] === 0) {
         this.data.drawingTracks[plateKey] = {}
       }
 
-      // 如果该时间点不存在，初始化为数组
-      if (!this.data.drawingTracks[plateKey][timeKey]) {
-        this.data.drawingTracks[plateKey][timeKey] = []
+      // 初始化该图版的笔画计数（如果不存在）
+      if (this.strokeCountByPlate[plateKey] === undefined) {
+        this.strokeCountByPlate[plateKey] = 0
       }
 
-      // 将当前轨迹的点合并到该时间点的数组中
-      this.data.drawingTracks[plateKey][timeKey] = this.data.drawingTracks[
-        plateKey
-      ][timeKey].concat(this.currentTrack)
+      // 使用笔画编号作为 key
+      const strokeKey = String(this.strokeCountByPlate[plateKey])
 
-      // 清空当前轨迹
+      // 保存当前轨迹到该笔画编号
+      this.data.drawingTracks[plateKey][strokeKey] = this.currentTrack
+
+      // 递增笔画计数
+      this.strokeCountByPlate[plateKey]++
+
+      // 清空当前轨迹状态
       this.currentTrack = null
       this.currentTrackStartTime = null
       this.currentTrackPlateKey = null
+      this.currentTrackColor = null
+      this.lastDrawingPoint = null
     }
 
     /**
@@ -1399,7 +1439,7 @@
     _trackZoom: (direction) => trackerInstance.trackZoom(direction),
     _trackRotate: (angle) => trackerInstance.trackRotate(angle),
     _trackNavigation: (direction) => trackerInstance.trackNavigation(direction),
-    _trackDrawingStart: (x, y) => trackerInstance.trackDrawingStart(x, y),
+    _trackDrawingStart: (x, y, color) => trackerInstance.trackDrawingStart(x, y, color),
     _trackDrawingPoint: (x, y) => trackerInstance.trackDrawingPoint(x, y),
     _trackDrawingEnd: () => trackerInstance.trackDrawingEnd(),
     _trackClearAll: () => trackerInstance.trackClearAll(),

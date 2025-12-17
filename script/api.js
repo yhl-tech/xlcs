@@ -687,13 +687,30 @@
           continue
         }
 
+        // 过滤掉空数组（如 "2": []）
+        if (Array.isArray(plateData) && plateData.length === 0) {
+          continue
+        }
+
         // 如果 plateData 是对象（包含时间键），规范化时间键和坐标
         if (typeof plateData === "object" && !Array.isArray(plateData)) {
+          // 过滤掉空对象
+          if (Object.keys(plateData).length === 0) {
+            continue
+          }
           const normalizedPlateData = {}
           for (const [timeKey, coordinates] of Object.entries(plateData)) {
+            // 过滤掉空数组的笔画
+            if (Array.isArray(coordinates) && coordinates.length === 0) {
+              continue
+            }
             const normalizedTimeKey = self.normalizeTimeString(timeKey)
             normalizedPlateData[normalizedTimeKey] =
               formatCoordinates(coordinates)
+          }
+          // 如果过滤后为空对象，跳过该图版
+          if (Object.keys(normalizedPlateData).length === 0) {
+            continue
           }
           normalized[plateKey] = normalizedPlateData
         } else {
@@ -748,7 +765,7 @@
       formData.append("file", file, "trajectory.json")
 
       // 保存文件到本地
-      saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
+      // saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
 
       // 添加 user_id 到 FormData（对应 Python 的 data 参数）
       formData.append("user_id", userId)
