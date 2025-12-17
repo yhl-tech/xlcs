@@ -107,7 +107,9 @@
         // 调用 API.phoneLogin 方法
         const response = await window.API.phoneLogin(phone, verificationCode)
 
-        if (response.code === 0 && response.data?.access_token) {
+        console.log("[Auth] 手机号登录响应:", response, "code类型:", typeof response.code)
+
+        if (response.code == 0 && response.data?.access_token) {
           // 登录成功，保存 token 和用户信息
           // 手机号登录时，username 就是 phone
           this.setToken(response.data.access_token)
@@ -195,7 +197,9 @@
           password: password,
         })
 
-        if (response.code === 0 && response.data?.access_token) {
+        console.log("[Auth] 用户名登录响应:", response, "code类型:", typeof response.code)
+
+        if (response.code == 0 && response.data?.access_token) {
           // 登录成功，保存 token 和用户信息
           this.setToken(response.data.access_token)
           this.setUserInfo({ username: username })
@@ -269,34 +273,30 @@
         console.warn("[Auth] 读取 token 失败:", error)
       }
 
-      if (!window.apiClient) {
-        throw new Error("apiClient 未初始化")
-      }
-
-      if (!token) {
-        throw new Error("token 不存在")
-      }
-
-      if (!userInfo?.username) {
-        throw new Error("用户信息不存在")
-      }
-
-      // 调用登出接口，Authorization header 和 body 中的 token 都使用 storage 中的 token
-      await window.apiClient.post(
-        "/rorschach/user_logout",
-        {
-          username: userInfo.username,
-          token: token,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      // 1. 先调用退出接口
+      try {
+        if (window.apiClient && token && userInfo?.username) {
+          await window.apiClient.post(
+            "/rorschach/user_logout",
+            {
+              username: userInfo.username,
+              token: token,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          )
         }
-      )
+      } catch (error) {
+        console.warn("[Auth] 登出接口调用失败:", error)
+      }
 
-      // 接口成功后才清除所有本地存储
+      // 2. 接口返回后，清空存储
       this.clearAllStorage()
+
+      // 3. 返回成功
       return { success: true }
     }
 
@@ -305,6 +305,8 @@
      */
     clearAllStorage() {
       this.clearToken()
+      localStorage.clear()
+      sessionStorage.clear()
     }
 
     /**

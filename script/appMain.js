@@ -4944,6 +4944,9 @@ function setupAuthControls() {
         return
       }
 
+      // 标记正在退出，阻止 beforeunload 保存会话数据
+      window._isLoggingOut = true
+
       try {
         // 显示退出中状态
         logoutBtn.disabled = true
@@ -5098,6 +5101,10 @@ async function checkLoginAndInit() {
 }
 
 window.addEventListener("beforeunload", () => {
+  // 如果正在退出登录，不保存会话数据
+  if (window._isLoggingOut) {
+    return
+  }
   saveSessionSnapshot("beforeunload", { immediate: true })
 })
 
