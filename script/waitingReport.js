@@ -46,15 +46,16 @@ export class WordCloudDataSource {
       return this.getMockData();
     }
 
-    // 直接使用用户的对话文本，不做任何分词和筛选
-    const keywords = userDialogues.map(item => ({
+    // 直接使用用户的对话文本，限制为前6条
+    const limitedDialogues = userDialogues.slice(0, 12);
+    const keywords = limitedDialogues.map(item => ({
       text: item.text,  // 直接使用完整的对话文本
-      weight: 3 + Math.random() * 2,  // 随机权重 3-5
+      weight: 2 + Math.random() * 1.5,  // 随机权重 2-3.5
       category: 'user-dialogue'  // 标记为用户对话
     }));
 
-    // 对话词汇也直接使用用户的对话文本
-    const conversationWords = userDialogues.map(item => item.text);
+    // 对话词汇也直接使用用户的对话文本，限制为前12条
+    const conversationWords = limitedDialogues.map(item => item.text);
 
     // 用户信息（如果需要）
     const userInfo = this.extractUserInfo(history);
@@ -122,7 +123,7 @@ export class WordCloudDataSource {
     // 按频率排序并转换为关键词格式
     const keywords = Object.entries(wordCount)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 30) // 增加到30个高频词（用于词云主动画）
+      .slice(0, 15) // 减少到15个高频词（用于词云主动画）
       .map(([text, count]) => ({
         text,
         weight: Math.min(5, 2 + count * 0.5), // 根据频率计算权重（2-5）
@@ -135,7 +136,7 @@ export class WordCloudDataSource {
   // 提取对话词汇（用于飞词动画）
   extractConversationWords(words) {
     const uniqueWords = [...new Set(words)];
-    return uniqueWords.slice(0, 100); // 增加到100个不重复的词（用于飞词和粒子动画）
+    return uniqueWords.slice(0, 8); // 限制8个不重复的词（用于飞词和粒子动画）
   }
 
   // 猜测词的类别（简单规则，后续可以用 NLP）
@@ -184,22 +185,17 @@ export class WordCloudDataSource {
         },
         // 关键词数据（用于词云主动画）
         keywords: [
-          { text: '压力', weight: 5, category: 'emotion' },
-          { text: '焦虑', weight: 4.5, category: 'emotion' },
-          { text: '失眠', weight: 4, category: 'symptom' },
-          { text: '加班', weight: 3.5, category: 'situation' },
-          { text: '紧张', weight: 3.5, category: 'emotion' },
-          { text: '疲惫', weight: 4, category: 'emotion' },
-          { text: '困扰', weight: 3, category: 'emotion' },
-          { text: '平衡', weight: 3.5, category: 'goal' }
+          { text: '压力', weight: 3.5, category: 'emotion' },
+          { text: '焦虑', weight: 3, category: 'emotion' },
+          { text: '失眠', weight: 3, category: 'symptom' },
+          { text: '加班', weight: 2.5, category: 'situation' },
+          { text: '紧张', weight: 2.5, category: 'emotion' },
+          { text: '疲惫', weight: 3, category: 'emotion' }
         ],
         // 对话关键词（用于文本粒子和飞词动画）
         conversationWords: [
-          '压力', '焦虑', '失眠', '加班', '紧张', '疲惫', '困扰', '平衡',
-          '工作', '人际关系', '沟通', '团队', '项目', 'deadline', '会议',
-          '担心', '想太多', '睡不着', '情绪管理', '压力应对', '认知模式',
-          '情感倾向', '思维方式', '自我认知', '社交模式', '情绪稳定性',
-          '应对策略', '心理韧性'
+          '压力', '焦虑', '失眠', '加班', '紧张', '疲惫',
+          '工作', '人际关系', '沟通', '团队', '项目', 'deadline'
         ]
       }
     };
@@ -276,7 +272,7 @@ export class WordCloudDataSource {
   getTextFragments() {
     const data = this.data?.data || this.getMockData().data;
     const words = data.conversationWords || [];
-    return words.slice(0, 10); // 取前10个关键词
+    return words.slice(0, 6); // 取前6个关键词
   }
 
   // 获取飞词数据
@@ -441,7 +437,7 @@ export class WaitingReportManager {
       }
     }
 
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 100; i++) {
       particles.push(new NebulaParticle());
     }
 
@@ -584,7 +580,7 @@ export class WaitingReportManager {
 
     const particles = [];
     wordCloudData.forEach(wordData => {
-      const count = Math.ceil(wordData.weight / 2);
+      const count = Math.ceil(wordData.weight / 5); // 减少粒子倍数
       for (let i = 0; i < count; i++) {
         particles.push(new WordCloudParticle(wordData));
       }
@@ -672,7 +668,7 @@ export class WaitingReportManager {
     }
 
     const particles = [];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       particles.push(new TextParticle());
     }
 
@@ -751,7 +747,7 @@ export class WaitingReportManager {
     }
 
     const particles = [];
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 30; i++) {
       particles.push(new ConvergingParticle());
     }
 
@@ -944,7 +940,7 @@ export class WaitingReportManager {
     const createWordBurst = () => {
       if (!this.isActive) return;
 
-      const count = 3 + Math.floor(Math.random() * 3);
+      const count = 2 + Math.floor(Math.random() * 2); // 减少飞词数量
       for (let i = 0; i < count; i++) {
         setTimeout(() => createFlyingWord(), i * 50);
       }

@@ -694,10 +694,6 @@
 
         // 如果 plateData 是对象（包含时间键），规范化时间键和坐标
         if (typeof plateData === "object" && !Array.isArray(plateData)) {
-          // 过滤掉空对象
-          if (Object.keys(plateData).length === 0) {
-            continue
-          }
           const normalizedPlateData = {}
           for (const [timeKey, coordinates] of Object.entries(plateData)) {
             // 过滤掉空数组的笔画
@@ -708,14 +704,21 @@
             normalizedPlateData[normalizedTimeKey] =
               formatCoordinates(coordinates)
           }
-          // 如果过滤后为空对象，跳过该图版
-          if (Object.keys(normalizedPlateData).length === 0) {
-            continue
-          }
-          normalized[plateKey] = normalizedPlateData
+          // 即使是空对象也保留，确保位置存在
+          normalized[plateKey] = Object.keys(normalizedPlateData).length === 0
+            ? {}
+            : normalizedPlateData
         } else {
           // 其他情况直接复制
           normalized[plateKey] = plateData
+        }
+      }
+
+      // 确保始终有 10 个图版位置（"1" - "10"）
+      for (let i = 1; i <= 10; i++) {
+        const key = String(i)
+        if (!(key in normalized)) {
+          normalized[key] = {}  // 补齐缺失的图版位置为空对象
         }
       }
 
@@ -912,7 +915,9 @@
       }
 
       // 验证文件类型
+      const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
       console.log("上传文件名:", userId, fileToUpload.name)
+      console.log("音频文件大小:", fileSizeMB, "M")
       const fileName = fileToUpload.name.toLowerCase()
       const isValidFormat =
         fileName.endsWith(".mp3") || fileName.endsWith(".mp4")

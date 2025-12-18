@@ -95,7 +95,7 @@ const REPORT_PROCESSING_STATUSES = new Set([
 
 const DEFAULT_REPORT_WAITING_STATUS = {
   status: "processing",
-  message: "测试后大约 3~4 小时会生成测试报告，请耐心等待。",
+  message: "测试后大约 1～2天会生成测试报告，请耐心等待。",
 }
 
 const SKIP_REPORT_REDIRECT_FLAG = "xlcs_skip_report_redirect"
@@ -3125,7 +3125,7 @@ async function askNextQuestion() {
   // 如果没有找到可显示的问题，说明所有问题都已处理完毕
   if (!question || currentQuestionIndex >= POST_TEST_QUESTIONS.length) {
     const finishText =
-      "再次感谢您的时间，测试报告将会交给模型进行分析，为时大约3～4小时, 请您耐心等待"
+      "再次感谢您的时间，测试报告将会交给模型进行分析，为时大约1-2天, 请您耐心等待"
 
     // 不显示文案，移除背景色
     questionText.textContent = ""
@@ -5278,7 +5278,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
   //   showPostTestView()
-  //   currentQuestionIndex = 0
+  //   currentQuestionIndex = 8
   //   askNextQuestion()
   // }, 100)
 })
