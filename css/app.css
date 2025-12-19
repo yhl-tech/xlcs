@@ -1162,6 +1162,13 @@ html {
   color: #8b5cf6;
 }
 
+.intro-info-text p::before {
+  content: "✦";
+  font-size: 18px;
+  opacity: 0.8;
+  color: #8b5cf6;
+}
+
 .intro-info-text strong {
   color: #1e293b;
   font-weight: 600;
@@ -1621,10 +1628,12 @@ html {
   animation: slideUp 0.3s ease-out;
   position: relative;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   flex-shrink: 0;
   width: 100%;
   max-width: 1100px;
   box-sizing: border-box;
+  z-index: 10;
 }
 
 /* 当提交按钮显示时，隐藏问题文本框 */

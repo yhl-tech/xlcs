@@ -1923,7 +1923,7 @@ async function prepareIntroExperience({ resume = false } = {}) {
 
   // 等待一小段时间，确保按钮已完全初始化
   await new Promise((resolve) => setTimeout(resolve, 100))
-  startIntroGuide()
+  // startIntroGuide()
   // 自动开始操作反应测试（包含第一段播报、6个操作步骤、第二段播报）
   try {
     // 执行操作反应测试
@@ -5277,8 +5277,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
-  //   // showPostTestView()
-  //   // currentQuestionIndex = 0
-  //   // askNextQuestion()
+  //   showPostTestView()
+  //   currentQuestionIndex = 0
+  //   askNextQuestion()
   // }, 100)
 })
