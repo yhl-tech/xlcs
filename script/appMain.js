@@ -4806,13 +4806,13 @@ async function playWelcomeMessage() {
 
 const WELCOME_TEXT_CONTENT = Object.freeze({
   intro:
-    "Hello，亲爱的用户您好，欢迎来到知己心探（InnerScan）心理测试，在测试前，需要跟您确认以下几点：",
+    "Hello，亲爱的用户您好，欢迎来到知己心探心理测试，在测试前，需要跟您确认以下几点：",
   points: [
-    "1.请先填写左侧的个人信息。",
-    "2.请确保您的电脑麦克风和音响正常。您可以在浏览器上配置您的麦克风。", // 这里应该有个确认语音听见的交互。并配一张图作为麦克风配置的提示。
-    "3.测试时需要保持您周围的环境保持安静，避免被外界电话、信息打扰。",
+    "1.首先，请先在网页左侧，填写您的个人信息",
+    "2.测试需要在台式电脑或笔记本电脑上进行，请确保您的电脑麦克风和音响正常。您可以在浏览器上配置您的麦克风，并利用下方的设备测试按钮，检测您的麦克风和音响状态。",
+    "3.需要提醒您的是，测试时需要保持您周围的环境安静，避免被外界的电话、微信消息打扰，只有这样才能达到最好的测试效果",
     "4.整个心理测试过程采用数字人语音交互完成，确保您的信息隐私安全，请放心。",
-    "如果以上信息确认完毕，那么请点击蓝色的开始测试按钮，我们将正式开始心理测试。",
+    "5.如果以上信息确认完毕，那么请点击蓝色的开始测试按钮，我们将向您介绍心理测试的具体操作流程",
   ],
 })
 
@@ -4856,7 +4856,7 @@ function renderWelcomeText() {
                     点击下方按钮播放测试音，并在浏览器弹出提示时允许使用麦克风，然后对着麦克风说一句平时说话的句子。
                 </p>
                 <div class="device-check-actions">
-                    <button type="button" data-action="speaker-test">🔊 测试语音播放</button>
+                    <button type="button" data-action="speaker-test">🔊 测试语音（音响）播放</button>
                     <button type="button" data-action="mic-test">🎙️ 检测麦克风（测试时请说话）</button>
                 </div>
                 <div class="device-check-result" data-role="device-check-result">等待检测</div>
@@ -5026,44 +5026,44 @@ async function routeToReportSummaryIfAvailable() {
     return false
   }
 
-  try {
-    // 1. 先检查用户是否已提交过测试数据
-    if (typeof window.API.checkUploadFilesStatus === "function") {
-      const uploadStatus = await window.API.checkUploadFilesStatus(userId)
+  // try {
+  //   // 1. 先检查用户是否已提交过测试数据
+  //   if (typeof window.API.checkUploadFilesStatus === "function") {
+  //     const uploadStatus = await window.API.checkUploadFilesStatus(userId)
     
-      // 如果用户未提交数据（data 不为 true），不跳转
-      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
-        return false
-      }
-    } else {
-      // 接口不存在，不跳转
-      return false
-    }
+  //     // 如果用户未提交数据（data 不为 true），不跳转
+  //     if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+  //       return false
+  //     }
+  //   } else {
+  //     // 接口不存在，不跳转
+  //     return false
+  //   }
 
-    // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
-    let statusInfo = null
-    if (typeof window.API.checkReportStatus === "function") {
-      const response = await window.API.checkReportStatus(userId)
+  //   // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
+  //   let statusInfo = null
+  //   if (typeof window.API.checkReportStatus === "function") {
+  //     const response = await window.API.checkReportStatus(userId)
 
-      statusInfo = buildReportStatusFromResponse(response)
-    }
+  //     statusInfo = buildReportStatusFromResponse(response)
+  //   }
 
-    // 3. 如果没有状态信息，使用默认等待状态
-    if (!statusInfo) {
-      statusInfo = {
-        status: "processing",
-        message: "报告生成中，请稍候...",
-        uploaded: true,
-      }
-    }
+  //   // 3. 如果没有状态信息，使用默认等待状态
+  //   if (!statusInfo) {
+  //     statusInfo = {
+  //       status: "processing",
+  //       message: "报告生成中，请稍候...",
+  //       uploaded: true,
+  //     }
+  //   }
 
-    latestReportStatus = statusInfo
-    showSummary({ reportStatus: statusInfo })
-    return true
-  } catch (error) {
-    console.warn("[Report] 检查报告状态失败:", error)
-    return false
-  }
+  //   latestReportStatus = statusInfo
+  //   showSummary({ reportStatus: statusInfo })
+  //   return true
+  // } catch (error) {
+  //   console.warn("[Report] 检查报告状态失败:", error)
+  //   return false
+  // }
 }
 
 // 登录检查和初始化
@@ -5277,8 +5277,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
-  //   showPostTestView()
-  //   currentQuestionIndex = 8
-  //   askNextQuestion()
+  //   // showPostTestView()
+  //   // currentQuestionIndex = 0
+  //   // askNextQuestion()
   // }, 100)
 })

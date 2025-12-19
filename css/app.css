@@ -608,6 +608,17 @@ html {
   border-bottom: 1px solid var(--border-color);
 }
 
+.title-bar .logo {
+  width: 132px;
+  height: 105px;
+  margin-right: 10px;
+}
+
+.title-content {
+  display: flex;
+  align-items: center;
+}
+
 /* 测试模式下，title-bar 背景透明 */
 .test-mode .title-bar {
   background: transparent;

@@ -602,7 +602,7 @@ function setupGuideSyncHooks() {
 function createAutoAdvanceConfig() {
   // 配置每个步骤的停留时间（毫秒）
   return {
-    default: 2000, // 默认2秒
+    default: 4000, // 默认2秒
     steps: {
       0: 2000, // 图版预览区 - 2秒
       1: 2000, // 缩放与旋转 - 2秒      2: 20000, // 绘图工具组 - 2秒
