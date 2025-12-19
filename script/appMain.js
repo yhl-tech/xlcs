@@ -3034,7 +3034,7 @@ function showPostTestView(options = {}) {
     imageContainer.style.display = "none"
   }
   postTestView.style.display = "block"
-  progressText.textContent = "测试总结阶段"
+  progressText.textContent = "第三项测试"
 
   // 隐藏背景动画（后测试阶段不显示背景）
   const bgContainer = document.getElementById("blackhole-bg-container")
@@ -4857,7 +4857,7 @@ function renderWelcomeText() {
                 </p>
                 <div class="device-check-actions">
                     <button type="button" data-action="speaker-test">🔊 测试语音播放</button>
-                    <button type="button" data-action="mic-test">🎙️ 测试麦克风</button>
+                    <button type="button" data-action="mic-test">🎙️ 检测麦克风（测试时请说话）</button>
                 </div>
                 <div class="device-check-result" data-role="device-check-result">等待检测</div>
             </div>
