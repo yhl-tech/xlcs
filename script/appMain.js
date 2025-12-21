@@ -40,6 +40,7 @@ import {
 } from "./operationReactionTest.js"
 import { waitingReportManager } from "./waitingReport.js"
 import { initImagePan } from "./imagePan.js"
+import { ImagePreloader } from "./imagePreloader.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -424,7 +425,7 @@ function initPreviewCanvasInteractions() {
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
       introPreviewImage.style.display = ""
-      introPreviewImage.src = `./images/rorschach-blot-1.webp`
+      introPreviewImage.src = `./images/rorschach-blot-1.png`
     }
     // 重置画布尺寸并恢复状态
     if (introPreviewImage && previewCanvas) {
@@ -2206,6 +2207,15 @@ function initTest(restoredSnapshot = null) {
   // 初始化或重置图片平移状态
   panOffsetX = 0
   panOffsetY = 0
+
+  // 启动图片预加载（如果未恢复状态，则进行初始预加载）
+  if (!isRestored) {
+    ImagePreloader.initialPreload()
+  } else {
+    // 恢复状态时，预加载当前图片的后续图片
+    ImagePreloader.preloadAhead(state.currentIndex)
+  }
+
   loadImage(state.currentIndex)
   if (isRestored) {
     updateTransform({ zoom: state.zoom, rotation: state.rotation }, true)
@@ -2953,14 +2963,13 @@ function loadImage(index) {
 
   // 等待淡出动画完成后再加载新图片（增加延迟时间，让渐隐效果更慢）
   setTimeout(() => {
-    rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
-    rorschachImage.onerror = () => {
-      rorschachImage.classList.remove("image-fade-out")
-    }
+    // 检查图片是否已预加载
+    if (ImagePreloader.isPreloaded(index)) {
+      // 图片已预加载，直接从缓存获取
+      const preloadedImg = ImagePreloader.getPreloadedImage(index)
+      rorschachImage.src = preloadedImg.src
 
-    // 确保图片加载后加载该图版的画布状态
-    if (rorschachImage.complete) {
-      // 图片已缓存，立即加载画布状态
+      // 图片已在缓存中，立即执行加载完成逻辑
       resizeCanvas()
       loadCanvasState(index)
       // 渐显效果：移除淡出类，触发淡入
@@ -2969,9 +2978,18 @@ function loadImage(index) {
       setTimeout(() => {
         rorschachImage.classList.remove("image-fade-in")
       }, 800) // 增加渐显动画时间到800ms，让效果更慢
+
+      console.log(`[loadImage] 图片 ${index + 1} 从预加载缓存中加载，立即显示`)
     } else {
-      // 图片需要加载，等待加载完成
-      rorschachImage.onload = () => {
+      // 图片未预加载，使用原有加载逻辑
+      rorschachImage.src = `./images/rorschach-blot-${index + 1}.png`
+      rorschachImage.onerror = () => {
+        rorschachImage.classList.remove("image-fade-out")
+      }
+
+      // 确保图片加载后加载该图版的画布状态
+      if (rorschachImage.complete) {
+        // 图片已缓存，立即加载画布状态
         resizeCanvas()
         loadCanvasState(index)
         // 渐显效果：移除淡出类，触发淡入
@@ -2980,9 +2998,24 @@ function loadImage(index) {
         setTimeout(() => {
           rorschachImage.classList.remove("image-fade-in")
         }, 800) // 增加渐显动画时间到800ms，让效果更慢
-        rorschachImage.onload = null
+      } else {
+        // 图片需要加载，等待加载完成
+        rorschachImage.onload = () => {
+          resizeCanvas()
+          loadCanvasState(index)
+          // 渐显效果：移除淡出类，触发淡入
+          rorschachImage.classList.remove("image-fade-out")
+          rorschachImage.classList.add("image-fade-in")
+          setTimeout(() => {
+            rorschachImage.classList.remove("image-fade-in")
+          }, 800) // 增加渐显动画时间到800ms，让效果更慢
+          rorschachImage.onload = null
+        }
       }
     }
+
+    // 预加载后续图片（在加载当前图片后触发）
+    ImagePreloader.preloadAhead(index)
   }, 800) // 增加淡出动画时间到800ms，让渐隐效果更慢
 
   updateNavButtons()
@@ -3062,6 +3095,9 @@ function showPostTestView(options = {}) {
     window.InteractionTracker.recordSelectPhase()
   }
 
+  // 预加载所有图片（确保缩略图网格显示时所有图片都已加载）
+  ImagePreloader.preloadRange(0, state.totalImages - 1)
+
   // 重置所有相关元素到初始状态，确保重新测试时与第一次测试一致
   const grid = document.getElementById("post-test-grid")
   grid.innerHTML = ""
@@ -3097,7 +3133,7 @@ function showPostTestView(options = {}) {
     item.dataset.index = i
     item.innerHTML = `<img src="./images/rorschach-blot-${
       i + 1
-    }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
+    }.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
     item.addEventListener("click", handleImageSelection)
     grid.appendChild(item)
   }
@@ -3707,6 +3743,9 @@ function showSummary(options = {}) {
   grid.innerHTML = ""
   renderSummaryReportSection(summaryView, grid, latestReportStatus)
 
+  // 预加载所有图片（确保汇总视图显示时所有图片都已加载）
+  ImagePreloader.preloadRange(0, state.totalImages - 1)
+
   const canvasStates = Array.isArray(state.canvasStates)
     ? state.canvasStates
     : new Array(state.totalImages).fill(null)
@@ -3718,7 +3757,8 @@ function showSummary(options = {}) {
     const compositeContainer = document.createElement("div")
     compositeContainer.style.position = "relative"
     const baseImage = document.createElement("img")
-    baseImage.src = `./images/rorschach-blot-${i + 1}.webp`
+    // 如果图片已预加载，使用预加载的图片 URL（浏览器会从缓存中获取）
+    baseImage.src = ImagePreloader.getImageUrl(i)
     compositeContainer.appendChild(baseImage)
     if (canvasStates[i]) {
       const drawingImage = document.createElement("img")
@@ -5006,7 +5046,10 @@ function setupAuthControls() {
           return
         }
 
-        const result = await window.API.uploadDrawingTracks(drawingTracks, userId)
+        const result = await window.API.uploadDrawingTracks(
+          drawingTracks,
+          userId
+        )
         console.log("[测试] uploadDrawingTracks 结果:", result)
         alert("轨迹上传成功，请查看控制台")
       } catch (error) {
@@ -5030,7 +5073,7 @@ async function routeToReportSummaryIfAvailable() {
   //   // 1. 先检查用户是否已提交过测试数据
   //   if (typeof window.API.checkUploadFilesStatus === "function") {
   //     const uploadStatus = await window.API.checkUploadFilesStatus(userId)
-    
+
   //     // 如果用户未提交数据（data 不为 true），不跳转
   //     if (uploadStatus.code != 0 || uploadStatus.data !== true) {
   //       return false
