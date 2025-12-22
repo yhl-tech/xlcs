@@ -254,7 +254,7 @@ export const TTS = {
   speaker: "zh_female_vv_jupiter_bigtts",
   inited: false,
   currentMode: null,
-  // 当前对话阶段：pretest（测试前）、intest（测试中）、posttest（测试后）
+  // 当前对话阶段：pretest（测试前）、intest1（第一张图）、intest2to10（第2-10张图）、posttest（测试后）
   currentPhase: null,
 }
 

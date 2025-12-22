@@ -141,7 +141,8 @@ function getCurrentDiagPhase() {
     case "intro":
       return "pretest"
     case "test":
-      return "intest"
+      // 根据当前图片索引判断是第一张还是后面几张
+      return state.currentIndex === 0 ? "intest1" : "intest2to10"
     case "post":
     case "summary":
       return "posttest"
@@ -1985,9 +1986,9 @@ async function enterTestExperience({
 
       while (retryCount < maxRetries) {
         try {
-          // 测试阶段使用 intest phase
-          TTS.currentPhase = "intest"
-          await ensureTTSInit("audio", "intest")
+          // 测试阶段初始为第一张图，使用 intest1 phase
+          TTS.currentPhase = "intest1"
+          await ensureTTSInit("audio", "intest1")
           break
         } catch (error) {
           retryCount++
@@ -2834,6 +2835,15 @@ function navigate(direction) {
 
     state.currentIndex = newIndex
     console.log("[调试] state.currentIndex 更新为:", state.currentIndex)
+
+    // 更新 TTS 阶段：第一张图用 intest1，后面的图用 intest2to10
+    if (state.currentIndex === 0) {
+      TTS.currentPhase = "intest1"
+      console.log("[TTS] 阶段更新为: intest1")
+    } else if (state.currentIndex >= 1) {
+      TTS.currentPhase = "intest2to10"
+      console.log("[TTS] 阶段更新为: intest2to10")
+    }
 
     // 检查是否有保存的冷却时间需要恢复
     let hasRestoredCooldown = false
