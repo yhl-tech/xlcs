@@ -2071,6 +2071,10 @@ async function enterTestExperience({
     updateProgress()
 
     if (state.mediaRecorder && state.mediaRecorder.state === "inactive") {
+      console.log(
+        "[Audio] Starting MediaRecorder, previous state:",
+        state.mediaRecorder.state
+      )
       state.mediaRecorder.start()
     }
 
@@ -2286,11 +2290,29 @@ function resizeCanvas() {
 // 音频和语音检测
 function initAudio(stream) {
   state.mediaRecorder = new MediaRecorder(stream)
-  state.mediaRecorder.ondataavailable = (event) =>
+  console.log(
+    "[Audio] MediaRecorder created, initial state:",
+    state.mediaRecorder?.state
+  )
+  state.mediaRecorder.ondataavailable = (event) => {
+    try {
+      console.log(
+        "[Audio] ondataavailable, chunk size:",
+        event?.data?.size ?? "unknown"
+      )
+    } catch (e) {
+      console.warn("[Audio] ondataavailable logging failed:", e)
+    }
     state.audioChunks.push(event.data)
+    console.log(
+      "[Audio] audioChunks length after push:",
+      state.audioChunks.length
+    )
+  }
 
   state.mediaRecorder.onstop = () => {
     const audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+    console.log("[Audio] onstop: created audioBlob, size:", audioBlob.size)
 
     // 保存音频Blob到state，供finishAndSave使用
     state.audioBlob = audioBlob
@@ -2309,6 +2331,10 @@ function initAudio(stream) {
         window.URL.revokeObjectURL(audioUrl);
         */
     state.audioChunks = []
+    console.log(
+      "[Audio] audioChunks cleared after onstop:",
+      state.audioChunks.length
+    )
   }
 
   // 优化：降低前端语音检测敏感度，提高阈值以减少误判
@@ -3350,6 +3376,10 @@ function finishAndSave() {
   }
 
   if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+    console.log(
+      "[Audio] finishAndSaveData stopping MediaRecorder, state:",
+      state.mediaRecorder.state
+    )
     state.mediaRecorder.stop()
   }
 
@@ -3408,12 +3438,82 @@ function finishAndSave() {
           finishBtn.textContent = "正在提交数据..."
         }
 
-        // 获取音频数据（作为备用，submitAllData 会优先从 AudioRecorder 获取）
+        // 获取音频数据：优先使用 AudioRecorder 导出的 MP3（包含 AI + mic），否则回退到 mediaRecorder 的 blob 或 chunks
+        console.log(
+          "[Audio] Preparing audio for submit. mediaRecorder state:",
+          state.mediaRecorder?.state,
+          "audioChunks length:",
+          state.audioChunks?.length,
+          "existing audioBlob size:",
+          state.audioBlob ? state.audioBlob.size : null,
+          "AudioRecorder available:",
+          !!(window.AudioRecorder && window.AudioRecorder._instance)
+        )
         let audioBlob = null
-        if (state.audioBlob) {
-          audioBlob = state.audioBlob
-        } else if (state.audioChunks && state.audioChunks.length > 0) {
-          audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+
+        // 1) 优先尝试从 AudioRecorder 导出 MP3（如果有数据）
+        try {
+          if (window.AudioRecorder && window.AudioRecorder._instance) {
+            const status = window.AudioRecorder.getStatus()
+            console.log("[Audio] AudioRecorder status before submit:", status)
+            if (status && status.bufferCount > 0) {
+              try {
+                // 如果录制还在进行，先停止以确保数据完整
+                if (window.AudioRecorder._instance.isRecording) {
+                  window.AudioRecorder.stop()
+                }
+                const mp3Blob = await window.AudioRecorder.exportMP3()
+                if (mp3Blob && mp3Blob.size > 0) {
+                  audioBlob = mp3Blob
+                  console.log(
+                    "[Audio] Using AudioRecorder MP3 for submit, size:",
+                    mp3Blob.size
+                  )
+                }
+              } catch (err) {
+                console.warn("[Audio] AudioRecorder.exportMP3 failed:", err)
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[Audio] AudioRecorder check failed:", err)
+        }
+
+        // 2) 如果没有得到 MP3，再使用 state.audioBlob 或 chunks（MediaRecorder）
+        if (!audioBlob) {
+          if (state.audioBlob) {
+            audioBlob = state.audioBlob
+          } else if (state.audioChunks && state.audioChunks.length > 0) {
+            audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+          }
+        }
+
+        // 在提交/导出前停止 AudioRecorder（如果在录制），以避免导出过程中有新写入
+        let recorderWasRecording = false
+        try {
+          if (
+            typeof window !== "undefined" &&
+            window.AudioRecorder &&
+            window.AudioRecorder._instance
+          ) {
+            recorderWasRecording = Boolean(
+              window.AudioRecorder._instance.isRecording
+            )
+            if (recorderWasRecording) {
+              try {
+                window.AudioRecorder.stop()
+                console.log(
+                  "[AudioFix] stopped AudioRecorder for stable export"
+                )
+              } catch (err) {
+                console.warn("[AudioFix] failed to stop AudioRecorder:", err)
+              }
+              // 等待短暂时间确保 write paths see isRecording=false
+              await new Promise((resolve) => setTimeout(resolve, 120))
+            }
+          }
+        } catch (e) {
+          console.warn("[AudioFix] stop check failed:", e)
         }
 
         // 调用接口提交数据（音频处理逻辑已统一到 submitAllData 中）
@@ -3422,6 +3522,20 @@ function finishAndSave() {
           audioBlob,
           state.postTestAnswers
         )
+
+        // 提交完成后，若此前正在录制则重启录制以继续会话记录
+        try {
+          if (
+            recorderWasRecording &&
+            typeof window !== "undefined" &&
+            window.AudioRecorder
+          ) {
+            window.AudioRecorder.start()
+            console.log("[AudioFix] restarted AudioRecorder after submit")
+          }
+        } catch (e) {
+          console.warn("[AudioFix] restart AudioRecorder failed:", e)
+        }
 
         console.log("[API] 数据提交成功:", result)
 
@@ -5016,7 +5130,10 @@ function setupAuthControls() {
           return
         }
 
-        const result = await window.API.uploadDrawingTracks(drawingTracks, userId)
+        const result = await window.API.uploadDrawingTracks(
+          drawingTracks,
+          userId
+        )
         console.log("[测试] uploadDrawingTracks 结果:", result)
         alert("轨迹上传成功，请查看控制台")
       } catch (error) {
@@ -5040,7 +5157,7 @@ async function routeToReportSummaryIfAvailable() {
     // 1. 先检查用户是否已提交过测试数据
     if (typeof window.API.checkUploadFilesStatus === "function") {
       const uploadStatus = await window.API.checkUploadFilesStatus(userId)
-    
+
       // 如果用户未提交数据（data 不为 true），不跳转
       if (uploadStatus.code != 0 || uploadStatus.data !== true) {
         return false

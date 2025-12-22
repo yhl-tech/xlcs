@@ -63,7 +63,6 @@
     }
   }
 
-
   /**
    * API 客户端类
    */
@@ -705,9 +704,10 @@
               formatCoordinates(coordinates)
           }
           // 即使是空对象也保留，确保位置存在
-          normalized[plateKey] = Object.keys(normalizedPlateData).length === 0
-            ? {}
-            : normalizedPlateData
+          normalized[plateKey] =
+            Object.keys(normalizedPlateData).length === 0
+              ? {}
+              : normalizedPlateData
         } else {
           // 其他情况直接复制
           normalized[plateKey] = plateData
@@ -718,7 +718,7 @@
       for (let i = 1; i <= 10; i++) {
         const key = String(i)
         if (!(key in normalized)) {
-          normalized[key] = {}  // 补齐缺失的图版位置为空对象
+          normalized[key] = {} // 补齐缺失的图版位置为空对象
         }
       }
 
@@ -849,9 +849,11 @@
      * @returns {Promise} 请求Promise
      */
     async uploadMedia(file, userId = null) {
-      console.log("[API] uploadMedia 参数:", { fileType: file?.type, fileName: file?.name, userId })
-     
-      
+      console.log("[API] uploadMedia 参数:", {
+        fileType: file?.type,
+        fileName: file?.name,
+        userId,
+      })
 
       // 确保文件有正确的文件名和类型
       let fileToUpload = file
@@ -879,7 +881,11 @@
 
         // 创建 File 对象，使用 userId 命名
         const fileName = userId ? `${userId}${extension}` : `audio${extension}`
-        console.log("[API] uploadMedia 创建文件名:", { userId, extension, fileName })
+        console.log("[API] uploadMedia 创建文件名:", {
+          userId,
+          extension,
+          fileName,
+        })
         fileToUpload = new File([file], fileName, {
           type: file.type || "audio/mpeg",
         })
@@ -929,8 +935,10 @@
       formData.append("file", fileToUpload)
 
       // 保存文件到本地
-      const mediaFileName = `media_${userId || "unknown"}_${Date.now()}_${fileToUpload.name}`
-      // saveFileToLocal(fileToUpload, mediaFileName)
+      const mediaFileName = `media_${userId || "unknown"}_${Date.now()}_${
+        fileToUpload.name
+      }`
+      saveFileToLocal(fileToUpload, mediaFileName)
 
       return apiClient.post("/rorschach/user/upload_media", formData)
     },

@@ -1350,7 +1350,9 @@
 
       // 5. 提交音频文件
       try {
+        console.log("[InteractionTracker] submitAllData called for user:", userId, "incoming audioBlob:", audioBlob)
         let audioFileToUpload = audioBlob
+        console.log("[InteractionTracker] initial audioFileToUpload:", audioFileToUpload)
 
         // 如果未提供音频且录制器有数据，优先使用录制器导出的MP3
         if (
@@ -1360,25 +1362,39 @@
         ) {
           try {
             const status = window.AudioRecorder.getStatus()
+            console.log("[InteractionTracker] AudioRecorder status:", status)
             if (status.bufferCount > 0) {
               window.AudioRecorder.stop()
               audioFileToUpload = await window.AudioRecorder.exportMP3()
+              console.log(
+                "[InteractionTracker] AudioRecorder exported file:",
+                audioFileToUpload,
+                "type:",
+                audioFileToUpload?.type,
+                "size:",
+                audioFileToUpload?.size
+              )
             }
           } catch (error) {
+            console.error("[InteractionTracker] AudioRecorder export failed:", error)
             // 导出失败，继续使用原有的 audioBlob
           }
         }
 
         // 如果有音频文件且API可用，则上传
         if (audioFileToUpload && window.API && window.API.uploadMedia) {
+          console.log("[InteractionTracker] uploading media, API available:", !!window.API.uploadMedia, "file:", audioFileToUpload)
           results.media = await window.API.uploadMedia(
             audioFileToUpload,
             userId
           )
+          console.log("[InteractionTracker] upload result:", results.media)
         } else if (audioFileToUpload) {
           results.media = { success: false, error: "uploadMedia API 不可用" }
+          console.log("[InteractionTracker] uploadMedia API not available")
         } else {
           results.media = { success: false, error: "没有可上传的音频文件" }
+          console.log("[InteractionTracker] no audio file to upload")
         }
       } catch (error) {
         results.media = { success: false, error: error.message }

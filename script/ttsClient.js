@@ -32,22 +32,89 @@ import { getWebSocketUrl } from "./config.js"
     return buffer
   }
 
+  /**
+   * 简单线性重采样 Int16Array，从 srcRate 到 dstRate
+   * 质量足够用于短语音片段，保持顺序与时长近似
+   */
+  function resampleInt16Array(srcInt16, srcRate, dstRate) {
+    if (!srcInt16 || srcInt16.length === 0) return new Int16Array(0)
+    if (srcRate === dstRate) return srcInt16
+    const ratio = dstRate / srcRate
+    const newLen = Math.round(srcInt16.length * ratio)
+    const out = new Int16Array(newLen)
+    for (let i = 0; i < newLen; i++) {
+      const srcPos = i / ratio
+      const i0 = Math.floor(srcPos)
+      const frac = srcPos - i0
+      const s0 = srcInt16[i0] || 0
+      const s1 = srcInt16[i0 + 1] || 0
+      out[i] = Math.round(s0 + (s1 - s0) * frac)
+    }
+    return out
+  }
+
+  // 短期策略控制：是否在 AI 播放时写入 AI PCM 到 AudioRecorder
+  function shouldWriteAIToRecorder() {
+    return !Boolean(window._skipWritingAIToAudioRecorder)
+  }
+
+  // 全局控制接口：设置跳过写 AI PCM 的开关（可选超时自动恢复）
+  window.setSkipWritingAIToAudioRecorder = function (
+    skip = true,
+    timeoutMs = 30000
+  ) {
+    try {
+      window._skipWritingAIToAudioRecorder = Boolean(skip)
+      console.log(
+        "[AudioFix] setSkipWritingAIToAudioRecorder:",
+        window._skipWritingAIToAudioRecorder
+      )
+      if (window._skipAIWriteTimer) {
+        clearTimeout(window._skipAIWriteTimer)
+        window._skipAIWriteTimer = null
+      }
+      if (skip && timeoutMs > 0) {
+        window._skipAIWriteTimer = setTimeout(() => {
+          window._skipWritingAIToAudioRecorder = false
+          window._skipAIWriteTimer = null
+          console.log(
+            "[AudioFix] auto restored write-AI-to-recorder = false (timeout)"
+          )
+        }, timeoutMs)
+      }
+    } catch (e) {
+      console.warn("[AudioFix] setSkipWritingAIToAudioRecorder failed:", e)
+    }
+  }
+
   async function playPCMWithWebAudio(
     pcmData,
     sampleRate,
     onendedCallback = null
   ) {
-    // 在播放前保存PCM数据到录制器
+    // NOTE: AI PCM writing is centralized to playQueue to avoid duplicate writes.
+    // playPCMWithWebAudio no longer writes PCM into AudioRecorder to prevent
+    // duplicated/serialised recordings that corrupt exported MP3 durations.
     if (
       window.AudioRecorder &&
       window.AudioRecorder._instance &&
       window.AudioRecorder._instance.isRecording
     ) {
       try {
-        const int16View = new Int16Array(pcmData)
-        window.AudioRecorder.addPCMData(int16View, sampleRate)
+        if (
+          typeof shouldWriteAIToRecorder === "function" &&
+          !shouldWriteAIToRecorder()
+        ) {
+          console.log(
+            "[AudioFix] skip writing AI PCM to AudioRecorder (playPCMWithWebAudio) - centralized to playQueue"
+          )
+        } else {
+          console.log(
+            "[AudioFix] suppressing AI PCM write in playPCMWithWebAudio; playQueue will handle recording"
+          )
+        }
       } catch (error) {
-        console.warn("[TTS] 保存音频数据失败:", error)
+        console.warn("[TTS] 保存音频数据失败 (log only):", error)
       }
     }
 
@@ -323,17 +390,26 @@ import { getWebSocketUrl } from "./config.js"
 
       const int16View = new Int16Array(arrayBuffer)
 
-      // 在播放前保存PCM数据到录制器
+      // 在播放前根据短期策略决定是否保存AI的PCM到录制器
       if (
         window.AudioRecorder &&
         window.AudioRecorder._instance &&
         window.AudioRecorder._instance.isRecording
       ) {
         try {
-          window.AudioRecorder.addPCMData(
-            int16View,
-            this.config.outputAudio.sampleRate
-          )
+          if (
+            typeof shouldWriteAIToRecorder === "function" &&
+            !shouldWriteAIToRecorder()
+          ) {
+            console.log(
+              "[AudioFix] skip writing AI PCM to AudioRecorder (playQueue)"
+            )
+          } else {
+            window.AudioRecorder.addPCMData(
+              int16View,
+              this.config.outputAudio.sampleRate
+            )
+          }
         } catch (error) {
           console.warn("[TTS] 保存音频数据失败:", error)
         }
@@ -436,6 +512,34 @@ import { getWebSocketUrl } from "./config.js"
 
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(pcmData)
+        }
+        // 同步把麦克风 PCM 保存到全局 AudioRecorder（以便导出包含 AI + 用户的 MP3）
+        try {
+          if (
+            window.AudioRecorder &&
+            window.AudioRecorder._instance &&
+            window.AudioRecorder._instance.isRecording
+          ) {
+            const int16View = new Int16Array(pcmData)
+            // 目标采样率：优先使用 AudioRecorder 已设置的采样率，否则用 outputAudio.sampleRate（通常 24000）
+            const targetRate =
+              (window.AudioRecorder._instance &&
+                window.AudioRecorder._instance.sampleRate) ||
+              this.config.outputAudio.sampleRate ||
+              24000
+            // 实际来源采样率应当使用输入缓冲的采样率（event.inputBuffer.sampleRate）
+            const srcRate =
+              event.inputBuffer && event.inputBuffer.sampleRate
+                ? event.inputBuffer.sampleRate
+                : this.config.inputAudio.sampleRate || 16000
+            const toAdd =
+              srcRate === targetRate
+                ? int16View
+                : resampleInt16Array(int16View, srcRate, targetRate)
+            window.AudioRecorder.addPCMData(toAdd, targetRate)
+          }
+        } catch (err) {
+          console.warn("[Dialog] 保存麦克风PCM到录制器失败:", err)
         }
       }
 

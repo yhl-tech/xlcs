@@ -46,6 +46,24 @@
         return
       }
 
+      // 如果全局设置了暂停写入（例如导出/提交期间），则跳过写入以保证导出稳定
+      try {
+        if (typeof window !== "undefined" && window._pauseAudioRecorderWrites) {
+          if (!window._audioRecorderSkippedWrites) window._audioRecorderSkippedWrites = 0
+          window._audioRecorderSkippedWrites++
+          // 仅在每隔较大次数时输出日志，避免过多日志
+          if (window._audioRecorderSkippedWrites % 100 === 0) {
+            console.log(
+              "[AudioRecorder] skipped write due to pause flag, total skipped:",
+              window._audioRecorderSkippedWrites
+            )
+          }
+          return
+        }
+      } catch (e) {
+        console.warn("[AudioRecorder] pause check failed:", e)
+      }
+
       // 确保是 Int16Array
       let int16Data
       if (pcmData instanceof Int16Array) {
