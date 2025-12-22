@@ -1636,8 +1636,8 @@ html {
   z-index: 10;
 }
 
-/* 当提交按钮显示时，隐藏问题文本框 */
-#post-test-view:has(#finish-btn:not([style*="display: none"])) #question-text {
+/* 当提交按钮显示时，隐藏问题文本框 - 使用 class 控制更可靠 */
+#post-test-view.show-finish-btn #question-text {
   display: none !important;
 }
 
