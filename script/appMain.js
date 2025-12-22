@@ -1156,6 +1156,10 @@ function hideReportCheckLoading() {
     console.log("[hideReportCheckLoading] 恢复介绍页布局")
     if (infoScreen) {
       infoScreen.style.display = "flex"
+      // 信息填写页显示时，延迟预加载（避免阻塞播报功能）
+      setTimeout(() => {
+        ImagePreloader.preloadAll()
+      }, 500)
     }
     if (appWindow) {
       // 这里保持 app-window 可见，用于在右侧展示欢迎内容和语音检测
@@ -1595,6 +1599,10 @@ async function resumeTestFromSnapshot(snapshot = null) {
       }
       infoScreen.style.display = "flex"
       appWindow.style.display = "none"
+      // 信息填写页显示时，延迟开始预加载（避免阻塞页面渲染）
+      setTimeout(() => {
+        ImagePreloader.preloadAll()
+      }, 500)
     }
     return
   }
@@ -1830,6 +1838,10 @@ async function prepareIntroExperience({ resume = false } = {}) {
       "[正常流程] introOverlay.style.display 实际值:",
       introOverlay.style.display
     )
+    // 介绍页显示时，延迟确保所有图片正在预加载（避免阻塞播报功能）
+    setTimeout(() => {
+      ImagePreloader.preloadAll()
+    }, 500)
   } else {
     console.error("[正常流程] 错误：introOverlay 元素不存在！")
   }
@@ -2208,11 +2220,14 @@ function initTest(restoredSnapshot = null) {
   panOffsetX = 0
   panOffsetY = 0
 
-  // 启动图片预加载（如果未恢复状态，则进行初始预加载）
-  if (!isRestored) {
-    ImagePreloader.initialPreload()
-  } else {
-    // 恢复状态时，预加载当前图片的后续图片
+  // 注意：图片预加载已在登录页/介绍页完成，这里不再重复预加载
+  // 如果恢复状态，确保当前图片已预加载（优先保证恢复时图片能快速显示）
+  if (isRestored) {
+    // 优先确保当前图片已预加载（如果还没开始，立即开始）
+    if (!ImagePreloader.isPreloadingOrLoaded(state.currentIndex)) {
+      ImagePreloader.preloadImage(state.currentIndex)
+    }
+    // 然后预加载后续图片（用于后续切换）
     ImagePreloader.preloadAhead(state.currentIndex)
   }
 
@@ -3991,6 +4006,10 @@ function showInfoScreenForRetest() {
   hideTestLoadingOverlay({ keepMainHidden: true })
   if (infoScreen) {
     infoScreen.style.display = "flex"
+    // 重新测试时显示信息填写页，延迟预加载（避免阻塞页面）
+    setTimeout(() => {
+      ImagePreloader.preloadAll()
+    }, 500)
   }
   if (appWindow) {
     appWindow.style.display = "none"

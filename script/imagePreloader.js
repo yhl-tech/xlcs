@@ -1,328 +1,318 @@
 /**
- * 图片预加载管理器
- * 用于优化图片加载性能，提前加载用户可能查看的图片到浏览器缓存
+ * 精简版图片预加载管理器
+ * 目的：删除复杂且未必被外部直接依赖的逻辑，保留 appMain.js 依赖的公共 API。
  */
-
 import { state } from "./appState.js"
 
-/**
- * 图片预加载管理器
- */
-export const ImagePreloader = {
-  // 预加载缓存：存储已创建的 Image 对象
-  preloadCache: new Map(), // key: 图片索引, value: Image 对象
+const preloadCache = new Map() // key: index(number) 或 path(string) -> HTMLImageElement
+const loadingStatus = new Map() // key -> 'loading' | 'loaded' | 'error'
 
-  // 预加载状态：跟踪哪些图片正在加载或已加载
-  loadingStatus: new Map(), // key: 图片索引, value: 'loading' | 'loaded' | 'error'
+const specialImages = {
+  example: "rorschach-blot-example.png",
+}
 
-  // 当前正在加载的图片数量（用于并发控制）
-  currentLoadingCount: 0,
+// Download queue to serialize setting `img.src` so only one image starts downloading at a time.
+const downloadQueue = []
+let isDownloading = false
 
-  // 待加载队列（当达到并发限制时使用）
-  loadingQueue: [],
-
-  // 配置参数
-  config: {
-    preloadAhead: 2, // 预加载前几张（当前图片的前2张）
-    initialPreload: 3, // 初始预加载数量（页面加载时预加载前3张）
-    maxConcurrent: 3, // 最大并发预加载数
-    enableNetworkAware: true, // 是否启用网络感知
-  },
-
-  /**
-   * 初始化预加载器
-   */
-  init() {
-    // 网络感知预加载配置
-    if (this.config.enableNetworkAware) {
-      this._applyNetworkAwareConfig()
-    }
-
-    console.log("[ImagePreloader] 预加载器已初始化", {
-      preloadAhead: this.config.preloadAhead,
-      initialPreload: this.config.initialPreload,
-      maxConcurrent: this.config.maxConcurrent,
-    })
-  },
-
-  /**
-   * 根据网络速度调整预加载策略
-   * @private
-   */
-  _applyNetworkAwareConfig() {
+function _processDownloadQueue() {
+  if (isDownloading) return
+  const task = downloadQueue.shift()
+  if (!task) return
+  isDownloading = true
+  const { href, key, img, onLoad, onError } = task
+  try {
+    console.debug &&
+      console.debug(
+        "[ImagePreloader] _processDownloadQueue START",
+        "key:",
+        key,
+        "href:",
+        href,
+        "queueLength:",
+        downloadQueue.length
+      )
+  } catch (e) {
+    /* noop */
+  }
+  // Attach handlers and start download
+  img.onload = function () {
     try {
-      const connection =
-        navigator.connection ||
-        navigator.mozConnection ||
-        navigator.webkitConnection
-
-      if (connection) {
-        const effectiveType = connection.effectiveType
-
-        if (effectiveType === "slow-2g" || effectiveType === "2g") {
-          // 慢速网络：只预加载下一张
-          this.config.preloadAhead = 1
-          this.config.initialPreload = 2
-          this.config.maxConcurrent = 1
-          console.log("[ImagePreloader] 检测到慢速网络，调整预加载策略")
-        } else if (effectiveType === "3g") {
-          // 3G 网络：预加载 2 张
-          this.config.preloadAhead = 2
-          this.config.initialPreload = 3
-          this.config.maxConcurrent = 2
-          console.log("[ImagePreloader] 检测到 3G 网络，调整预加载策略")
-        } else {
-          // 4G/WiFi：使用默认配置
-          console.log("[ImagePreloader] 检测到快速网络，使用默认预加载策略")
-        }
-      }
-    } catch (error) {
-      console.warn("[ImagePreloader] 网络检测失败，使用默认配置:", error)
+      console.debug && console.debug("[ImagePreloader] img.onload", key, href)
+      onLoad && onLoad()
+    } finally {
+      isDownloading = false
     }
-  },
-
-  /**
-   * 核心方法：预加载单张图片
-   * @param {number} index - 图片索引（0-9）
-   * @returns {boolean} 是否成功启动预加载
-   */
-  preloadImage(index) {
-    // 参数验证
-    if (index < 0 || index >= state.totalImages) {
-      console.warn(
-        `[ImagePreloader] 无效的图片索引: ${index}，总图片数: ${state.totalImages}`
-      )
-      return false
+  }
+  img.onerror = function () {
+    try {
+      console.warn && console.warn("[ImagePreloader] img.onerror", key, href)
+      onError && onError()
+    } finally {
+      isDownloading = false
     }
+  }
+  try {
+    console.debug && console.debug("[ImagePreloader] setting img.src", href)
+    img.src = href
+  } catch (e) {
+    // 如果立即抛错，标记为 error 并继续处理队列
+    loadingStatus.set(key, "error")
+    isDownloading = false
+    setTimeout(_processDownloadQueue, 0)
+  }
+}
 
-    // 检查是否已预加载
-    if (this.preloadCache.has(index)) {
-      return true // 已预加载，直接返回
-    }
+function _createAndLoadImage(href, key) {
+  if (!href) return null
+  // 如果已创建或正在加载，直接返回已创建的对象（避免重复）
+  if (preloadCache.has(key) && loadingStatus.get(key) === "loaded")
+    return preloadCache.get(key)
+  if (loadingStatus.get(key) === "loading") return null
 
-    // 检查是否正在加载
-    const status = this.loadingStatus.get(index)
-    if (status === "loading") {
-      return false // 正在加载中，避免重复
-    }
-
-    // 检查并发限制
-    if (this.currentLoadingCount >= this.config.maxConcurrent) {
-      // 达到并发限制，加入队列
-      this.loadingQueue.push(index)
-      return false
-    }
-
-    // 创建新的 Image 对象进行预加载
+  try {
     const img = new Image()
+    // 标记为正在加载并在缓存中存一个占位 image 对象
+    loadingStatus.set(key, "loading")
+    preloadCache.set(key, img)
 
-    // 标记为加载中
-    this.loadingStatus.set(index, "loading")
-    this.currentLoadingCount++
-
-    // 设置加载成功回调
-    img.onload = () => {
-      this.loadingStatus.set(index, "loaded")
-      this.preloadCache.set(index, img)
-      this.currentLoadingCount--
-
-      console.log(
-        `[ImagePreloader] 图片 ${index + 1} (rorschach-blot-${index + 1}.png) 预加载完成`
-      )
-
-      // 处理队列中的下一个
-      this._processQueue()
+    // 准备队列任务：实际赋 src 的逻辑将在队列中串行执行
+    const onLoad = () => {
+      try {
+        loadingStatus.set(key, "loaded")
+        preloadCache.set(key, img)
+        console.debug &&
+          console.debug("[ImagePreloader] onLoad handler (loaded)", key, href)
+      } catch (err) {
+        /* noop */
+      } finally {
+        img.onload = null
+        img.onerror = null
+        _processDownloadQueue()
+      }
+    }
+    const onError = () => {
+      try {
+        loadingStatus.set(key, "error")
+        console.warn &&
+          console.warn("[ImagePreloader] onError handler (error)", key, href)
+      } catch (err) {
+        /* noop */
+      } finally {
+        img.onload = null
+        img.onerror = null
+        _processDownloadQueue()
+      }
     }
 
-    // 设置加载失败回调
-    img.onerror = () => {
-      this.loadingStatus.set(index, "error")
-      this.currentLoadingCount--
+    console.debug &&
+      console.debug("[ImagePreloader] enqueue", {
+        key,
+        href,
+        queueBefore: downloadQueue.length,
+      })
+    downloadQueue.push({ href, key, img, onLoad, onError })
+    _processDownloadQueue()
+    return img
+  } catch (e) {
+    console.warn("[ImagePreloader] 创建 Image 失败:", e)
+    return null
+  }
+}
 
-      console.warn(
-        `[ImagePreloader] 图片 ${index + 1} (rorschach-blot-${index + 1}.png) 预加载失败`
-      )
+export const ImagePreloader = {
+  preloadCache,
+  loadingStatus,
+  specialImages,
 
-      // 处理队列中的下一个
-      this._processQueue()
-    }
-
-    // 开始加载（设置 src 触发加载）
-    img.src = `./images/rorschach-blot-${index + 1}.png`
-
+  preloadImage(index) {
+    if (typeof index !== "number" || index < 0) return false
+    if (
+      typeof state === "object" &&
+      Number.isFinite(state.totalImages) &&
+      index >= state.totalImages
+    )
+      return false
+    if (preloadCache.has(index) && loadingStatus.get(index) === "loaded")
+      return true
+    const href = `./images/rorschach-blot-${index + 1}.png`
+    console.debug &&
+      console.debug("[ImagePreloader] preloadImage requested", index, href)
+    _createAndLoadImage(href, index)
     return true
   },
 
-  /**
-   * 处理预加载队列
-   * @private
-   */
-  _processQueue() {
-    if (this.loadingQueue.length === 0) {
-      return
-    }
-
-    if (this.currentLoadingCount >= this.config.maxConcurrent) {
-      return // 仍在并发限制内，等待
-    }
-
-    // 从队列中取出下一个
-    const nextIndex = this.loadingQueue.shift()
-    this.preloadImage(nextIndex)
-  },
-
-  /**
-   * 批量预加载：预加载指定范围的图片
-   * @param {number} startIndex - 起始索引
-   * @param {number} endIndex - 结束索引（包含）
-   */
   preloadRange(startIndex, endIndex) {
-    // 参数验证和修正
-    startIndex = Math.max(0, startIndex)
-    endIndex = Math.min(state.totalImages - 1, endIndex)
-
-    if (startIndex > endIndex) {
-      console.warn(
-        `[ImagePreloader] 无效的范围: [${startIndex}, ${endIndex}]`
-      )
-      return
-    }
-
-    console.log(
-      `[ImagePreloader] 开始批量预加载图片 ${startIndex + 1} 到 ${endIndex + 1}`
+    startIndex = Math.max(0, Math.floor(startIndex || 0))
+    endIndex = Math.min(
+      typeof state === "object" ? state.totalImages - 1 : endIndex,
+      Math.floor(endIndex || startIndex)
     )
+    if (startIndex > endIndex) return
 
-    // 遍历范围内的所有图片
-    for (let i = startIndex; i <= endIndex; i++) {
-      this.preloadImage(i)
+    console.debug &&
+      console.debug("[ImagePreloader] preloadRange", { startIndex, endIndex })
+    // Sequentially preload images one-by-one to avoid queuing many at once.
+    const self = this
+    let current = startIndex
+
+    function loadNext() {
+      if (current > endIndex) return
+      // 如果已加载或正在加载，等待其完成再继续
+      if (
+        preloadCache.has(current) &&
+        loadingStatus.get(current) === "loaded"
+      ) {
+        current++
+        // next tick
+        setTimeout(loadNext, 0)
+        return
+      }
+      if (loadingStatus.get(current) === "loading") {
+        // poll until finished
+        const poll = setInterval(() => {
+          const s = loadingStatus.get(current)
+          if (s === "loaded" || s === "error") {
+            clearInterval(poll)
+            current++
+            setTimeout(loadNext, 0)
+          }
+        }, 120)
+        return
+      }
+      // start loading this index
+      console.debug &&
+        console.debug("[ImagePreloader] preloadRange start index", current)
+      self.preloadImage(current)
+      // poll for completion then proceed
+      const poll2 = setInterval(() => {
+        const s = loadingStatus.get(current)
+        if (s === "loaded" || s === "error") {
+          clearInterval(poll2)
+          current++
+          setTimeout(loadNext, 0)
+        }
+      }, 120)
     }
+
+    loadNext()
   },
 
-  /**
-   * 智能预加载：根据当前图片索引预加载后续图片
-   * @param {number} currentIndex - 当前图片索引
-   */
   preloadAhead(currentIndex) {
-    // 计算需要预加载的范围
-    const startIndex = currentIndex + 1
-    const endIndex = Math.min(
-      state.totalImages - 1,
-      currentIndex + this.config.preloadAhead
-    )
+    // 预加载下一张作为轻量策略（只预加载 1 张，避免同时触发多张下载）
+    this.preloadRange(currentIndex + 1, currentIndex + 1)
+  },
 
-    if (startIndex <= endIndex) {
-      // 预加载后续图片
-      this.preloadRange(startIndex, endIndex)
+  preloadSpecialImage(imageKey) {
+    const name = specialImages[imageKey]
+    if (!name) return false
+    // 尝试常见位置，优先 images，然后 public/images
+    // 仅使用 public 目录下的静态资源路径，避免打包时重复输出相同文件
+    const candidates = [`./public/images/${name}`]
+    for (const href of candidates) {
+      if (loadingStatus.get(href) === "loaded" || preloadCache.has(href)) {
+        return true
+      }
+      _createAndLoadImage(href, href)
+      // 如果是示例图（intro-preview-image），在示例图加载完成后再开始按序预加载 rorschach-blot-1..N
+      try {
+        if (imageKey === "example" && typeof document !== "undefined") {
+          // Ensure we only trigger once
+          if (!window._imagePreloader_exampleTriggered) {
+            const el = document.getElementById("intro-preview-image")
+            const triggerPreloadRange = () => {
+              try {
+                window._imagePreloader_exampleTriggered = true
+                // preload numbered images sequentially (indexes 0..totalImages-1)
+                if (
+                  typeof state === "object" &&
+                  Number.isFinite(state.totalImages)
+                ) {
+                  const last = Math.max(0, state.totalImages - 1)
+                  // start from 0 (rorschach-blot-1.png corresponds to index 0)
+                  this.preloadRange(0, last)
+                }
+              } catch (err) {
+                /* noop */
+              }
+            }
+
+            if (el) {
+              if (el.complete && el.naturalWidth > 0) {
+                triggerPreloadRange()
+              } else {
+                const onLoad = () => {
+                  try {
+                    el.removeEventListener("load", onLoad)
+                  } catch (e) {}
+                  triggerPreloadRange()
+                }
+                el.addEventListener("load", onLoad)
+              }
+            } else {
+              // no DOM element available; rely on the created Image to trigger queue handlers
+              // the _createAndLoadImage call above will enqueue download and eventually call preloadRange via its onLoad
+            }
+          }
+        }
+      } catch (e) {
+        // noop
+      }
     }
+    return true
+  },
 
-    // 可选：预加载前一张图片（支持后退）
-    if (currentIndex > 0) {
-      this.preloadImage(currentIndex - 1)
+  preloadAll() {
+    // 轻量预加载：优先加载关键资源（示例图与 logo）并预加载首张
+    this.preloadSpecialImage("example")
+    this.preloadSpecialImage("logo")
+    if (
+      state &&
+      typeof state.totalImages === "number" &&
+      state.totalImages > 0
+    ) {
+      // 仅预加载第一张，避免在初始化时并行下载多张图片
+      this.preloadRange(0, Math.min(0, state.totalImages - 1))
     }
   },
 
-  /**
-   * 初始预加载：页面加载时预加载前几张
-   */
   initialPreload() {
-    const count = Math.min(
-      this.config.initialPreload,
-      state.totalImages
+    // 兼容旧调用：预加载第一张
+    this.preloadRange(
+      0,
+      Math.min(0, typeof state === "object" ? state.totalImages - 1 : 0)
     )
-
-    console.log(
-      `[ImagePreloader] 开始初始预加载前 ${count} 张图片`
-    )
-
-    // 预加载前 N 张图片
-    this.preloadRange(0, count - 1)
   },
 
-  /**
-   * 检查图片是否已预加载
-   * @param {number} index - 图片索引
-   * @returns {boolean} 是否已预加载
-   */
   isPreloaded(index) {
-    return this.loadingStatus.get(index) === "loaded"
+    return loadingStatus.get(index) === "loaded"
   },
 
-  /**
-   * 获取预加载的图片对象（如果已加载）
-   * @param {number} index - 图片索引
-   * @returns {HTMLImageElement|null} 预加载的图片对象，如果未加载则返回 null
-   */
-  getPreloadedImage(index) {
-    return this.preloadCache.get(index) || null
+  isPreloadingOrLoaded(index) {
+    const s = loadingStatus.get(index)
+    return s === "loading" || s === "loaded"
   },
 
-  /**
-   * 获取图片的 URL（用于直接设置 src）
-   * @param {number} index - 图片索引
-   * @returns {string} 图片 URL
-   */
+  getPreloadedImage(key) {
+    return preloadCache.get(key) || null
+  },
+
   getImageUrl(index) {
     return `./images/rorschach-blot-${index + 1}.png`
   },
 
-  /**
-   * 清理预加载缓存（可选，节省内存）
-   * @param {Array<number>} keepIndices - 要保留的图片索引数组
-   */
   clearCache(keepIndices = []) {
     const keepSet = new Set(keepIndices)
-
-    // 清理不在保留列表中的缓存
-    for (const [index, img] of this.preloadCache.entries()) {
-      if (!keepSet.has(index)) {
-        this.preloadCache.delete(index)
-        this.loadingStatus.delete(index)
+    for (const k of Array.from(preloadCache.keys())) {
+      if (typeof k === "number" && !keepSet.has(k)) {
+        preloadCache.delete(k)
+        loadingStatus.delete(k)
       }
     }
-
-    console.log(
-      `[ImagePreloader] 已清理缓存，保留 ${keepIndices.length} 张图片`
-    )
   },
 
-  /**
-   * 获取预加载统计信息
-   * @returns {Object} 统计信息
-   */
-  getStats() {
-    let loadedCount = 0
-    let loadingCount = 0
-    let errorCount = 0
-
-    for (const status of this.loadingStatus.values()) {
-      if (status === "loaded") loadedCount++
-      else if (status === "loading") loadingCount++
-      else if (status === "error") errorCount++
-    }
-
-    return {
-      total: state.totalImages,
-      loaded: loadedCount,
-      loading: loadingCount,
-      error: errorCount,
-      cached: this.preloadCache.size,
-      queueLength: this.loadingQueue.length,
-    }
-  },
-
-  /**
-   * 重置预加载器（清除所有缓存和状态）
-   */
   reset() {
-    this.preloadCache.clear()
-    this.loadingStatus.clear()
-    this.currentLoadingCount = 0
-    this.loadingQueue = []
-
-    console.log("[ImagePreloader] 预加载器已重置")
+    preloadCache.clear()
+    loadingStatus.clear()
   },
 }
-
-// 自动初始化
-ImagePreloader.init()
-
