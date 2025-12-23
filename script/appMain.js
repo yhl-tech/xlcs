@@ -2027,6 +2027,14 @@ async function enterTestExperience({
         console.warn("开始录音失败:", err)
       }
 
+      // 启动混合录音（同时录制 TTS 和麦克风）
+      try {
+        await window.dialogClient.startMixedRecording()
+        console.log("[测试] 混合录音已启动")
+      } catch (err) {
+        console.warn("启动混合录音失败:", err)
+      }
+
       if (!skipOpeningSpeech) {
         try {
           console.log("[进入测试页] 发送开场白")
@@ -3337,10 +3345,21 @@ function goToNextQuestion() {
 }
 
 // 完成和汇总
-function finishAndSave() {
+async function finishAndSave() {
   // 如果按钮被禁用，直接返回（防止在播报期间点击）
   if (finishBtn && finishBtn.disabled) {
     return
+  }
+
+  // 先停止混合录音，获取混合音频
+  let mixedAudioBlob = null
+  if (window.dialogClient && window.dialogClient.isMixedRecording) {
+    try {
+      mixedAudioBlob = await window.dialogClient.stopMixedRecording()
+      console.log("[测试完成] 混合录音已停止，大小:", (mixedAudioBlob?.size / 1024 / 1024).toFixed(2), "MB")
+    } catch (err) {
+      console.warn("[测试完成] 停止混合录音失败:", err)
+    }
   }
 
   // 断开TTS连接
@@ -3349,8 +3368,25 @@ function finishAndSave() {
     console.log("[测试完成] TTS连接已断开")
   }
 
+  // 等待 MediaRecorder 停止并生成 audioBlob（备用）
   if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
-    state.mediaRecorder.stop()
+    await new Promise((resolve) => {
+      const originalOnStop = state.mediaRecorder.onstop
+      state.mediaRecorder.onstop = (event) => {
+        if (originalOnStop) {
+          originalOnStop(event)
+        }
+        console.log("[录音] MediaRecorder 已停止，audioBlob 已生成")
+        resolve()
+      }
+      state.mediaRecorder.stop()
+    })
+  }
+
+  // 保存混合录音到 state（优先使用混合录音）
+  if (mixedAudioBlob) {
+    state.audioBlob = mixedAudioBlob
+    console.log("[测试完成] 使用混合录音作为最终音频")
   }
 
   // 导出交互追踪数据
@@ -3446,15 +3482,43 @@ function finishAndSave() {
 }
 
 // 只处理数据提交和清理（不处理视图切换）
-function finishAndSaveData() {
+async function finishAndSaveData() {
+  // 先停止混合录音，获取混合音频
+  let mixedAudioBlob = null
+  if (window.dialogClient && window.dialogClient.isMixedRecording) {
+    try {
+      mixedAudioBlob = await window.dialogClient.stopMixedRecording()
+      console.log("[测试完成] 混合录音已停止，大小:", (mixedAudioBlob?.size / 1024 / 1024).toFixed(2), "MB")
+    } catch (err) {
+      console.warn("[测试完成] 停止混合录音失败:", err)
+    }
+  }
+
   // 断开TTS连接
   if (window.dialogClient) {
     window.dialogClient.disconnect()
     console.log("[测试完成] TTS连接已断开")
   }
 
+  // 等待 MediaRecorder 停止并生成 audioBlob（备用）
   if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
-    state.mediaRecorder.stop()
+    await new Promise((resolve) => {
+      const originalOnStop = state.mediaRecorder.onstop
+      state.mediaRecorder.onstop = (event) => {
+        if (originalOnStop) {
+          originalOnStop(event)
+        }
+        console.log("[录音] MediaRecorder 已停止，audioBlob 已生成")
+        resolve()
+      }
+      state.mediaRecorder.stop()
+    })
+  }
+
+  // 保存混合录音到 state（优先使用混合录音）
+  if (mixedAudioBlob) {
+    state.audioBlob = mixedAudioBlob
+    console.log("[测试完成] 使用混合录音作为最终音频")
   }
 
   // 导出交互追踪数据
@@ -4977,24 +5041,136 @@ function setupAuthControls() {
     })
   }
 
-  // 测试提交按钮
-  // const testSubmitBtn = document.getElementById("test-submit-btn")
-  // if (testSubmitBtn) {
-  //   testSubmitBtn.addEventListener("click", async () => {
-  //     console.log("[测试] 点击测试提交按钮")
-  //     try {
-  //       const result = await window.submitTestDataToServer(
-  //         window.InteractionTracker,
-  //         state.audioBlob
-  //       )
-  //       console.log("[测试] submitTestDataToServer 结果:", result)
-  //       alert("测试完成，请查看控制台")
-  //     } catch (error) {
-  //       console.error("[测试] submitTestDataToServer 错误:", error)
-  //       alert("测试失败: " + error.message)
-  //     }
-  //   })
-  // }
+  // 测试提交按钮 - 用于测试混合音频上传功能
+  const testSubmitBtn = document.getElementById("test-audio-btn")
+  if (testSubmitBtn) {
+    testSubmitBtn.addEventListener("click", async () => {
+      console.log("[测试音频] ========== 开始测试 ==========")
+
+      const userId = getCurrentUserId()
+      if (!userId) {
+        alert("请先登录")
+        return
+      }
+
+      // 检查 dialogClient 是否存在（用于混合录音）
+      const hasDialogClient = !!window.dialogClient
+
+      // 检查混合录音状态
+      if (hasDialogClient) {
+        const mixedStatus = window.dialogClient.getMixedRecordingStatus?.() || {}
+        console.log("[测试音频] 混合录音状态:", mixedStatus)
+
+        // 如果正在混合录音，停止并上传
+        if (mixedStatus.isRecording) {
+          console.log("[测试音频] 停止混合录音...")
+          testSubmitBtn.disabled = true
+          testSubmitBtn.textContent = "处理中..."
+
+          try {
+            const mixedBlob = await window.dialogClient.stopMixedRecording()
+            console.log("[测试音频] 混合录音已停止，大小:", (mixedBlob?.size / 1024 / 1024).toFixed(2), "MB")
+
+            if (mixedBlob && mixedBlob.size > 0) {
+              testSubmitBtn.textContent = "上传中..."
+              const result = await window.API.uploadMedia(mixedBlob, userId)
+              console.log("[测试音频] 上传结果:", result)
+
+              testSubmitBtn.textContent = "✅ 成功"
+              testSubmitBtn.style.background = "#10b981"
+              alert("混合音频上传成功!\n文件大小: " + (mixedBlob.size / 1024 / 1024).toFixed(2) + "MB\n包含: AI语音 + 用户语音")
+            } else {
+              alert("混合录音数据为空")
+            }
+          } catch (error) {
+            console.error("[测试音频] 处理失败:", error)
+            testSubmitBtn.textContent = "❌ 失败"
+            testSubmitBtn.style.background = "#ef4444"
+            alert("失败: " + error.message)
+          } finally {
+            setTimeout(() => {
+              testSubmitBtn.disabled = false
+              testSubmitBtn.textContent = "测试音频"
+              testSubmitBtn.style.background = "#4CAF50"
+            }, 2000)
+          }
+          return
+        }
+
+        // 如果没有在混合录音，启动混合录音
+        console.log("[测试音频] 启动混合录音...")
+        try {
+          await window.dialogClient.startMixedRecording()
+          testSubmitBtn.textContent = "混合录音中(点击停止)"
+          testSubmitBtn.style.background = "#ef4444"
+          alert("混合录音已开始！\n正在录制: AI语音 + 用户语音\n请说几句话，然后再次点击按钮停止并上传。")
+        } catch (err) {
+          console.error("[测试音频] 启动混合录音失败:", err)
+          alert("启动混合录音失败: " + err.message)
+        }
+        return
+      }
+
+      // 如果没有 dialogClient，使用普通 MediaRecorder
+      console.log("[测试音频] 使用普通 MediaRecorder")
+
+      if (!state.mediaRecorder) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          state.mediaRecorder = new MediaRecorder(stream)
+          state.mediaRecorder.ondataavailable = (event) => {
+            state.audioChunks.push(event.data)
+          }
+          state.mediaRecorder.onstop = () => {
+            state.audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+          }
+        } catch (err) {
+          alert("无法访问麦克风: " + err.message)
+          return
+        }
+      }
+
+      if (state.mediaRecorder.state === "inactive") {
+        state.audioChunks = []
+        state.mediaRecorder.start()
+        testSubmitBtn.textContent = "录音中(点击停止)"
+        testSubmitBtn.style.background = "#ef4444"
+        return
+      }
+
+      if (state.mediaRecorder.state === "recording") {
+        testSubmitBtn.disabled = true
+        testSubmitBtn.textContent = "处理中..."
+
+        await new Promise((resolve) => {
+          const orig = state.mediaRecorder.onstop
+          state.mediaRecorder.onstop = (e) => { if (orig) orig(e); resolve() }
+          state.mediaRecorder.stop()
+        })
+
+        const blob = state.audioBlob || new Blob(state.audioChunks, { type: "audio/webm" })
+        if (blob && blob.size > 0) {
+          try {
+            testSubmitBtn.textContent = "上传中..."
+            await window.API.uploadMedia(blob, userId)
+            testSubmitBtn.textContent = "✅ 成功"
+            testSubmitBtn.style.background = "#10b981"
+            alert("上传成功! 大小: " + (blob.size / 1024 / 1024).toFixed(2) + "MB")
+          } catch (error) {
+            testSubmitBtn.textContent = "❌ 失败"
+            testSubmitBtn.style.background = "#ef4444"
+            alert("上传失败: " + error.message)
+          }
+        }
+
+        setTimeout(() => {
+          testSubmitBtn.disabled = false
+          testSubmitBtn.textContent = "测试音频"
+          testSubmitBtn.style.background = "#4CAF50"
+        }, 2000)
+      }
+    })
+  }
 
   // 测试轨迹上传按钮
   const testTracksBtn = document.getElementById("test-tracks-btn")

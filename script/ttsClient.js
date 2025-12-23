@@ -105,6 +105,13 @@ import { getWebSocketUrl } from "./config.js"
       this.nextPlayTime = 0
       this.currentSource = null
 
+      // 混合录音相关
+      this.mixedStreamDestination = null
+      this.mixedMediaRecorder = null
+      this.mixedAudioChunks = []
+      this.isMixedRecording = false
+      this.micSource = null
+
       this.onConnect = null
       this.onDisconnect = null
       this.onError = null
@@ -353,7 +360,12 @@ import { getWebSocketUrl } from "./config.js"
 
       const source = this.audioContext.createBufferSource()
       source.buffer = audioBuffer
+      // 连接到扬声器输出
       source.connect(this.audioContext.destination)
+      // 同时连接到混合录音流（如果存在）
+      if (this.mixedStreamDestination && this.isMixedRecording) {
+        source.connect(this.mixedStreamDestination)
+      }
       this.currentSource = source
 
       const currentTime = this.audioContext.currentTime
@@ -380,6 +392,12 @@ import { getWebSocketUrl } from "./config.js"
 
       if (this.audioContext.state === "suspended") {
         await this.audioContext.resume()
+      }
+
+      // 创建混合录音的 destination
+      if (!this.mixedStreamDestination) {
+        this.mixedStreamDestination = this.audioContext.createMediaStreamDestination()
+        console.log("[Dialog] 混合录音 destination 已创建")
       }
 
       if (!this.mediaStream) {
@@ -579,8 +597,85 @@ import { getWebSocketUrl } from "./config.js"
       this.ws.send(message)
     }
 
+    // 开始混合录音（同时录制 TTS 和麦克风）
+    async startMixedRecording() {
+      if (this.isMixedRecording) {
+        console.warn("[Dialog] 混合录音已在进行中")
+        return
+      }
+
+      // 确保音频已初始化
+      await this.initAudio()
+
+      if (!this.mixedStreamDestination) {
+        this.mixedStreamDestination = this.audioContext.createMediaStreamDestination()
+      }
+
+      // 将麦克风连接到混合流
+      if (this.mediaStream && !this.micSource) {
+        this.micSource = this.audioContext.createMediaStreamSource(this.mediaStream)
+        this.micSource.connect(this.mixedStreamDestination)
+        console.log("[Dialog] 麦克风已连接到混合流")
+      }
+
+      // 创建 MediaRecorder 录制混合流
+      this.mixedAudioChunks = []
+      this.mixedMediaRecorder = new MediaRecorder(this.mixedStreamDestination.stream, {
+        mimeType: "audio/webm;codecs=opus"
+      })
+
+      this.mixedMediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.mixedAudioChunks.push(event.data)
+        }
+      }
+
+      this.mixedMediaRecorder.start()
+      this.isMixedRecording = true
+      console.log("[Dialog] 混合录音已开始")
+    }
+
+    // 停止混合录音并返回音频 Blob
+    async stopMixedRecording() {
+      if (!this.isMixedRecording || !this.mixedMediaRecorder) {
+        console.warn("[Dialog] 混合录音未在进行中")
+        return null
+      }
+
+      return new Promise((resolve) => {
+        this.mixedMediaRecorder.onstop = () => {
+          const audioBlob = new Blob(this.mixedAudioChunks, { type: "audio/webm" })
+          console.log("[Dialog] 混合录音已停止，大小:", (audioBlob.size / 1024 / 1024).toFixed(2), "MB")
+          this.isMixedRecording = false
+          this.mixedAudioChunks = []
+          resolve(audioBlob)
+        }
+        this.mixedMediaRecorder.stop()
+      })
+    }
+
+    // 获取混合录音状态
+    getMixedRecordingStatus() {
+      return {
+        isRecording: this.isMixedRecording,
+        chunksCount: this.mixedAudioChunks.length
+      }
+    }
+
     disconnect() {
       this.stopRecording()
+
+      // 停止混合录音
+      if (this.isMixedRecording && this.mixedMediaRecorder) {
+        this.mixedMediaRecorder.stop()
+        this.isMixedRecording = false
+      }
+
+      // 断开麦克风与混合流的连接
+      if (this.micSource) {
+        this.micSource.disconnect()
+        this.micSource = null
+      }
 
       if (this.mediaStream) {
         this.mediaStream.getTracks().forEach((track) => track.stop())
