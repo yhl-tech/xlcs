@@ -53,12 +53,10 @@ import { getWebSocketUrl } from "./config.js"
     return out
   }
 
-  // 短期策略控制：是否在 AI 播放时写入 AI PCM 到 AudioRecorder
   function shouldWriteAIToRecorder() {
     return !Boolean(window._skipWritingAIToAudioRecorder)
   }
 
-  // 全局控制接口：设置跳过写 AI PCM 的开关（可选超时自动恢复）
   window.setSkipWritingAIToAudioRecorder = function (
     skip = true,
     timeoutMs = 30000
@@ -92,9 +90,6 @@ import { getWebSocketUrl } from "./config.js"
     sampleRate,
     onendedCallback = null
   ) {
-    // NOTE: AI PCM writing is centralized to playQueue to avoid duplicate writes.
-    // playPCMWithWebAudio no longer writes PCM into AudioRecorder to prevent
-    // duplicated/serialised recordings that corrupt exported MP3 durations.
     if (
       window.AudioRecorder &&
       window.AudioRecorder._instance &&
