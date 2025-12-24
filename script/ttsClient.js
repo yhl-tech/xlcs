@@ -32,6 +32,7 @@ import { getWebSocketUrl } from "./config.js"
     return buffer
   }
 
+<<<<<<< HEAD
   /**
    * 简单线性重采样 Int16Array，从 srcRate 到 dstRate
    * 质量足够用于短语音片段，保持顺序与时长近似
@@ -85,31 +86,27 @@ import { getWebSocketUrl } from "./config.js"
     }
   }
 
+=======
+>>>>>>> parent of 5886162 ('feat:用户录音处理')
   async function playPCMWithWebAudio(
     pcmData,
     sampleRate,
     onendedCallback = null
   ) {
+<<<<<<< HEAD
+=======
+    // 在播放前保存PCM数据到录制器
+>>>>>>> parent of 5886162 ('feat:用户录音处理')
     if (
       window.AudioRecorder &&
       window.AudioRecorder._instance &&
       window.AudioRecorder._instance.isRecording
     ) {
       try {
-        if (
-          typeof shouldWriteAIToRecorder === "function" &&
-          !shouldWriteAIToRecorder()
-        ) {
-          console.log(
-            "[AudioFix] skip writing AI PCM to AudioRecorder (playPCMWithWebAudio) - centralized to playQueue"
-          )
-        } else {
-          console.log(
-            "[AudioFix] suppressing AI PCM write in playPCMWithWebAudio; playQueue will handle recording"
-          )
-        }
+        const int16View = new Int16Array(pcmData)
+        window.AudioRecorder.addPCMData(int16View, sampleRate)
       } catch (error) {
-        console.warn("[TTS] 保存音频数据失败 (log only):", error)
+        console.warn("[TTS] 保存音频数据失败:", error)
       }
     }
 
@@ -385,26 +382,17 @@ import { getWebSocketUrl } from "./config.js"
 
       const int16View = new Int16Array(arrayBuffer)
 
-      // 在播放前根据短期策略决定是否保存AI的PCM到录制器
+      // 在播放前保存PCM数据到录制器
       if (
         window.AudioRecorder &&
         window.AudioRecorder._instance &&
         window.AudioRecorder._instance.isRecording
       ) {
         try {
-          if (
-            typeof shouldWriteAIToRecorder === "function" &&
-            !shouldWriteAIToRecorder()
-          ) {
-            console.log(
-              "[AudioFix] skip writing AI PCM to AudioRecorder (playQueue)"
-            )
-          } else {
-            window.AudioRecorder.addPCMData(
-              int16View,
-              this.config.outputAudio.sampleRate
-            )
-          }
+          window.AudioRecorder.addPCMData(
+            int16View,
+            this.config.outputAudio.sampleRate
+          )
         } catch (error) {
           console.warn("[TTS] 保存音频数据失败:", error)
         }
@@ -507,34 +495,6 @@ import { getWebSocketUrl } from "./config.js"
 
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(pcmData)
-        }
-        // 同步把麦克风 PCM 保存到全局 AudioRecorder（以便导出包含 AI + 用户的 MP3）
-        try {
-          if (
-            window.AudioRecorder &&
-            window.AudioRecorder._instance &&
-            window.AudioRecorder._instance.isRecording
-          ) {
-            const int16View = new Int16Array(pcmData)
-            // 目标采样率：优先使用 AudioRecorder 已设置的采样率，否则用 outputAudio.sampleRate（通常 24000）
-            const targetRate =
-              (window.AudioRecorder._instance &&
-                window.AudioRecorder._instance.sampleRate) ||
-              this.config.outputAudio.sampleRate ||
-              24000
-            // 实际来源采样率应当使用输入缓冲的采样率（event.inputBuffer.sampleRate）
-            const srcRate =
-              event.inputBuffer && event.inputBuffer.sampleRate
-                ? event.inputBuffer.sampleRate
-                : this.config.inputAudio.sampleRate || 16000
-            const toAdd =
-              srcRate === targetRate
-                ? int16View
-                : resampleInt16Array(int16View, srcRate, targetRate)
-            window.AudioRecorder.addPCMData(toAdd, targetRate)
-          }
-        } catch (err) {
-          console.warn("[Dialog] 保存麦克风PCM到录制器失败:", err)
         }
       }
 

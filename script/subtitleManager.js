@@ -98,7 +98,7 @@
         this.indicatorElement = document.getElementById("subtitle-indicator")
 
         if (!this.container || !this.textElement) {
-          // console.warn("[Subtitle] DOM 元素未找到")
+          console.warn("[Subtitle] DOM 元素未找到")
         }
       }
     }
@@ -111,7 +111,7 @@
         window.SpeechRecognition || window.webkitSpeechRecognition
 
       if (!SpeechRecognition) {
-        // console.warn("[Subtitle] 浏览器不支持 Web Speech API，将使用后端识别")
+        console.warn("[Subtitle] 浏览器不支持 Web Speech API，将使用后端识别")
         this.speechSupported = false
         return
       }
@@ -198,11 +198,11 @@
           ]
 
           if (disableErrors.includes(error)) {
-            // console.warn(
-            //   `[Subtitle] Web Speech API ${
-            //     errorMessages[error] || error
-            //   }，将使用后端识别`
-            // )
+            console.warn(
+              `[Subtitle] Web Speech API ${
+                errorMessages[error] || error
+              }，将使用后端识别`
+            )
             this.speechSupported =
               error === "network" ? false : this.speechSupported
             this.webSpeechWorking = false
@@ -228,7 +228,7 @@
 
         this.speechSupported = true
       } catch (error) {
-        // console.warn("[Subtitle] Web Speech API 初始化失败:", error)
+        console.warn("[Subtitle] Web Speech API 初始化失败:", error)
         this.speechSupported = false
       }
     }
@@ -401,9 +401,9 @@
       if (speaker === "user" || speaker === "assistant") {
         // 如果是长文本，直接显示，不使用打字机效果
         if (isLongText) {
-          // console.log(
-          //   `[Subtitle] addText 长文本直接显示 | speaker=${speaker} | textLength=${textToShow.length} | maxTypingLength=${CONFIG.maxTypingLength}`
-          // )
+          console.log(
+            `[Subtitle] addText 长文本直接显示 | speaker=${speaker} | textLength=${textToShow.length} | maxTypingLength=${CONFIG.maxTypingLength}`
+          )
           // 停止当前打字机效果（如果有）
           if (this.typingTimer) {
             clearTimeout(this.typingTimer)
@@ -439,51 +439,51 @@
             textToShow.length > this.currentText.length
           ) {
             if (this.isTyping) {
-              // console.log(
-              //   `[Subtitle] addText 打字中收到新文本 | speaker=${speaker} | currentText="${
-              //     this.currentText
-              //   }" | currentLength=${
-              //     this.currentText.length
-              //   } | newText="${textToShow}" | newLength=${
-              //     textToShow.length
-              //   } | currentLastChar="${
-              //     this.currentText[this.currentText.length - 1] || ""
-              //   }" | newLastChar="${textToShow[textToShow.length - 1] || ""}"`
-              // )
-              // console.log(
-              //   `[Subtitle] addText 累积文本更新，继续打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
-              // )
+              console.log(
+                `[Subtitle] addText 打字中收到新文本 | speaker=${speaker} | currentText="${
+                  this.currentText
+                }" | currentLength=${
+                  this.currentText.length
+                } | newText="${textToShow}" | newLength=${
+                  textToShow.length
+                } | currentLastChar="${
+                  this.currentText[this.currentText.length - 1] || ""
+                }" | newLastChar="${textToShow[textToShow.length - 1] || ""}"`
+              )
+              console.log(
+                `[Subtitle] addText 累积文本更新，继续打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+              )
             } else {
-              // console.log(
-              //   `[Subtitle] addText 打字完成后收到扩展文本，继续打字机效果 | isTyping=${
-              //     this.isTyping
-              //   } | currentText="${
-              //     this.currentText
-              //   }" | newText="${textToShow}" | newLastChar="${
-              //     textToShow[textToShow.length - 1] || ""
-              //   }"`
-              // )
+              console.log(
+                `[Subtitle] addText 打字完成后收到扩展文本，继续打字机效果 | isTyping=${
+                  this.isTyping
+                } | currentText="${
+                  this.currentText
+                }" | newText="${textToShow}" | newLastChar="${
+                  textToShow[textToShow.length - 1] || ""
+                }"`
+              )
             }
             // 累积文本更新：继续打字机效果，从当前位置继续
             this.typeText(textToShow, speaker, options)
           } else {
             // 新文本完全不同，停止当前打字机效果，重新开始
             if (this.isTyping) {
-              // console.log(
-              //   `[Subtitle] addText 文本完全不同，重新开始打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
-              // )
+              console.log(
+                `[Subtitle] addText 文本完全不同，重新开始打字机效果 | currentText="${this.currentText}" | newText="${textToShow}"`
+              )
             } else {
-              // console.log(
-              //   `[Subtitle] addText 开始新的打字机效果 | isTyping=${
-              //     this.isTyping
-              //   } | currentSpeaker=${
-              //     this.currentSpeaker
-              //   } | newSpeaker=${speaker} | currentText="${
-              //     this.currentText
-              //   }" | newText="${textToShow}" | newLastChar="${
-              //     textToShow[textToShow.length - 1] || ""
-              //   }"`
-              // )
+              console.log(
+                `[Subtitle] addText 开始新的打字机效果 | isTyping=${
+                  this.isTyping
+                } | currentSpeaker=${
+                  this.currentSpeaker
+                } | newSpeaker=${speaker} | currentText="${
+                  this.currentText
+                }" | newText="${textToShow}" | newLastChar="${
+                  textToShow[textToShow.length - 1] || ""
+                }"`
+              )
             }
             // 停止当前打字机效果（如果有）
             if (this.typingTimer) {
@@ -502,17 +502,17 @@
             // 文本完全相同，跳过
             return
           }
-          // console.log(
-          //   `[Subtitle] addText 开始新的打字机效果 | isTyping=${
-          //     this.isTyping
-          //   } | currentSpeaker=${
-          //     this.currentSpeaker
-          //   } | newSpeaker=${speaker} | currentText="${
-          //     this.currentText
-          //   }" | newText="${textToShow}" | newLastChar="${
-          //     textToShow[textToShow.length - 1] || ""
-          //   }"`
-          // )
+          console.log(
+            `[Subtitle] addText 开始新的打字机效果 | isTyping=${
+              this.isTyping
+            } | currentSpeaker=${
+              this.currentSpeaker
+            } | newSpeaker=${speaker} | currentText="${
+              this.currentText
+            }" | newText="${textToShow}" | newLastChar="${
+              textToShow[textToShow.length - 1] || ""
+            }"`
+          )
           // 说话人不同，直接开始新的打字机效果
           this.typeText(textToShow, speaker, options)
         }
@@ -534,9 +534,9 @@
 
       // 检查文本长度，如果超过阈值，直接显示，不使用打字机效果
       if (text.length > CONFIG.maxTypingLength) {
-        // console.log(
-        //   `[Subtitle] typeText 长文本直接显示 | speaker=${speaker} | textLength=${text.length} | maxTypingLength=${CONFIG.maxTypingLength}`
-        // )
+        console.log(
+          `[Subtitle] typeText 长文本直接显示 | speaker=${speaker} | textLength=${text.length} | maxTypingLength=${CONFIG.maxTypingLength}`
+        )
         // 停止当前打字机效果（如果有）
         if (this.typingTimer) {
           clearTimeout(this.typingTimer)
@@ -606,23 +606,23 @@
       const type = () => {
         if (index < targetText.length) {
           this.currentText = targetText.substring(0, index + 1)
-          // console.log(
-          //   `[Subtitle] typeText 打字中 | speaker=${speaker} | index=${index} | currentLength=${
-          //     this.currentText.length
-          //   } | targetLength=${targetText.length} | currentText="${
-          //     this.currentText
-          //   }" | lastChar="${this.currentText[this.currentText.length - 1]}"`
-          // )
+          console.log(
+            `[Subtitle] typeText 打字中 | speaker=${speaker} | index=${index} | currentLength=${
+              this.currentText.length
+            } | targetLength=${targetText.length} | currentText="${
+              this.currentText
+            }" | lastChar="${this.currentText[this.currentText.length - 1]}"`
+          )
           this.displayText(this.currentText, speaker, false)
           this.typingTimer = setTimeout(type, speed)
           index++
         } else {
           // 打字机效果完成
-          // console.log(
-          //   `[Subtitle] typeText 完成 | speaker=${speaker} | finalText="${targetText}" | finalLength=${
-          //     targetText.length
-          //   } | lastChar="${targetText[targetText.length - 1]}"`
-          // )
+          console.log(
+            `[Subtitle] typeText 完成 | speaker=${speaker} | finalText="${targetText}" | finalLength=${
+              targetText.length
+            } | lastChar="${targetText[targetText.length - 1]}"`
+          )
           this.displayText(targetText, speaker, true)
           this.typingTimer = null
           this.isTyping = false
@@ -651,15 +651,15 @@
       const oldText = this.currentText
       const displayedTextBefore = this.textElement.textContent
 
-      // console.log(
-      //   `[Subtitle] displayText 调用 | speaker=${speaker} | isComplete=${isComplete} | oldText="${oldText}" | newText="${text}" | textLength=${
-      //     text.length
-      //   } | lastChar="${
-      //     text[text.length - 1] || ""
-      //   }" | displayedTextBefore="${displayedTextBefore}" | displayedLengthBefore=${
-      //     displayedTextBefore.length
-      //   }`
-      // )
+      console.log(
+        `[Subtitle] displayText 调用 | speaker=${speaker} | isComplete=${isComplete} | oldText="${oldText}" | newText="${text}" | textLength=${
+          text.length
+        } | lastChar="${
+          text[text.length - 1] || ""
+        }" | displayedTextBefore="${displayedTextBefore}" | displayedLengthBefore=${
+          displayedTextBefore.length
+        }`
+      )
 
       // 更新状态
       this.currentText = text
@@ -668,16 +668,16 @@
 
       // 验证显示后的文本
       const displayedTextAfter = this.textElement.textContent
-      // console.log(
-      //   `[Subtitle] displayText 完成 | speaker=${speaker} | text="${text}" | displayedTextAfter="${displayedTextAfter}" | displayedLengthAfter=${
-      //     displayedTextAfter.length
-      //   } | match=${displayedTextAfter === text}`
-      // )
+      console.log(
+        `[Subtitle] displayText 完成 | speaker=${speaker} | text="${text}" | displayedTextAfter="${displayedTextAfter}" | displayedLengthAfter=${
+          displayedTextAfter.length
+        } | match=${displayedTextAfter === text}`
+      )
 
       if (displayedTextAfter !== text) {
-        // console.warn(
-        //   `[Subtitle] displayText 文本不匹配 | expected="${text}" | actual="${displayedTextAfter}" | expectedLength=${text.length} | actualLength=${displayedTextAfter.length}`
-        // )
+        console.warn(
+          `[Subtitle] displayText 文本不匹配 | expected="${text}" | actual="${displayedTextAfter}" | expectedLength=${text.length} | actualLength=${displayedTextAfter.length}`
+        )
       }
 
       // 设置样式类
@@ -826,7 +826,7 @@
           JSON.stringify(this.stats)
         )
       } catch (error) {
-        // console.warn("[Subtitle] 保存历史记录失败:", error)
+        console.warn("[Subtitle] 保存历史记录失败:", error)
         // sessionStorage 可能已满，尝试清理旧数据
         if (error.name === "QuotaExceededError") {
           this.history = this.history.slice(
@@ -977,17 +977,17 @@
         const currentUserText =
           this.currentSpeaker === "user" ? this.currentText : ""
 
-        // console.log(
-        //   `[Subtitle] handleTextMessage 用户语音 | backendText="${backendText}" | backendLength=${
-        //     backendText.length
-        //   } | backendLastChar="${
-        //     backendText[backendText.length - 1] || ""
-        //   }" | currentUserText="${currentUserText}" | currentLength=${
-        //     currentUserText.length
-        //   } | currentLastChar="${
-        //     currentUserText[currentUserText.length - 1] || ""
-        //   }"`
-        // )
+        console.log(
+          `[Subtitle] handleTextMessage 用户语音 | backendText="${backendText}" | backendLength=${
+            backendText.length
+          } | backendLastChar="${
+            backendText[backendText.length - 1] || ""
+          }" | currentUserText="${currentUserText}" | currentLength=${
+            currentUserText.length
+          } | currentLastChar="${
+            currentUserText[currentUserText.length - 1] || ""
+          }"`
+        )
 
         // 优先使用后端文本
         // 如果后端文本与当前显示的 Web Speech API 文本不同，使用后端文本
@@ -1009,20 +1009,20 @@
             backendTextWithoutPunctuation === currentTextWithoutPunctuation &&
             backendText.length < currentUserText.length
           ) {
-            // console.log(
-            //   `[Subtitle] handleTextMessage 用户语音：后端文本只是去掉了标点符号，跳过 | backendText="${backendText}" | currentText="${currentUserText}"`
-            // )
+            console.log(
+              `[Subtitle] handleTextMessage 用户语音：后端文本只是去掉了标点符号，跳过 | backendText="${backendText}" | currentText="${currentUserText}"`
+            )
             return
           }
 
-          // console.log(
-          //   `[Subtitle] handleTextMessage 用户语音：使用后端文本 | backendText="${backendText}"`
-          // )
+          console.log(
+            `[Subtitle] handleTextMessage 用户语音：使用后端文本 | backendText="${backendText}"`
+          )
           // 使用后端文本，继续处理
         } else if (backendText === currentUserText && backendText) {
-          // console.log(
-          //   `[Subtitle] handleTextMessage 用户语音：后端文本与当前显示相同，跳过 | text="${backendText}"`
-          // )
+          console.log(
+            `[Subtitle] handleTextMessage 用户语音：后端文本与当前显示相同，跳过 | text="${backendText}"`
+          )
           // 后端文本与当前显示相同，跳过（避免重复显示）
           return
         }
