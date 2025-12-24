@@ -650,7 +650,7 @@
           y,
         ],
         color: this.currentTrackColor || "red",
-        time: this._getFullTimestamp(),
+        time: this._getDrawingTimestamp(),
       }
       this.currentTrack.push(segment)
 
@@ -749,6 +749,22 @@
     _formatTimestamp(timestamp) {
       if (!this.testStartTime || !timestamp) return "00:00"
       const elapsed = Math.floor((timestamp - this.testStartTime) / 1000) // 秒数
+      const minutes = Math.floor(elapsed / 60)
+      const seconds = elapsed % 60
+      return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+        2,
+        "0"
+      )}`
+    }
+
+    /**
+     * 获取画笔轨迹的相对时间戳
+     * @returns {string} 格式化的相对时间字符串 "MM:SS"
+     */
+    _getDrawingTimestamp() {
+      if (!this.testStartTime) return "00:00"
+      const now = Date.now()
+      const elapsed = Math.floor((now - this.testStartTime) / 1000)
       const minutes = Math.floor(elapsed / 60)
       const seconds = elapsed % 60
       return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
