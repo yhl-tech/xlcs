@@ -27,8 +27,8 @@ const getApiBaseUrl = () => {
 export const WS_CONFIG = {
 
   // 开发环境 - 直接使用线上地址、
-    development: "ws://localhost:8765",
-    // development: "wss://www.jionlp.com/xlcp/ws/",
+    // development: "ws://localhost:8765",
+    development: "wss://www.jionlp.com/xlcp/ws/",
   // 生产环境（使用域名和 wss:// 因为页面通过 HTTPS 加载）
   production: "wss://www.jionlp.com/xlcp/ws/",
 }

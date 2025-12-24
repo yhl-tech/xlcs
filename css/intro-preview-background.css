@@ -459,6 +459,12 @@ body:has(#intro-overlay[style*="display: block"]) #blackhole-bg-container,
   margin-top: 6px !important;
 }
 
+.device-check[data-status="error"] .device-check-result {
+  color: rgba(239, 68, 68, 0.95) !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
 /* 预览窗口页样式调整 - 玻璃态效果，配合粒子动画背景 */
 .intro-preview-panel,
 .test-preview-panel {

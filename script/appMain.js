@@ -21,6 +21,7 @@ import {
   findWhyQuestion,
   shouldDisplayQuestion,
 } from "./appState.js"
+import { formatDateTime } from "./utils.js"
 
 // 判断是否为生产环境（从 appState.js 导入或本地定义）
 const isProduction =
@@ -2130,7 +2131,7 @@ function fetchUserInfo(validatedValues = null) {
     学历: draft.education,
     职业: draft.occupation,
     当前心情: draft.mood,
-    测试时间: new Date().toLocaleString(),
+    测试时间: formatDateTime(),
   }
   const userInfo = window.auth.getUserInfo()
   state.basicInfo = basicInfo
@@ -4065,6 +4066,7 @@ function showInfoScreenForRetest() {
     rorschachImage.src = ""
   }
   clearCanvas()
+  renderWelcomeText()
   showWelcomeCardContainer()
   window.scrollTo({ top: 0, behavior: "smooth" })
 }
@@ -5212,44 +5214,44 @@ async function routeToReportSummaryIfAvailable() {
     return false
   }
 
-  try {
-    // 1. 先检查用户是否已提交过测试数据
-    if (typeof window.API.checkUploadFilesStatus === "function") {
-      const uploadStatus = await window.API.checkUploadFilesStatus(userId)
+  // try {
+  //   // 1. 先检查用户是否已提交过测试数据
+  //   if (typeof window.API.checkUploadFilesStatus === "function") {
+  //     const uploadStatus = await window.API.checkUploadFilesStatus(userId)
     
-      // 如果用户未提交数据（data 不为 true），不跳转
-      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
-        return false
-      }
-    } else {
-      // 接口不存在，不跳转
-      return false
-    }
+  //     // 如果用户未提交数据（data 不为 true），不跳转
+  //     if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+  //       return false
+  //     }
+  //   } else {
+  //     // 接口不存在，不跳转
+  //     return false
+  //   }
 
-    // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
-    let statusInfo = null
-    if (typeof window.API.checkReportStatus === "function") {
-      const response = await window.API.checkReportStatus(userId)
+  //   // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
+  //   let statusInfo = null
+  //   if (typeof window.API.checkReportStatus === "function") {
+  //     const response = await window.API.checkReportStatus(userId)
 
-      statusInfo = buildReportStatusFromResponse(response)
-    }
+  //     statusInfo = buildReportStatusFromResponse(response)
+  //   }
 
-    // 3. 如果没有状态信息，使用默认等待状态
-    if (!statusInfo) {
-      statusInfo = {
-        status: "processing",
-        message: "报告生成中，请稍候...",
-        uploaded: true,
-      }
-    }
+  //   // 3. 如果没有状态信息，使用默认等待状态
+  //   if (!statusInfo) {
+  //     statusInfo = {
+  //       status: "processing",
+  //       message: "报告生成中，请稍候...",
+  //       uploaded: true,
+  //     }
+  //   }
 
-    latestReportStatus = statusInfo
-    showSummary({ reportStatus: statusInfo })
-    return true
-  } catch (error) {
-    console.warn("[Report] 检查报告状态失败:", error)
-    return false
-  }
+  //   latestReportStatus = statusInfo
+  //   showSummary({ reportStatus: statusInfo })
+  //   return true
+  // } catch (error) {
+  //   console.warn("[Report] 检查报告状态失败:", error)
+  //   return false
+  // }
 }
 
 // 登录检查和初始化
@@ -5462,9 +5464,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1000)
 
   // 开发调试：直接进入 mood 问题
-  // setTimeout(() => {
-  //   showPostTestView()
-  //   currentQuestionIndex = 0
-  //   askNextQuestion()
-  // }, 100)
+  setTimeout(() => {
+    // showPostTestView()
+    // currentQuestionIndex = 0
+    // askNextQuestion()
+  }, 100)
 })
