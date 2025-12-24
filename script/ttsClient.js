@@ -32,71 +32,12 @@ import { getWebSocketUrl } from "./config.js"
     return buffer
   }
 
-<<<<<<< HEAD
-  /**
-   * 简单线性重采样 Int16Array，从 srcRate 到 dstRate
-   * 质量足够用于短语音片段，保持顺序与时长近似
-   */
-  function resampleInt16Array(srcInt16, srcRate, dstRate) {
-    if (!srcInt16 || srcInt16.length === 0) return new Int16Array(0)
-    if (srcRate === dstRate) return srcInt16
-    const ratio = dstRate / srcRate
-    const newLen = Math.round(srcInt16.length * ratio)
-    const out = new Int16Array(newLen)
-    for (let i = 0; i < newLen; i++) {
-      const srcPos = i / ratio
-      const i0 = Math.floor(srcPos)
-      const frac = srcPos - i0
-      const s0 = srcInt16[i0] || 0
-      const s1 = srcInt16[i0 + 1] || 0
-      out[i] = Math.round(s0 + (s1 - s0) * frac)
-    }
-    return out
-  }
-
-  function shouldWriteAIToRecorder() {
-    return !Boolean(window._skipWritingAIToAudioRecorder)
-  }
-
-  window.setSkipWritingAIToAudioRecorder = function (
-    skip = true,
-    timeoutMs = 30000
-  ) {
-    try {
-      window._skipWritingAIToAudioRecorder = Boolean(skip)
-      console.log(
-        "[AudioFix] setSkipWritingAIToAudioRecorder:",
-        window._skipWritingAIToAudioRecorder
-      )
-      if (window._skipAIWriteTimer) {
-        clearTimeout(window._skipAIWriteTimer)
-        window._skipAIWriteTimer = null
-      }
-      if (skip && timeoutMs > 0) {
-        window._skipAIWriteTimer = setTimeout(() => {
-          window._skipWritingAIToAudioRecorder = false
-          window._skipAIWriteTimer = null
-          console.log(
-            "[AudioFix] auto restored write-AI-to-recorder = false (timeout)"
-          )
-        }, timeoutMs)
-      }
-    } catch (e) {
-      console.warn("[AudioFix] setSkipWritingAIToAudioRecorder failed:", e)
-    }
-  }
-
-=======
->>>>>>> parent of 5886162 ('feat:用户录音处理')
   async function playPCMWithWebAudio(
     pcmData,
     sampleRate,
     onendedCallback = null
   ) {
-<<<<<<< HEAD
-=======
     // 在播放前保存PCM数据到录制器
->>>>>>> parent of 5886162 ('feat:用户录音处理')
     if (
       window.AudioRecorder &&
       window.AudioRecorder._instance &&
