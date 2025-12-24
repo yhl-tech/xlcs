@@ -3238,6 +3238,12 @@ async function askNextQuestion() {
     // 确保按钮可见
     nextQuestionButton.style.setProperty("visibility", "visible", "important")
     nextQuestionButton.style.setProperty("opacity", "1", "important")
+
+    // 先禁用按钮，等待TTS播报完成
+    nextQuestionButton.disabled = true
+    nextQuestionButton.style.opacity = "0.5"
+    nextQuestionButton.style.cursor = "not-allowed"
+    nextQuestionButton.textContent = "播报中..."
   }
 
   // 恢复当前问题的选中状态（从答案数组中恢复）
@@ -3259,6 +3265,16 @@ async function askNextQuestion() {
   const whyText = whyQuestion ? whyQuestion.text : ""
   const combinedText = whyText ? `${mainText} ${whyText}` : mainText
 
+  // 检查是否是最后一个问题
+  let nextDisplayableIndex = currentQuestionIndex + 1
+  while (
+    nextDisplayableIndex < POST_TEST_QUESTIONS.length &&
+    !shouldDisplayQuestion(POST_TEST_QUESTIONS[nextDisplayableIndex])
+  ) {
+    nextDisplayableIndex++
+  }
+  const isLastQuestion = nextDisplayableIndex >= POST_TEST_QUESTIONS.length
+
   // 一次性播报合并后的文本（不等待播报完成，允许用户随时操作）
   try {
     const ttsQuery = buildTTSQuery(combinedText)
@@ -3267,8 +3283,53 @@ async function askNextQuestion() {
       "[askNextQuestion] 开始播报问题，当前问题索引:",
       currentQuestionIndex
     )
+
+    // 估算TTS播放时间（每字约220-250ms）
+    const estimatedDuration = Math.max(2000, combinedText.length * 250)
+    console.log("[askNextQuestion] 预计播报时长:", estimatedDuration, "ms")
+
+    // 等待TTS播报完成后，启动15秒倒计时
+    setTimeout(() => {
+      if (nextQuestionButton) {
+        let countdown = 15
+        const originalText = isLastQuestion ? "提交" : "下一页"
+        nextQuestionButton.textContent = `${originalText} (${countdown}s)`
+
+        const countdownInterval = setInterval(() => {
+          countdown--
+          if (countdown > 0) {
+            nextQuestionButton.textContent = `${originalText} (${countdown}s)`
+          } else {
+            clearInterval(countdownInterval)
+            nextQuestionButton.disabled = false
+            nextQuestionButton.style.opacity = "1"
+            nextQuestionButton.style.cursor = "pointer"
+            nextQuestionButton.textContent = originalText
+          }
+        }, 1000)
+      }
+    }, estimatedDuration)
   } catch (error) {
     console.warn("[askNextQuestion] TTS 播报失败:", error)
+    // 如果播报失败，直接启动倒计时
+    if (nextQuestionButton) {
+      let countdown = 15
+      const originalText = isLastQuestion ? "提交" : "下一页"
+      nextQuestionButton.textContent = `${originalText} (${countdown}s)`
+
+      const countdownInterval = setInterval(() => {
+        countdown--
+        if (countdown > 0) {
+          nextQuestionButton.textContent = `${originalText} (${countdown}s)`
+        } else {
+          clearInterval(countdownInterval)
+          nextQuestionButton.disabled = false
+          nextQuestionButton.style.opacity = "1"
+          nextQuestionButton.style.cursor = "pointer"
+          nextQuestionButton.textContent = originalText
+        }
+      }, 1000)
+    }
   }
 }
 
@@ -3326,6 +3387,25 @@ function goToNextQuestion() {
   const gridContainer = document.getElementById("post-test-grid")
   if (gridContainer) {
     gridContainer.style.pointerEvents = "auto"
+  }
+
+  // 检查是否是最后一个问题
+  let nextDisplayableIndex = currentQuestionIndex + 1
+  while (
+    nextDisplayableIndex < POST_TEST_QUESTIONS.length &&
+    !shouldDisplayQuestion(POST_TEST_QUESTIONS[nextDisplayableIndex])
+  ) {
+    nextDisplayableIndex++
+  }
+  const isLastQuestion = nextDisplayableIndex >= POST_TEST_QUESTIONS.length
+
+  // 如果是最后一个问题，直接完成测试
+  if (isLastQuestion) {
+    console.log("[goToNextQuestion] 这是最后一个问题，完成测试")
+    // 递增索引以触发完成逻辑
+    currentQuestionIndex++
+    askNextQuestion()
+    return
   }
 
   // 递增到下一个问题，如果下一个是 why 问题则继续跳过
@@ -5214,44 +5294,44 @@ async function routeToReportSummaryIfAvailable() {
     return false
   }
 
-  // try {
-  //   // 1. 先检查用户是否已提交过测试数据
-  //   if (typeof window.API.checkUploadFilesStatus === "function") {
-  //     const uploadStatus = await window.API.checkUploadFilesStatus(userId)
+  try {
+    // 1. 先检查用户是否已提交过测试数据
+    if (typeof window.API.checkUploadFilesStatus === "function") {
+      const uploadStatus = await window.API.checkUploadFilesStatus(userId)
     
-  //     // 如果用户未提交数据（data 不为 true），不跳转
-  //     if (uploadStatus.code != 0 || uploadStatus.data !== true) {
-  //       return false
-  //     }
-  //   } else {
-  //     // 接口不存在，不跳转
-  //     return false
-  //   }
+      // 如果用户未提交数据（data 不为 true），不跳转
+      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+        return false
+      }
+    } else {
+      // 接口不存在，不跳转
+      return false
+    }
 
-  //   // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
-  //   let statusInfo = null
-  //   if (typeof window.API.checkReportStatus === "function") {
-  //     const response = await window.API.checkReportStatus(userId)
+    // 2. 用户已提交数据，获取报告状态（用于设置提示文案）
+    let statusInfo = null
+    if (typeof window.API.checkReportStatus === "function") {
+      const response = await window.API.checkReportStatus(userId)
 
-  //     statusInfo = buildReportStatusFromResponse(response)
-  //   }
+      statusInfo = buildReportStatusFromResponse(response)
+    }
 
-  //   // 3. 如果没有状态信息，使用默认等待状态
-  //   if (!statusInfo) {
-  //     statusInfo = {
-  //       status: "processing",
-  //       message: "报告生成中，请稍候...",
-  //       uploaded: true,
-  //     }
-  //   }
+    // 3. 如果没有状态信息，使用默认等待状态
+    if (!statusInfo) {
+      statusInfo = {
+        status: "processing",
+        message: "报告生成中，请稍候...",
+        uploaded: true,
+      }
+    }
 
-  //   latestReportStatus = statusInfo
-  //   showSummary({ reportStatus: statusInfo })
-  //   return true
-  // } catch (error) {
-  //   console.warn("[Report] 检查报告状态失败:", error)
-  //   return false
-  // }
+    latestReportStatus = statusInfo
+    showSummary({ reportStatus: statusInfo })
+    return true
+  } catch (error) {
+    console.warn("[Report] 检查报告状态失败:", error)
+    return false
+  }
 }
 
 // 登录检查和初始化
@@ -5464,9 +5544,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1000)
 
   // 开发调试：直接进入 mood 问题
-  setTimeout(() => {
-    // showPostTestView()
-    // currentQuestionIndex = 0
-    // askNextQuestion()
-  }, 100)
+  // setTimeout(() => {
+  //   showPostTestView()
+  //   currentQuestionIndex = 0
+  //   askNextQuestion()
+  // }, 100)
 })
