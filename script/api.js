@@ -753,12 +753,18 @@
         throw new Error("笔迹轨迹数据参数无效")
       }
 
-      // 获取图版尺寸并构建完整数据结构
-      const rorschachImage = document.getElementById("rorschach-image")
+      // 获取图版尺寸：优先从 state 中获取已保存的尺寸，否则尝试从 DOM 获取
+      let canvasSize = [0, 0]
+      if (window.state?.canvasSize && window.state.canvasSize[0] > 0) {
+        canvasSize = window.state.canvasSize
+      } else {
+        const rorschachImage = document.getElementById("rorschach-image")
+        if (rorschachImage && rorschachImage.clientHeight > 0) {
+          canvasSize = [rorschachImage.clientHeight, rorschachImage.clientWidth]
+        }
+      }
       const dataWithCanvasSize = {
-        canvas_size: rorschachImage
-          ? [rorschachImage.clientHeight, rorschachImage.clientWidth]
-          : [0, 0],
+        canvas_size: canvasSize,
         data: drawingTracksData
       }
 
@@ -813,11 +819,11 @@
       })
 
       // 修正 URL 拼写image.png错误，并在 headers 中设置 User-Id
-      // return apiClient.post("/rorschach/user/upload_trajectory", formData, {
-      //   headers: {
-      //     "User-Id": userId,
-      //   },
-      // })
+      return apiClient.post("/rorschach/user/upload_trajectory", formData, {
+        headers: {
+          "User-Id": userId,
+        },
+      })
     },
 
     /**
@@ -875,10 +881,19 @@
     /**
      * 上传音/视频文件
      * @param {Blob|File} file - 音频或视频文件
-     * @param {string} userId - 用户ID（可选）
+     * @param {string} userId - 用户ID（可选，如果不传则从 localStorage 获取）
      * @returns {Promise} 请求Promise
      */
     async uploadMedia(file, userId = null) {
+      // 如果没有传入 userId，从 localStorage 获取
+      if (!userId) {
+        try {
+          const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}")
+          userId = userInfo.username || null
+        } catch (e) {
+          console.warn("[API] 从 localStorage 获取 userId 失败:", e)
+        }
+      }
       console.log("[API] uploadMedia 参数:", { fileType: file?.type, fileName: file?.name, userId })
      
       

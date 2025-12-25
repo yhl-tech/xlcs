@@ -815,7 +815,6 @@ const postTestView = document.getElementById("post-test-view")
 const summaryView = document.getElementById("summary-view")
 const waitingReportView = document.getElementById("waiting-report-view")
 const questionText = document.getElementById("question-text")
-const finishBtn = document.getElementById("finish-btn")
 const nextQuestionBtn = document.getElementById("next-question-btn")
 const nextBtn = document.getElementById("next-btn")
 const prevBtn = document.getElementById("prev-btn")
@@ -2293,6 +2292,10 @@ function resizeCanvas() {
   canvas.height = rorschachImage.clientHeight
   canvas.style.width = rorschachImage.clientWidth + "px"
   canvas.style.height = rorschachImage.clientHeight + "px"
+  // 保存图版尺寸到 state
+  if (rorschachImage.clientHeight > 0 && rorschachImage.clientWidth > 0) {
+    state.canvasSize = [rorschachImage.clientHeight, rorschachImage.clientWidth]
+  }
 }
 
 // 音频和语音检测
@@ -2625,7 +2628,6 @@ function setupEventListeners() {
   }
   prevBtn.addEventListener("click", () => navigate(-1))
   nextBtn.addEventListener("click", () => navigate(1))
-  finishBtn.addEventListener("click", finishAndSave)
   if (nextQuestionBtn) {
     nextQuestionBtn.addEventListener("click", goToNextQuestion)
   }
@@ -3088,10 +3090,6 @@ function showPostTestView(options = {}) {
   const grid = document.getElementById("post-test-grid")
   grid.innerHTML = ""
   grid.style.display = "" // 重置显示状态
-  finishBtn.style.display = "none" // 确保完成按钮隐藏
-  finishBtn.textContent = "提交" //
-  finishBtn.style.backgroundColor = "" // 重置按钮背景色
-  finishBtn.disabled = false // 重置按钮禁用状态
 
   // 重新获取按钮元素（防止页面刷新后元素丢失）
   const nextBtn = document.getElementById("next-question-btn")
@@ -3158,11 +3156,6 @@ async function askNextQuestion() {
     const nextBtn = document.getElementById("next-question-btn")
     if (nextBtn) {
       nextBtn.style.display = "none"
-    }
-
-    // 隐藏完成按钮
-    if (finishBtn) {
-      finishBtn.style.display = "none"
     }
 
     // 隐藏问题进度柱
@@ -3294,7 +3287,7 @@ async function askNextQuestion() {
     // 等待TTS播报完成后，启动15秒倒计时
     setTimeout(() => {
       if (nextQuestionButton) {
-        let countdown = 15
+        let countdown = 1
         const originalText = isLastQuestion ? "提交" : "下一页"
         nextQuestionButton.textContent = `${originalText} (${countdown}s)`
 
@@ -3316,7 +3309,7 @@ async function askNextQuestion() {
     console.warn("[askNextQuestion] TTS 播报失败:", error)
     // 如果播报失败，直接启动倒计时
     if (nextQuestionButton) {
-      let countdown = 15
+      let countdown = 1
       const originalText = isLastQuestion ? "提交" : "下一页"
       nextQuestionButton.textContent = `${originalText} (${countdown}s)`
 
@@ -3428,143 +3421,6 @@ function goToNextQuestion() {
   askNextQuestion()
 }
 
-// 完成和汇总
-async function finishAndSave() {
-  // 如果按钮被禁用，直接返回（防止在播报期间点击）
-  if (finishBtn && finishBtn.disabled) {
-    return
-  }
-
-  // 先停止混合录音，获取混合音频
-  let mixedAudioBlob = null
-  if (window.dialogClient && window.dialogClient.isMixedRecording) {
-    try {
-      mixedAudioBlob = await window.dialogClient.stopMixedRecording()
-      console.log("[测试完成] 混合录音已停止，大小:", (mixedAudioBlob?.size / 1024 / 1024).toFixed(2), "MB")
-    } catch (err) {
-      console.warn("[测试完成] 停止混合录音失败:", err)
-    }
-  }
-
-  // 断开TTS连接
-  if (window.dialogClient) {
-    window.dialogClient.disconnect()
-    console.log("[测试完成] TTS连接已断开")
-  }
-
-  // 等待 MediaRecorder 停止并生成 audioBlob（备用）
-  if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
-    await new Promise((resolve) => {
-      const originalOnStop = state.mediaRecorder.onstop
-      state.mediaRecorder.onstop = (event) => {
-        if (originalOnStop) {
-          originalOnStop(event)
-        }
-        console.log("[录音] MediaRecorder 已停止，audioBlob 已生成")
-        resolve()
-      }
-      state.mediaRecorder.stop()
-    })
-  }
-
-  // 保存混合录音到 state（优先使用混合录音）
-  if (mixedAudioBlob) {
-    state.audioBlob = mixedAudioBlob
-    console.log("[测试完成] 使用混合录音作为最终音频")
-  }
-
-  // 导出交互追踪数据
-  if (window.InteractionTracker) {
-    try {
-      // 在停止追踪前，确保结束所有未完成的轨迹
-      // 如果当前还在某个图版上，确保该图版的轨迹被正确保存
-      if (state.currentIndex >= 0 && state.currentIndex < state.totalImages) {
-        window.InteractionTracker._updateCurrentPlate(state.currentIndex)
-      }
-      window.InteractionTracker.stop()
-
-      // 输出所有版图的统计信息（完整数据）
-      window.InteractionTracker.printAllPlatesStatistics()
-
-      const interactionData = window.InteractionTracker.exportJSON({
-        pretty: true,
-        includeStats: true,
-        includeMetadata: true,
-      })
-      console.log("[交互追踪数据]", JSON.parse(interactionData))
-
-      // 获取旋转次数统计数据（仅记录到控制台，不自动导出）
-      const rotationCounts = window.InteractionTracker.getRotationCounts()
-      console.log("[旋转次数统计]", rotationCounts)
-
-      // 获取画笔轨迹数据（仅记录到控制台，不自动导出）
-      const drawingTracks = window.InteractionTracker.getDrawingTracks()
-      console.log("[画笔轨迹数据]", drawingTracks)
-
-      // 获取音频时间戳统计数据（仅记录到控制台，不自动导出）
-      const audioTimestamps = window.InteractionTracker.getAudioTimestamps()
-      console.log("[音频时间戳统计（相对时间）]", audioTimestamps)
-
-      // 获取绝对时间戳统计数据
-      const absoluteTimestamps =
-        window.InteractionTracker.getAbsoluteTimestamps()
-      console.log("[绝对时间戳统计]", absoluteTimestamps)
-
-      // 可选：自动下载完整交互数据
-      // window.InteractionTracker.download('json');
-    } catch (error) {
-      console.error("[交互追踪] 导出数据失败:", error)
-    }
-  }
-
-  // 调用接口提交数据到服务器
-  if (window.submitTestDataToServer && window.InteractionTracker) {
-    // 使用异步方式提交，不阻塞页面显示
-    ;(async () => {
-      try {
-        // 显示提交提示
-        if (finishBtn) {
-          finishBtn.disabled = true
-          finishBtn.textContent = "正在提交数据..."
-        }
-
-        // 获取音频数据（作为备用，submitAllData 会优先从 AudioRecorder 获取）
-        let audioBlob = null
-        if (state.audioBlob) {
-          audioBlob = state.audioBlob
-        } else if (state.audioChunks && state.audioChunks.length > 0) {
-          audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
-        }
-
-        // 调用接口提交数据（音频处理逻辑已统一到 submitAllData 中）
-        const result = await window.submitTestDataToServer(
-          window.InteractionTracker,
-          audioBlob,
-          state.postTestAnswers
-        )
-
-        console.log("[API] 数据提交成功:", result)
-
-        // 显示成功提示
-        if (finishBtn) {
-          finishBtn.textContent = "✅ 数据已提交成功"
-          finishBtn.style.backgroundColor = "#10b981"
-        }
-      } catch (error) {
-        console.error("[API] 提交数据失败:", error)
-
-        // 显示错误提示（不影响继续显示汇总页面）
-        if (finishBtn) {
-          finishBtn.textContent = "⚠️ 数据提交失败（已保存本地）"
-          finishBtn.style.backgroundColor = "#f59e0b"
-        }
-      }
-    })()
-  }
-
-  showWaitingReport()
-}
-
 // 只处理数据提交和清理（不处理视图切换）
 async function finishAndSaveData() {
   // 先停止混合录音，获取混合音频
@@ -3645,14 +3501,88 @@ async function finishAndSaveData() {
     }
   }
 
+  // 跳转到汇总页面的函数
+  const goToSummary = () => {
+    console.log("[上传完成] 准备跳转到汇总页面")
+
+    // 停止词云动画
+    waitingReportManager.stop()
+
+    // 隐藏字幕
+    if (window.subtitleManager) {
+      window.subtitleManager.hide()
+    }
+
+    // 隐藏等待报告视图
+    waitingReportView.style.display = "none"
+
+    // 显示汇总页面
+    showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
+  }
+
   // 调用接口提交数据到服务器
   if (window.submitTestDataToServer && window.InteractionTracker) {
-    // 使用异步方式提交，不阻塞页面显示
-    ;(async () => {
+    // 获取进度显示元素
+    const uploadFill = document.getElementById("upload-fill")
+    const uploadPercent = document.getElementById("upload-percent")
+    const uploadStatusText = document.getElementById("upload-status-text")
+    const uploadRetryBtn = document.getElementById("upload-retry-btn")
+    const uploadRetestBtn = document.getElementById("upload-retest-btn")
+
+    // 记录失败的项目和重试次数
+    let hasFailure = false
+    let successCount = 0
+    let retryCount = 0
+    const MAX_RETRY = 2 // 最多重试2次（共3次尝试）
+
+    // 进度回调函数
+    const onUploadProgress = (current, total, name, success) => {
+      console.log(`[上传进度] ${current}/${total} - ${name} - ${success ? '成功' : '失败'}`)
+
+      // 记录是否有失败
+      if (!success) {
+        hasFailure = true
+      } else {
+        // 只有成功才增加进度
+        successCount++
+      }
+
+      const percent = Math.round((successCount / total) * 100)
+
+      if (uploadFill) {
+        uploadFill.style.height = `${percent}%`
+      }
+      if (uploadPercent) {
+        uploadPercent.textContent = `${percent}%`
+      }
+      if (uploadStatusText) {
+        uploadStatusText.textContent = `正在上传数据 (${current}/${total})...`
+      }
+    }
+
+    // 执行上传的函数（支持重试）
+    const executeUpload = async () => {
+      // 重置状态
+      hasFailure = false
+      successCount = 0
+      if (uploadFill) {
+        uploadFill.style.height = "0%"
+        uploadFill.classList.remove("failed", "success")
+      }
+      if (uploadPercent) {
+        uploadPercent.textContent = "0%"
+      }
+      if (uploadStatusText) {
+        uploadStatusText.textContent = "正在准备上传..."
+      }
+      if (uploadRetryBtn) {
+        uploadRetryBtn.style.display = "none"
+      }
+
       try {
         console.log("[API] 开始提交数据到服务器...")
 
-        // 获取音频数据（作为备用，submitAllData 会优先从 AudioRecorder 获取）
+        // 获取音频数据
         let audioBlob = null
         if (state.audioBlob) {
           audioBlob = state.audioBlob
@@ -3660,22 +3590,105 @@ async function finishAndSaveData() {
           audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
         }
 
-        // 调用接口提交数据
-        const result = await window.submitTestDataToServer(
-          window.InteractionTracker,
+        // 调用接口提交数据（带进度回调）
+        const result = await window.InteractionTracker.submitAllData(
+          window.auth?.getUserInfo()?.username || "unknown",
           audioBlob,
-          state.postTestAnswers
+          onUploadProgress
         )
 
-        console.log("[API] 数据提交成功:", result)
+        console.log("[API] 数据提交结果:", result)
+
+        if (hasFailure) {
+          // 有失败项目
+          console.error("[API] 部分数据提交失败，重试次数:", retryCount)
+          if (uploadFill) {
+            uploadFill.classList.add("failed")
+          }
+          if (uploadStatusText) {
+            uploadStatusText.textContent = "上传失败，请重试"
+          }
+          // 根据重试次数显示不同按钮
+          if (retryCount >= MAX_RETRY) {
+            // 已达到最大重试次数，显示重新测试按钮
+            if (uploadRetryBtn) {
+              uploadRetryBtn.style.display = "none"
+            }
+            if (uploadRetestBtn) {
+              uploadRetestBtn.style.display = "block"
+            }
+            if (uploadStatusText) {
+              uploadStatusText.textContent = "上传失败，请重新测试"
+            }
+          } else {
+            // 还可以重试
+            if (uploadRetryBtn) {
+              uploadRetryBtn.style.display = "block"
+            }
+            if (uploadRetestBtn) {
+              uploadRetestBtn.style.display = "none"
+            }
+          }
+        } else {
+          // 全部成功
+          if (uploadFill) {
+            uploadFill.classList.add("success")
+          }
+          if (uploadStatusText) {
+            uploadStatusText.textContent = "数据上传完成"
+          }
+          // 上传成功后延迟 1 秒跳转到汇总页面
+          setTimeout(goToSummary, 1000)
+        }
       } catch (error) {
-        console.error("[API] 提交数据失败:", error)
+        console.error("[API] 提交数据失败:", error, "重试次数:", retryCount)
+        if (uploadFill) {
+          uploadFill.classList.add("failed")
+        }
+        if (uploadStatusText) {
+          uploadStatusText.textContent = "上传失败，请重试"
+        }
+        // 根据重试次数显示不同按钮
+        if (retryCount >= MAX_RETRY) {
+          if (uploadRetryBtn) {
+            uploadRetryBtn.style.display = "none"
+          }
+          if (uploadRetestBtn) {
+            uploadRetestBtn.style.display = "block"
+          }
+          if (uploadStatusText) {
+            uploadStatusText.textContent = "上传失败，请重新测试"
+          }
+        } else {
+          if (uploadRetryBtn) {
+            uploadRetryBtn.style.display = "block"
+          }
+          if (uploadRetestBtn) {
+            uploadRetestBtn.style.display = "none"
+          }
+        }
       }
-    })()
+    }
+
+    // 绑定重试按钮事件
+    if (uploadRetryBtn) {
+      uploadRetryBtn.onclick = () => {
+        retryCount++
+        executeUpload()
+      }
+    }
+
+    // 绑定重新测试按钮事件
+    if (uploadRetestBtn) {
+      uploadRetestBtn.onclick = handleRetestClick
+    }
+
+    // 执行上传
+    executeUpload()
   }
 }
 
-// 只显示等待报告页面（不启动倒计时）
+// 只显示等待报告页面（不启动倒计时，等待上传完成后跳转）
 function showWaitingReportOnly() {
   console.log("[showWaitingReportOnly] 显示等待报告页面")
 
@@ -3714,27 +3727,8 @@ function showWaitingReportOnly() {
   appWindow.style.display = "flex"
   waitingReportView.style.display = "block"
 
-  // 启动等待报告动画
+  // 启动等待报告动画（词云动画会在上传完成后由 finishAndSaveData 中的 goToSummary 停止）
   waitingReportManager.start()
-
-  // 15秒后跳转到汇总页面
-  setTimeout(() => {
-    console.log("[showWaitingReportOnly] 准备跳转到汇总页面")
-
-    // 停止动画
-    waitingReportManager.stop()
-
-    // 隐藏字幕（跳转前确保字幕被隐藏）
-    if (window.subtitleManager) {
-      window.subtitleManager.hide()
-    }
-
-    // 隐藏等待报告视图
-    waitingReportView.style.display = "none"
-
-    // 显示汇总页面
-    showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
-  }, 12000)
 }
 
 function showWaitingReport() {
@@ -3959,6 +3953,31 @@ async function startRetestFlow() {
   }
   if (controlsBar) {
     controlsBar.style.display = "none"
+  }
+  // 隐藏等待报告视图和词云
+  if (waitingReportView) {
+    waitingReportView.style.display = "none"
+  }
+  if (waitingReportManager) {
+    waitingReportManager.stop()
+  }
+  // 重置上传进度
+  const uploadFill = document.getElementById("upload-fill")
+  const uploadPercent = document.getElementById("upload-percent")
+  const uploadRetryBtn = document.getElementById("upload-retry-btn")
+  const uploadRetestBtn = document.getElementById("upload-retest-btn")
+  if (uploadFill) {
+    uploadFill.style.height = "0%"
+    uploadFill.classList.remove("failed", "success")
+  }
+  if (uploadPercent) {
+    uploadPercent.textContent = "0%"
+  }
+  if (uploadRetryBtn) {
+    uploadRetryBtn.style.display = "none"
+  }
+  if (uploadRetestBtn) {
+    uploadRetestBtn.style.display = "none"
   }
   // 隐藏字幕
   if (window.subtitleManager) {
@@ -5547,9 +5566,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1000)
 
   // 开发调试：直接进入 mood 问题
-  // setTimeout(() => {
-  //   showPostTestView()
-  //   currentQuestionIndex = 0
-  //   askNextQuestion()
-  // }, 100)
+  setTimeout(() => {
+    showPostTestView()
+    currentQuestionIndex = 10
+    askNextQuestion()
+  }, 100)
 })

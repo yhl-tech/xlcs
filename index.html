@@ -120,8 +120,8 @@
           <div class="auth-controls" id="auth-controls" style="display: none">
             <span class="username" id="username-display"></span>
                 <!-- <button class="logout-btn" id="test-submit-btn" style="margin-right: 10px; background: #4CAF50;">测试提交</button> -->
-            <!-- <button class="logout-btn" id="test-tracks-btn" style="margin-right: 10px; background: #ff9800;">测试轨迹</button>
-            <button class="logout-btn" id="direct-enter-btn" style="margin-right: 10px; background: #2196F3;">直接进入</button> -->
+            <button class="logout-btn" id="test-tracks-btn" style="margin-right: 10px; background: #ff9800;">测试轨迹</button>
+            <!-- <button class="logout-btn" id="direct-enter-btn" style="margin-right: 10px; background: #2196F3;">直接进入</button> -->
              <!-- <button class="logout-btn" id="test-audio-btn" style="margin-right: 10px; background: #4CAF50;">测试音频录制</button> -->
               
             <button class="logout-btn" id="logout-btn">退出</button>
@@ -252,9 +252,6 @@
         </div>
         <p id="question-text"></p>
         <div id="post-test-grid" class="image-grid"></div>
-        <div class="finish">
-          <button id="finish-btn" style="display: none">提交</button>
-        </div>
 
         <!-- 问题进度柱 -->
         <div id="question-progress-pillar-container">
@@ -269,9 +266,6 @@
       </div>
 
       <div id="summary-view" style="display: none">
-        <!-- <h2>📊 报告生成中</h2> -->
-        <!-- <p style="text-align: center; color: #94a3b8; margin-bottom: 3rem; font-size: 1.1rem;">您的测试报告正在处理，请稍候...</p> -->
-
         <div id="summary-grid" class="image-grid"></div>
       </div>
 
@@ -370,6 +364,10 @@
           <!-- 黑洞核心 -->
           <div class="waiting-report-blackhole-core">
             <div class="waiting-report-core-data-stream" id="core-stream"></div>
+            <!-- 上传进度填充 -->
+            <div class="waiting-report-upload-fill" id="upload-fill"></div>
+            <!-- 上传进度百分比 -->
+            <div class="waiting-report-upload-percent" id="upload-percent"></div>
           </div>
           <!-- 数据计数器 -->
           <div class="waiting-report-data-counter" id="data-counter">0</div>
@@ -393,7 +391,11 @@
             id="spark-container"
           ></div>
         </div>
-        <p class="waiting-report-progress-text">正在整合多维度数据...</p>
+        <p class="waiting-report-progress-text" id="upload-status-text">正在整合多维度数据...</p>
+        <!-- 重试按钮 -->
+        <button class="waiting-report-retry-btn" id="upload-retry-btn" style="display: none">重新提交</button>
+        <!-- 重新测试按钮 -->
+        <button class="waiting-report-retest-btn" id="upload-retest-btn" style="display: none">重新测试</button>
       </div>
 
       <!-- 扫描线 -->

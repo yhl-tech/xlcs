@@ -13,7 +13,7 @@ export const SESSION_SAVE_DEBOUNCE = 600
 
 export const INACTIVITY_THRESHOLD_1 = 60000
 export const INACTIVITY_THRESHOLD_2 = 120000
-export const NEXT_BUTTON_COOLDOWN = 30 //冷却时间
+export const NEXT_BUTTON_COOLDOWN = 3 //冷却时间
 
 // 测试过程中的提示语配置
 export const PROMPT_TEXTS = {
@@ -220,6 +220,7 @@ export const state = {
   tool: "none",
   color: "#ef4444", // 红色（默认）
   canvasStates: new Array(10).fill(null),
+  canvasSize: [0, 0], // 图版尺寸 [height, width]
   isSpeaking: false,
   mediaRecorder: null,
   audioChunks: [],

@@ -1231,7 +1231,11 @@
         }
 
         const result = await window.API.uploadZoom(zoomData, userId)
-        console.log("[InteractionTracker] 放大缩小数据提交成功:", result)
+        console.log("[InteractionTracker] 放大缩小数据提交结果:", result)
+        // 检查返回的 code 字段
+        if (result && result.code === 1) {
+          return { success: false, error: result.exception || result.msg || "提交失败" }
+        }
         return { success: true, data: result }
       } catch (error) {
         console.error("[InteractionTracker] 放大缩小数据提交失败:", error)
@@ -1260,7 +1264,11 @@
         }
         console.log("rotateData", rotateData)
         const result = await window.API.uploadRotate(rotateData, userId)
-        console.log("[InteractionTracker] 旋转数据提交成功:", result)
+        console.log("[InteractionTracker] 旋转数据提交结果:", result)
+        // 检查返回的 code 字段
+        if (result && result.code === 1) {
+          return { success: false, error: result.exception || result.msg || "提交失败" }
+        }
         return { success: true, data: result }
       } catch (error) {
         console.error("[InteractionTracker] 旋转数据提交失败:", error)
@@ -1288,7 +1296,11 @@
           drawingTracksData,
           userId
         )
-        console.log("[InteractionTracker] 笔迹轨迹数据提交成功:", result)
+        console.log("[InteractionTracker] 笔迹轨迹数据提交结果:", result)
+        // 检查返回的 code 字段
+        if (result && result.code === 1) {
+          return { success: false, error: result.exception || result.msg || "提交失败" }
+        }
         return { success: true, data: result }
       } catch (error) {
         console.error("[InteractionTracker] 笔迹轨迹数据提交失败:", error)
@@ -1311,7 +1323,11 @@
         const segTimeData = this.getAudioTimestamps()
 
         const result = await window.API.uploadSegTime(segTimeData, userId)
-        console.log("[InteractionTracker] 时间戳数据提交成功:", result)
+        console.log("[InteractionTracker] 时间戳数据提交结果:", result)
+        // 检查返回的 code 字段
+        if (result && result.code === 1) {
+          return { success: false, error: result.exception || result.msg || "提交失败" }
+        }
         return { success: true, data: result }
       } catch (error) {
         console.error("[InteractionTracker] 时间戳数据提交失败:", error)
@@ -1323,9 +1339,10 @@
      * 提交所有数据到服务器（包括交互数据和音频）
      * @param {string} userId - 用户ID
      * @param {Blob|null} audioBlob - 音频文件（可选，如果不提供则从AudioRecorder获取）
+     * @param {Function|null} onProgress - 进度回调 (current, total, name) => void
      * @returns {Promise<Object>} 提交结果
      */
-    async submitAllData(userId, audioBlob = null) {
+    async submitAllData(userId, audioBlob = null, onProgress = null) {
       const results = {
         zoom: null,
         rotate: null,
@@ -1334,36 +1351,54 @@
         media: null,
       }
 
+      const totalSteps = 5
+      let currentStep = 0
+
+      const reportProgress = (name, success = true) => {
+        currentStep++
+        if (onProgress && typeof onProgress === "function") {
+          onProgress(currentStep, totalSteps, name, success)
+        }
+      }
+
       // 1. 提交放大缩小数据
       try {
         results.zoom = await this.submitZoomData(userId)
+        reportProgress("缩放数据", results.zoom.success !== false)
       } catch (error) {
         console.error("[InteractionTracker] 提交放大缩小数据时出错:", error)
         results.zoom = { success: false, error: error.message }
+        reportProgress("缩放数据", false)
       }
 
       // 2. 提交旋转数据
       try {
         results.rotate = await this.submitRotateData(userId)
+        reportProgress("旋转数据", results.rotate.success !== false)
       } catch (error) {
         console.error("[InteractionTracker] 提交旋转数据时出错:", error)
         results.rotate = { success: false, error: error.message }
+        reportProgress("旋转数据", false)
       }
 
       // 3. 提交时间戳数据
       try {
         results.segTime = await this.submitSegTimeData(userId)
+        reportProgress("时间戳数据", results.segTime.success !== false)
       } catch (error) {
         console.error("[InteractionTracker] 提交时间戳数据时出错:", error)
         results.segTime = { success: false, error: error.message }
+        reportProgress("时间戳数据", false)
       }
 
       // 4. 提交笔迹轨迹数据
       try {
         results.drawingTracks = await this.submitDrawingTracksData(userId)
+        reportProgress("轨迹数据", results.drawingTracks.success !== false)
       } catch (error) {
         console.error("[InteractionTracker] 提交笔迹轨迹数据时出错:", error)
         results.drawingTracks = { success: false, error: error.message }
+        reportProgress("轨迹数据", false)
       }
 
       // 5. 提交音频文件
@@ -1389,17 +1424,29 @@
 
         // 如果有音频文件且API可用，则上传
         if (audioFileToUpload && window.API && window.API.uploadMedia) {
-          results.media = await window.API.uploadMedia(
+          const mediaResult = await window.API.uploadMedia(
             audioFileToUpload,
             userId
           )
+          console.log("[InteractionTracker] 音频文件提交结果:", mediaResult)
+          // 检查返回的 code 字段
+          if (mediaResult && mediaResult.code === 1) {
+            results.media = { success: false, error: mediaResult.exception || mediaResult.msg || "提交失败" }
+            reportProgress("音频文件", false)
+          } else {
+            results.media = { success: true, data: mediaResult }
+            reportProgress("音频文件", true)
+          }
         } else if (audioFileToUpload) {
           results.media = { success: false, error: "uploadMedia API 不可用" }
+          reportProgress("音频文件", false)
         } else {
           results.media = { success: false, error: "没有可上传的音频文件" }
+          reportProgress("音频文件", false)
         }
       } catch (error) {
         results.media = { success: false, error: error.message }
+        reportProgress("音频文件", false)
       }
 
       return results
@@ -1470,8 +1517,8 @@
     submitSegTimeData: (userId) => trackerInstance.submitSegTimeData(userId),
     submitDrawingTracksData: (userId) =>
       trackerInstance.submitDrawingTracksData(userId),
-    submitAllData: (userId, audioBlob) =>
-      trackerInstance.submitAllData(userId, audioBlob),
+    submitAllData: (userId, audioBlob, onProgress) =>
+      trackerInstance.submitAllData(userId, audioBlob, onProgress),
 
     // 直接访问实例（高级用法）
     _instance: trackerInstance,

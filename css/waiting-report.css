@@ -125,23 +125,71 @@
   height: 200px;
 }
 
-/* 黑洞中心 - 深色核心 */
+/* 黑洞中心 - 深色核心（上传进度容器） */
 .waiting-report-blackhole-core {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
-  background: radial-gradient(circle, #0a0e27 0%, #000 50%, #0a0e27 100%);
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, #1a1a2e 0%, #0f0f1a 50%, #0a0a14 100%);
   border-radius: 50%;
   box-shadow:
     0 0 30px 10px rgba(0, 0, 0, 0.8),
     0 0 60px 20px rgba(10, 14, 39, 0.6),
     inset 0 0 30px rgba(0, 0, 0, 1);
   z-index: 3;
-  animation: coreBreath 1.5s ease-in-out infinite;
   overflow: hidden;
+}
+
+/* 上传进度填充（从底部向上填充） */
+.waiting-report-upload-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(180deg,
+    rgba(255, 180, 100, 0.9) 0%,
+    rgba(255, 140, 50, 0.95) 50%,
+    rgba(230, 120, 30, 1) 100%
+  );
+  border-radius: 0 0 50% 50%;
+  transition: height 0.5s ease-out;
+  z-index: 1;
+}
+
+/* 进度填充的波浪效果 */
+.waiting-report-upload-fill::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -10%;
+  width: 120%;
+  height: 16px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,60 C150,120 350,0 600,60 C850,120 1050,0 1200,60 L1200,120 L0,120 Z' fill='rgba(255,180,100,0.9)'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  animation: waveMove 2s linear infinite;
+}
+
+@keyframes waveMove {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* 上传进度百分比文字 */
+.waiting-report-upload-percent {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  z-index: 2;
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
 }
 
 /* 核心内数据流动效果 */
@@ -735,4 +783,80 @@
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
+}
+
+/* 重试按钮样式 */
+.waiting-report-retry-btn {
+  margin-top: 20px;
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.waiting-report-retry-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.waiting-report-retry-btn:active {
+  transform: translateY(0);
+}
+
+/* 重新测试按钮样式 */
+.waiting-report-retest-btn {
+  margin-top: 12px;
+  padding: 10px 28px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.waiting-report-retest-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.waiting-report-retest-btn:active {
+  transform: translateY(0);
+}
+
+/* 上传失败状态 */
+.waiting-report-upload-fill.failed {
+  background: linear-gradient(180deg,
+    rgba(239, 68, 68, 0.9) 0%,
+    rgba(220, 38, 38, 0.95) 50%,
+    rgba(185, 28, 28, 1) 100%
+  );
+}
+
+.waiting-report-upload-fill.failed::before {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,60 C150,120 350,0 600,60 C850,120 1050,0 1200,60 L1200,120 L0,120 Z' fill='rgba(239,68,68,0.9)'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+}
+
+/* 上传成功状态 */
+.waiting-report-upload-fill.success {
+  background: linear-gradient(180deg,
+    rgba(34, 197, 94, 0.9) 0%,
+    rgba(22, 163, 74, 0.95) 50%,
+    rgba(21, 128, 61, 1) 100%
+  );
+}
+
+.waiting-report-upload-fill.success::before {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,60 C150,120 350,0 600,60 C850,120 1050,0 1200,60 L1200,120 L0,120 Z' fill='rgba(34,197,94,0.9)'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
 }
