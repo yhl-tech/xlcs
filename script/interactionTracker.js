@@ -644,10 +644,10 @@
       // 记录线段：从上一个点到当前点
       const segment = {
         coords: [
-          this.lastDrawingPoint.x,
           this.lastDrawingPoint.y,
-          x,
+          this.lastDrawingPoint.x,
           y,
+          x,
         ],
         color: this.currentTrackColor || "red",
         time: this._getDrawingTimestamp(),
@@ -727,7 +727,7 @@
 
     /**
      * 获取画笔轨迹数据
-     * @returns {Object} 画笔轨迹数据，格式: { "1": {}, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+     * @returns {Object} 画笔轨迹数据，格式: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, "2": {}, ... }
      */
     getDrawingTracks() {
       const tracks = {}
@@ -1271,7 +1271,7 @@
     /**
      * 提交笔迹轨迹数据到服务器
      * @param {string} userId - 用户ID
-     * @returns {Promise<Object>} 提交结果
+     * @returns {Promise<Object>} 提交结果，数据格式: { canvas_size: [高, 宽], data: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, "2": {} } }
      */
     async submitDrawingTracksData(userId) {
       if (!window.API || !window.API.uploadDrawingTracks) {
@@ -1279,8 +1279,10 @@
       }
 
       try {
-        // 获取笔迹轨迹数据对象，格式: { "1": {}, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+        // 获取笔迹轨迹数据对象，格式: { "1": {}, "2": {"0": [...], "1": [...]}, ... }
         const drawingTracksData = this.getDrawingTracks()
+
+        console.log('drawingTracksData:', drawingTracksData)
 
         const result = await window.API.uploadDrawingTracks(
           drawingTracksData,

@@ -184,6 +184,23 @@
   }
 
   /**
+   * 初始化直接进入测试按钮
+   */
+  function initDirectEnterButton() {
+    const directEnterBtn = document.getElementById("direct-enter-btn")
+    if (!directEnterBtn) return
+
+    directEnterBtn.addEventListener("click", () => {
+      console.log("[测试] 点击直接进入按钮")
+      if (typeof window.enterTestExperience === "function") {
+        window.enterTestExperience()
+      } else {
+        alert("enterTestExperience 函数未找到")
+      }
+    })
+  }
+
+  /**
    * 初始化测试轨迹上传按钮
    */
   function initTestTracksButton() {
@@ -226,6 +243,7 @@
   function initTestButtons() {
     initTestAudioButton()
     initTestTracksButton()
+    initDirectEnterButton()
   }
 
   // 导出到全局

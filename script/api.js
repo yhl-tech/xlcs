@@ -646,7 +646,7 @@
 
     /**
      * 规范化笔迹轨迹数据中的时间格式和坐标格式
-     * @param {Object} data - 原始数据对象
+     * @param {Object} data - 原始数据对象 { canvas_size: [高, 宽], data: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, "2": {} } }
      * @returns {Object} 规范化后的数据对象
      */
     normalizeDrawingTracksData(data) {
@@ -676,14 +676,28 @@
         )
       }
 
-      for (const [plateKey, plateData] of Object.entries(data)) {
+      // 处理 canvas_size（如果存在）
+      if (data.canvas_size) {
+        normalized.canvas_size = data.canvas_size
+      }
+
+      // 获取轨迹数据
+      const tracksData = data.data || data.tracks || data
+      const normalizedData = {}
+
+      for (const [plateKey, plateData] of Object.entries(tracksData)) {
+        // 跳过非图版键（如 canvas_size、data、tracks）
+        if (plateKey === "canvas_size" || plateKey === "data" || plateKey === "tracks") {
+          continue
+        }
+
         // 如果 plateData 是数字（如 "1": 0），直接复制
         if (
           typeof plateData === "number" ||
           plateData === null ||
           plateData === undefined
         ) {
-          normalized[plateKey] = plateData
+          normalizedData[plateKey] = plateData
           continue
         }
 
@@ -705,29 +719,32 @@
               formatCoordinates(coordinates)
           }
           // 即使是空对象也保留，确保位置存在
-          normalized[plateKey] = Object.keys(normalizedPlateData).length === 0
+          normalizedData[plateKey] = Object.keys(normalizedPlateData).length === 0
             ? {}
             : normalizedPlateData
         } else {
           // 其他情况直接复制
-          normalized[plateKey] = plateData
+          normalizedData[plateKey] = plateData
         }
       }
 
       // 确保始终有 10 个图版位置（"1" - "10"）
       for (let i = 1; i <= 10; i++) {
         const key = String(i)
-        if (!(key in normalized)) {
-          normalized[key] = {}  // 补齐缺失的图版位置为空对象
+        if (!(key in normalizedData)) {
+          normalizedData[key] = {}  // 补齐缺失的图版位置为空对象
         }
       }
+
+      // 将规范化后的数据放在 data 字段中
+      normalized.data = normalizedData
 
       return normalized
     },
 
     /**
      * 上传笔迹轨迹数据
-     * @param {Object} drawingTracksData - 笔迹轨迹数据对象 { "1": 0, "2": {"25:23": [[x,y], [x,y], ...]}, ... }
+     * @param {Object} drawingTracksData - 笔迹轨迹数据对象 { canvas_size: [高, 宽], data: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, "2": {} } }
      * @param {string} userId - 用户ID
      * @returns {Promise} 请求Promise
      */
@@ -736,14 +753,27 @@
         throw new Error("笔迹轨迹数据参数无效")
       }
 
+      // 获取图版尺寸并构建完整数据结构
+      const rorschachImage = document.getElementById("rorschach-image")
+      const dataWithCanvasSize = {
+        canvas_size: rorschachImage
+          ? [rorschachImage.clientHeight, rorschachImage.clientWidth]
+          : [0, 0],
+        data: drawingTracksData
+      }
+
       // 规范化时间格式（确保秒数为两位数）
-      const normalizedData = this.normalizeDrawingTracksData(drawingTracksData)
+      const normalizedData = this.normalizeDrawingTracksData(dataWithCanvasSize)
 
       console.log("[API] 上传笔迹轨迹数据:", {
         originalData: drawingTracksData,
         normalizedData: normalizedData,
+        hasCanvasSize: 'canvas_size' in normalizedData,
+        canvasSizeValue: normalizedData.canvas_size,
         userId: userId,
       })
+
+
 
       // 准备表单数据
       const formData = new FormData()
@@ -768,7 +798,7 @@
       formData.append("file", file, "trajectory.json")
 
       // 保存文件到本地
-      // saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
+      saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
 
       // 添加 user_id 到 FormData（对应 Python 的 data 参数）
       formData.append("user_id", userId)
@@ -783,11 +813,11 @@
       })
 
       // 修正 URL 拼写image.png错误，并在 headers 中设置 User-Id
-      return apiClient.post("/rorschach/user/upload_trajectory", formData, {
-        headers: {
-          "User-Id": userId,
-        },
-      })
+      // return apiClient.post("/rorschach/user/upload_trajectory", formData, {
+      //   headers: {
+      //     "User-Id": userId,
+      //   },
+      // })
     },
 
     /**

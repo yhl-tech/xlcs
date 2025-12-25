@@ -2116,6 +2116,9 @@ async function enterTestExperience({
   }
 }
 
+// 暴露 enterTestExperience 到全局，供测试按钮使用
+window.enterTestExperience = enterTestExperience
+
 function fetchUserInfo(validatedValues = null) {
   const draft = validatedValues
     ? { ...validatedValues }
