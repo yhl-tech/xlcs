@@ -393,6 +393,7 @@
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 300000, // 5分钟超时
       }
 
       // 如果提供了进度回调，添加 onUploadProgress
@@ -977,7 +978,9 @@
       const mediaFileName = `media_${userId || "unknown"}_${Date.now()}_${fileToUpload.name}`
       // saveFileToLocal(fileToUpload, mediaFileName)
 
-      return apiClient.post("/rorschach/user/upload_media", formData)
+      return apiClient.post("/rorschach/user/upload_media", formData, {
+        timeout: 300000, // 5分钟超时
+      })
     },
 
     /**
