@@ -3131,6 +3131,9 @@ function showPostTestView(options = {}) {
 }
 
 async function askNextQuestion() {
+  // 设置后测阶段的 TTS phase
+  TTS.currentPhase = "posttest"
+
   // 跳过 why 问题，找到下一个应该显示的问题
   let question = null
   while (currentQuestionIndex < POST_TEST_QUESTIONS.length) {
@@ -3223,6 +3226,16 @@ async function askNextQuestion() {
     actionsContainer.style.opacity = "1"
   }
 
+  // 检查是否是最后一个问题（提前计算，用于设置按钮文本）
+  let nextDisplayableIndex = currentQuestionIndex + 1
+  while (
+    nextDisplayableIndex < POST_TEST_QUESTIONS.length &&
+    !shouldDisplayQuestion(POST_TEST_QUESTIONS[nextDisplayableIndex])
+  ) {
+    nextDisplayableIndex++
+  }
+  const isLastQuestion = nextDisplayableIndex >= POST_TEST_QUESTIONS.length
+
   // 显示下一页按钮（如果之前没获取到，再次尝试获取）
   if (!nextQuestionButton) {
     nextQuestionButton = document.getElementById("next-question-btn")
@@ -3235,11 +3248,10 @@ async function askNextQuestion() {
     nextQuestionButton.style.setProperty("visibility", "visible", "important")
     nextQuestionButton.style.setProperty("opacity", "1", "important")
 
-    // 先禁用按钮，等待TTS播报完成
-    nextQuestionButton.disabled = true
-    nextQuestionButton.style.opacity = "0.5"
-    nextQuestionButton.style.cursor = "not-allowed"
-    nextQuestionButton.textContent = "播报中..."
+    // 按钮立即可用，不再等待播报完成
+    nextQuestionButton.disabled = false
+    nextQuestionButton.style.cursor = "pointer"
+    nextQuestionButton.textContent = isLastQuestion ? "确认提交" : "下一页"
   }
 
   // 恢复当前问题的选中状态（从答案数组中恢复）
@@ -3261,16 +3273,6 @@ async function askNextQuestion() {
   const whyText = whyQuestion ? whyQuestion.text : ""
   const combinedText = whyText ? `${mainText} ${whyText}` : mainText
 
-  // 检查是否是最后一个问题
-  let nextDisplayableIndex = currentQuestionIndex + 1
-  while (
-    nextDisplayableIndex < POST_TEST_QUESTIONS.length &&
-    !shouldDisplayQuestion(POST_TEST_QUESTIONS[nextDisplayableIndex])
-  ) {
-    nextDisplayableIndex++
-  }
-  const isLastQuestion = nextDisplayableIndex >= POST_TEST_QUESTIONS.length
-
   // 一次性播报合并后的文本（不等待播报完成，允许用户随时操作）
   try {
     const ttsQuery = buildTTSQuery(combinedText)
@@ -3279,53 +3281,8 @@ async function askNextQuestion() {
       "[askNextQuestion] 开始播报问题，当前问题索引:",
       currentQuestionIndex
     )
-
-    // 估算TTS播放时间（每字约220-250ms）
-    const estimatedDuration = Math.max(2000, combinedText.length * 250)
-    console.log("[askNextQuestion] 预计播报时长:", estimatedDuration, "ms")
-
-    // 等待TTS播报完成后，启动15秒倒计时
-    setTimeout(() => {
-      if (nextQuestionButton) {
-        let countdown = 1
-        const originalText = isLastQuestion ? "提交" : "下一页"
-        nextQuestionButton.textContent = `${originalText} (${countdown}s)`
-
-        const countdownInterval = setInterval(() => {
-          countdown--
-          if (countdown > 0) {
-            nextQuestionButton.textContent = `${originalText} (${countdown}s)`
-          } else {
-            clearInterval(countdownInterval)
-            nextQuestionButton.disabled = false
-            nextQuestionButton.style.opacity = "1"
-            nextQuestionButton.style.cursor = "pointer"
-            nextQuestionButton.textContent = originalText
-          }
-        }, 1000)
-      }
-    }, estimatedDuration)
   } catch (error) {
     console.warn("[askNextQuestion] TTS 播报失败:", error)
-    // 如果播报失败，直接启动倒计时
-    if (nextQuestionButton) {
-      let countdown = 1
-      const originalText = isLastQuestion ? "提交" : "下一页"
-      nextQuestionButton.textContent = `${originalText} (${countdown}s)`
-
-      const countdownInterval = setInterval(() => {
-        countdown--
-        if (countdown > 0) {
-          nextQuestionButton.textContent = `${originalText} (${countdown}s)`
-        } else {
-          clearInterval(countdownInterval)
-          nextQuestionButton.disabled = false
-          nextQuestionButton.style.opacity = "1"
-          nextQuestionButton.style.cursor = "pointer"
-          nextQuestionButton.textContent = originalText
-        }
-      }, 1000)
-    }
   }
 }
 
