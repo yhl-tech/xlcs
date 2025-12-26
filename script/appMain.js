@@ -41,6 +41,7 @@ import {
 } from "./operationReactionTest.js"
 import { waitingReportManager } from "./waitingReport.js"
 import { initImagePan } from "./imagePan.js"
+import { ImagePreloader } from "./imagePreloader.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -1909,6 +1910,7 @@ async function prepareIntroExperience({ resume = false } = {}) {
 
   // 设置"进入"按钮的点击事件（只在操作反应测试完成后才可点击）
   const handleEnterClick = () => {
+    ImagePreloader.preloadAll()
     if (!enterBtn.disabled) {
       enterBtn.removeEventListener("click", handleEnterClick)
       enterTestExperience()
@@ -2977,7 +2979,8 @@ function loadImage(index) {
 
   // 等待淡出动画完成后再加载新图片（增加延迟时间，让渐隐效果更慢）
   setTimeout(() => {
-    rorschachImage.src = `./images/rorschach-blot-${index + 1}.webp`
+    const imageUrl = ImagePreloader.getImageUrl(index + 1)
+    rorschachImage.src = imageUrl
     rorschachImage.onerror = () => {
       rorschachImage.classList.remove("image-fade-out")
     }
@@ -3385,7 +3388,11 @@ async function finishAndSaveData() {
   if (window.dialogClient && window.dialogClient.isMixedRecording) {
     try {
       mixedAudioBlob = await window.dialogClient.stopMixedRecording()
-      console.log("[测试完成] 混合录音已停止，大小:", (mixedAudioBlob?.size / 1024 / 1024).toFixed(2), "MB")
+      console.log(
+        "[测试完成] 混合录音已停止，大小:",
+        (mixedAudioBlob?.size / 1024 / 1024).toFixed(2),
+        "MB"
+      )
     } catch (err) {
       console.warn("[测试完成] 停止混合录音失败:", err)
     }
@@ -3494,7 +3501,11 @@ async function finishAndSaveData() {
 
     // 进度回调函数
     const onUploadProgress = (current, total, name, success) => {
-      console.log(`[上传进度] ${current}/${total} - ${name} - ${success ? '成功' : '失败'}`)
+      console.log(
+        `[上传进度] ${current}/${total} - ${name} - ${
+          success ? "成功" : "失败"
+        }`
+      )
 
       // 记录是否有失败
       if (!success) {
@@ -3815,6 +3826,7 @@ function showSummary(options = {}) {
   }
   grid.innerHTML = ""
   renderSummaryReportSection(summaryView, grid, latestReportStatus)
+  ImagePreloader.preloadRange(0, state.totalImages - 1)
 
   const canvasStates = Array.isArray(state.canvasStates)
     ? state.canvasStates
@@ -3827,7 +3839,7 @@ function showSummary(options = {}) {
     const compositeContainer = document.createElement("div")
     compositeContainer.style.position = "relative"
     const baseImage = document.createElement("img")
-    baseImage.src = `./images/rorschach-blot-${i + 1}.webp`
+    baseImage.src = ImagePreloader.getImageUrl(i + 1)
     compositeContainer.appendChild(baseImage)
     if (canvasStates[i]) {
       const drawingImage = document.createElement("img")
@@ -5119,7 +5131,8 @@ function setupAuthControls() {
 
       // 检查混合录音状态
       if (hasDialogClient) {
-        const mixedStatus = window.dialogClient.getMixedRecordingStatus?.() || {}
+        const mixedStatus =
+          window.dialogClient.getMixedRecordingStatus?.() || {}
         console.log("[测试音频] 混合录音状态:", mixedStatus)
 
         // 如果正在混合录音，停止并上传
@@ -5130,7 +5143,11 @@ function setupAuthControls() {
 
           try {
             const mixedBlob = await window.dialogClient.stopMixedRecording()
-            console.log("[测试音频] 混合录音已停止，大小:", (mixedBlob?.size / 1024 / 1024).toFixed(2), "MB")
+            console.log(
+              "[测试音频] 混合录音已停止，大小:",
+              (mixedBlob?.size / 1024 / 1024).toFixed(2),
+              "MB"
+            )
 
             if (mixedBlob && mixedBlob.size > 0) {
               testSubmitBtn.textContent = "上传中..."
@@ -5139,7 +5156,11 @@ function setupAuthControls() {
 
               testSubmitBtn.textContent = "✅ 成功"
               testSubmitBtn.style.background = "#10b981"
-              alert("混合音频上传成功!\n文件大小: " + (mixedBlob.size / 1024 / 1024).toFixed(2) + "MB\n包含: AI语音 + 用户语音")
+              alert(
+                "混合音频上传成功!\n文件大小: " +
+                  (mixedBlob.size / 1024 / 1024).toFixed(2) +
+                  "MB\n包含: AI语音 + 用户语音"
+              )
             } else {
               alert("混合录音数据为空")
             }
@@ -5164,7 +5185,9 @@ function setupAuthControls() {
           await window.dialogClient.startMixedRecording()
           testSubmitBtn.textContent = "混合录音中(点击停止)"
           testSubmitBtn.style.background = "#ef4444"
-          alert("混合录音已开始！\n正在录制: AI语音 + 用户语音\n请说几句话，然后再次点击按钮停止并上传。")
+          alert(
+            "混合录音已开始！\n正在录制: AI语音 + 用户语音\n请说几句话，然后再次点击按钮停止并上传。"
+          )
         } catch (err) {
           console.error("[测试音频] 启动混合录音失败:", err)
           alert("启动混合录音失败: " + err.message)
@@ -5177,13 +5200,17 @@ function setupAuthControls() {
 
       if (!state.mediaRecorder) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          })
           state.mediaRecorder = new MediaRecorder(stream)
           state.mediaRecorder.ondataavailable = (event) => {
             state.audioChunks.push(event.data)
           }
           state.mediaRecorder.onstop = () => {
-            state.audioBlob = new Blob(state.audioChunks, { type: "audio/webm" })
+            state.audioBlob = new Blob(state.audioChunks, {
+              type: "audio/webm",
+            })
           }
         } catch (err) {
           alert("无法访问麦克风: " + err.message)
@@ -5205,18 +5232,24 @@ function setupAuthControls() {
 
         await new Promise((resolve) => {
           const orig = state.mediaRecorder.onstop
-          state.mediaRecorder.onstop = (e) => { if (orig) orig(e); resolve() }
+          state.mediaRecorder.onstop = (e) => {
+            if (orig) orig(e)
+            resolve()
+          }
           state.mediaRecorder.stop()
         })
 
-        const blob = state.audioBlob || new Blob(state.audioChunks, { type: "audio/webm" })
+        const blob =
+          state.audioBlob || new Blob(state.audioChunks, { type: "audio/webm" })
         if (blob && blob.size > 0) {
           try {
             testSubmitBtn.textContent = "上传中..."
             await window.API.uploadMedia(blob, userId)
             testSubmitBtn.textContent = "✅ 成功"
             testSubmitBtn.style.background = "#10b981"
-            alert("上传成功! 大小: " + (blob.size / 1024 / 1024).toFixed(2) + "MB")
+            alert(
+              "上传成功! 大小: " + (blob.size / 1024 / 1024).toFixed(2) + "MB"
+            )
           } catch (error) {
             testSubmitBtn.textContent = "❌ 失败"
             testSubmitBtn.style.background = "#ef4444"
@@ -5253,7 +5286,10 @@ function setupAuthControls() {
           return
         }
 
-        const result = await window.API.uploadDrawingTracks(drawingTracks, userId)
+        const result = await window.API.uploadDrawingTracks(
+          drawingTracks,
+          userId
+        )
         console.log("[测试] uploadDrawingTracks 结果:", result)
         alert("轨迹上传成功，请查看控制台")
       } catch (error) {
@@ -5277,7 +5313,7 @@ async function routeToReportSummaryIfAvailable() {
     // 1. 先检查用户是否已提交过测试数据
     if (typeof window.API.checkUploadFilesStatus === "function") {
       const uploadStatus = await window.API.checkUploadFilesStatus(userId)
-    
+
       // 如果用户未提交数据（data 不为 true），不跳转
       if (uploadStatus.code != 0 || uploadStatus.data !== true) {
         return false
