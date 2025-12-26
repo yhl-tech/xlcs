@@ -1,6 +1,9 @@
 import { defineConfig } from "vite"
 import { createHtmlPlugin } from "vite-plugin-html"
 
+// 是否为生产环境（用于控制生产时移除 console 等行为）
+const isProduction = process.env.NODE_ENV === "production"
+
 /**
  * Vite 构建配置
  * 用于打包知己心探测试前端项目
@@ -25,15 +28,11 @@ export default defineConfig({
     minify: "terser",
     terserOptions: {
       compress: {
-        drop_console: true, // 删除 console
+        // 保留生产环境的 console（运行时控制开关更安全），避免在构建阶段删除日志
+        drop_console: false,
         drop_debugger: true, // 移除 debugger
-        pure_funcs: [
-          "console.log",
-          "console.info",
-          "console.warn",
-          "console.error",
-          "console.debug",
-        ], // 移除特定的 console 方法
+        // 不把 console.* 列入 pure_funcs，以免被去除
+        pure_funcs: [],
       },
       mangle: true, // 变量名混淆
       format: {

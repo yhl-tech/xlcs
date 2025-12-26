@@ -425,7 +425,7 @@ function initPreviewCanvasInteractions() {
       introPreviewImage.onerror = () =>
         handlePreviewImageError(introPreviewImage)
       introPreviewImage.style.display = ""
-      introPreviewImage.src = `./images/rorschach-blot-1.png`
+      introPreviewImage.src = `./images/rorschach-blot-1.webp`
     }
     // 重置画布尺寸并恢复状态
     if (introPreviewImage && previewCanvas) {
@@ -1156,10 +1156,7 @@ function hideReportCheckLoading() {
     console.log("[hideReportCheckLoading] 恢复介绍页布局")
     if (infoScreen) {
       infoScreen.style.display = "flex"
-      // 信息填写页显示时，延迟预加载（避免阻塞播报功能）
-      setTimeout(() => {
-        ImagePreloader.preloadAll()
-      }, 500)
+      // 信息填写页显示时，不再执行预加载以避免占用带宽或阻塞播报功能
     }
     if (appWindow) {
       // 这里保持 app-window 可见，用于在右侧展示欢迎内容和语音检测
@@ -1838,10 +1835,7 @@ async function prepareIntroExperience({ resume = false } = {}) {
       "[正常流程] introOverlay.style.display 实际值:",
       introOverlay.style.display
     )
-    // 介绍页显示时，延迟确保所有图片正在预加载（避免阻塞播报功能）
-    setTimeout(() => {
-      ImagePreloader.preloadAll()
-    }, 500)
+    // 介绍页显示时，不再进行延迟预加载，改为按需加载图片
   } else {
     console.error("[正常流程] 错误：introOverlay 元素不存在！")
   }
@@ -2221,15 +2215,7 @@ function initTest(restoredSnapshot = null) {
   panOffsetY = 0
 
   // 注意：图片预加载已在登录页/介绍页完成，这里不再重复预加载
-  // 如果恢复状态，确保当前图片已预加载（优先保证恢复时图片能快速显示）
-  if (isRestored) {
-    // 优先确保当前图片已预加载（如果还没开始，立即开始）
-    if (!ImagePreloader.isPreloadingOrLoaded(state.currentIndex)) {
-      ImagePreloader.preloadImage(state.currentIndex)
-    }
-    // 然后预加载后续图片（用于后续切换）
-    ImagePreloader.preloadAhead(state.currentIndex)
-  }
+  // If restored, do not run preloading; rely on on-demand loading
 
   loadImage(state.currentIndex)
   if (isRestored) {
@@ -2978,13 +2964,15 @@ function loadImage(index) {
 
   // 等待淡出动画完成后再加载新图片（增加延迟时间，让渐隐效果更慢）
   setTimeout(() => {
-    // 检查图片是否已预加载
-    if (ImagePreloader.isPreloaded(index)) {
-      // 图片已预加载，直接从缓存获取
-      const preloadedImg = ImagePreloader.getPreloadedImage(index)
-      rorschachImage.src = preloadedImg.src
+    // 简化加载逻辑：按需加载图片（不依赖预加载缓存）
+    const imageUrl = ImagePreloader.getImageUrl(index)
+    rorschachImage.src = imageUrl
+    rorschachImage.onerror = () => {
+      rorschachImage.classList.remove("image-fade-out")
+    }
 
-      // 图片已在缓存中，立即执行加载完成逻辑
+    // 确保图片加载后加载该图版的画布状态
+    if (rorschachImage.complete) {
       resizeCanvas()
       loadCanvasState(index)
       // 渐显效果：移除淡出类，触发淡入
@@ -2992,45 +2980,21 @@ function loadImage(index) {
       rorschachImage.classList.add("image-fade-in")
       setTimeout(() => {
         rorschachImage.classList.remove("image-fade-in")
-      }, 800) // 增加渐显动画时间到800ms，让效果更慢
-
-      console.log(`[loadImage] 图片 ${index + 1} 从预加载缓存中加载，立即显示`)
+      }, 800)
     } else {
-      // 图片未预加载，使用原有加载逻辑
-      rorschachImage.src = `./images/rorschach-blot-${index + 1}.png`
-      rorschachImage.onerror = () => {
-        rorschachImage.classList.remove("image-fade-out")
-      }
-
-      // 确保图片加载后加载该图版的画布状态
-      if (rorschachImage.complete) {
-        // 图片已缓存，立即加载画布状态
+      rorschachImage.onload = () => {
         resizeCanvas()
         loadCanvasState(index)
-        // 渐显效果：移除淡出类，触发淡入
         rorschachImage.classList.remove("image-fade-out")
         rorschachImage.classList.add("image-fade-in")
         setTimeout(() => {
           rorschachImage.classList.remove("image-fade-in")
-        }, 800) // 增加渐显动画时间到800ms，让效果更慢
-      } else {
-        // 图片需要加载，等待加载完成
-        rorschachImage.onload = () => {
-          resizeCanvas()
-          loadCanvasState(index)
-          // 渐显效果：移除淡出类，触发淡入
-          rorschachImage.classList.remove("image-fade-out")
-          rorschachImage.classList.add("image-fade-in")
-          setTimeout(() => {
-            rorschachImage.classList.remove("image-fade-in")
-          }, 800) // 增加渐显动画时间到800ms，让效果更慢
-          rorschachImage.onload = null
-        }
+        }, 800)
+        rorschachImage.onload = null
       }
     }
 
-    // 预加载后续图片（在加载当前图片后触发）
-    ImagePreloader.preloadAhead(index)
+    // 不再主动预加载后续图片；保持按需加载策略
   }, 800) // 增加淡出动画时间到800ms，让渐隐效果更慢
 
   updateNavButtons()
@@ -3110,8 +3074,7 @@ function showPostTestView(options = {}) {
     window.InteractionTracker.recordSelectPhase()
   }
 
-  // 预加载所有图片（确保缩略图网格显示时所有图片都已加载）
-  ImagePreloader.preloadRange(0, state.totalImages - 1)
+  // 取消预加载：缩略图网格将按需加载图片
 
   // 重置所有相关元素到初始状态，确保重新测试时与第一次测试一致
   const grid = document.getElementById("post-test-grid")
@@ -3148,7 +3111,7 @@ function showPostTestView(options = {}) {
     item.dataset.index = i
     item.innerHTML = `<img src="./images/rorschach-blot-${
       i + 1
-    }.png" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
+    }.webp" alt="Image ${i + 1}"><h4>图 ${i + 1}</h4>`
     item.addEventListener("click", handleImageSelection)
     grid.appendChild(item)
   }
