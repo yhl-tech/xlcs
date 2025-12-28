@@ -1,11 +1,16 @@
 class ImagePreloader {
-  constructor() {
+  constructor(options = {}) {
     this.worker = null
     this.cache = new Map()
     this.isInitialized = false
     this.loadingProgress = new Map()
     this.onProgressCallback = null
     this.onErrorCallback = null
+    this.options = Object.assign({ autoStart: false }, options)
+
+    this.isLoading = false
+    this.loadingQueue = []
+    this.currentLoadingIndex = null
 
     this.init()
   }
@@ -24,7 +29,9 @@ class ImagePreloader {
 
       this.isInitialized = true
 
-      this.startPreloading()
+      if (this.options.autoStart) {
+        this.startPreloading()
+      }
     } catch (error) {
       this.fallbackMode = true
     }
@@ -96,6 +103,10 @@ class ImagePreloader {
         })
       }
     } catch (error) {}
+
+    this.isLoading = false
+    this.currentLoadingIndex = null
+    this.processQueue()
   }
 
   handleImageError(index, error) {
@@ -111,6 +122,10 @@ class ImagePreloader {
         error: true,
       })
     }
+
+    this.isLoading = false
+    this.currentLoadingIndex = null
+    this.processQueue()
   }
 
   handleProgressUpdate(progress) {}
@@ -127,12 +142,68 @@ class ImagePreloader {
 
   startPreloading() {
     if (!this.worker) return
+
+    for (let i = 1; i <= 10; i++) {
+      if (!this.cache.has(i) && this.loadingProgress.get(i) !== "loading") {
+        this.loadingQueue.push(i)
+      }
+    }
+
+    this.processQueue()
+  }
+
+  preloadImage(index) {
+    if (
+      !this.worker ||
+      this.cache.has(index) ||
+      this.loadingProgress.get(index) === "loading"
+    )
+      return
+
+    this.loadingQueue.push(index)
+    this.processQueue()
+  }
+
+  processQueue() {
+    if (this.isLoading || this.loadingQueue.length === 0) {
+      return
+    }
+
+    const index = this.loadingQueue.shift()
+    if (
+      this.cache.has(index) ||
+      this.loadingProgress.get(index) === "loading"
+    ) {
+      this.processQueue()
+      return
+    }
+
+    this.isLoading = true
+    this.currentLoadingIndex = index
+    this.loadingProgress.set(index, "loading")
+
     const imagesBase = new URL("images/", document.baseURI).toString()
     this.worker.postMessage({
-      type: "START_PRELOAD",
-      imageCount: 10,
+      type: "PRELOAD_SINGLE",
+      imageIndex: index,
       imagesBase,
     })
+  }
+
+  preloadRange(startIndex, endIndex) {
+    if (!this.worker) return
+
+    for (
+      let i = Math.max(1, startIndex + 1);
+      i <= Math.min(10, endIndex + 1);
+      i++
+    ) {
+      if (!this.cache.has(i) && this.loadingProgress.get(i) !== "loading") {
+        this.loadingQueue.push(i)
+      }
+    }
+
+    this.processQueue()
   }
 
   getImageUrl(index) {
@@ -150,6 +221,14 @@ class ImagePreloader {
 
   isImageLoaded(index) {
     return this.cache.has(index)
+  }
+
+  isLoadingImage() {
+    return this.isLoading
+  }
+
+  getCurrentLoadingIndex() {
+    return this.currentLoadingIndex
   }
 
   getLoadingStats() {
@@ -197,14 +276,17 @@ const imagePreloaderInstance = new ImagePreloader()
 ImagePreloader.getImageUrl = (index) =>
   imagePreloaderInstance.getImageUrl(index)
 ImagePreloader.preloadAll = () => imagePreloaderInstance.startPreloading()
-ImagePreloader.preloadRange = (start, end) => {
-  imagePreloaderInstance.startPreloading()
-}
+ImagePreloader.preloadImage = (index) =>
+  imagePreloaderInstance.preloadImage(index)
+ImagePreloader.preloadRange = (start, end) =>
+  imagePreloaderInstance.preloadRange(start, end)
 ImagePreloader.isImageLoaded = (index) =>
   imagePreloaderInstance.isImageLoaded(index)
 ImagePreloader.getLoadingStats = () => imagePreloaderInstance.getLoadingStats()
+ImagePreloader.isLoadingImage = () => imagePreloaderInstance.isLoadingImage()
+ImagePreloader.getCurrentLoadingIndex = () =>
+  imagePreloaderInstance.getCurrentLoadingIndex()
 
-// 导出到全局作用域，使HTML中的代码可以访问
 window.ImagePreloader = ImagePreloader
 
 export { ImagePreloader, imagePreloaderInstance as default }

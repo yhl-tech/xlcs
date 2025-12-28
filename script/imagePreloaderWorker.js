@@ -1,8 +1,11 @@
 self.onmessage = async function (event) {
-  const { type, imageCount, imagesBase } = event.data
+  const { type, imageCount, imagesBase, imageIndex } = event.data
   switch (type) {
     case "START_PRELOAD":
       await startImagePreloading(imageCount || 10, imagesBase)
+      break
+    case "PRELOAD_SINGLE":
+      await preloadSingleImage(imageIndex, imagesBase)
       break
     default:
   }
@@ -38,6 +41,31 @@ async function startImagePreloading(imageCount, imagesBase) {
     type: "PRELOAD_COMPLETE",
     totalImages: imageCount,
   })
+}
+
+async function preloadSingleImage(imageIndex, imagesBase) {
+  try {
+    if (!imagesBase) {
+      throw new Error("imagesBase 未传入，无法定位图片")
+    }
+    const imagePath = `${imagesBase.replace(
+      /\/$/,
+      ""
+    )}/rorschach-blot-${imageIndex}.webp`
+    const result = await fetchImageWithRetry(imagePath, imageIndex)
+    self.postMessage({
+      type: "IMAGE_LOADED",
+      index: imageIndex,
+      blob: result.blob,
+      contentType: result.contentType,
+    })
+  } catch (error) {
+    self.postMessage({
+      type: "IMAGE_ERROR",
+      index: imageIndex,
+      error: error.message,
+    })
+  }
 }
 
 async function fetchImageWithRetry(url, index, maxRetries = 3) {

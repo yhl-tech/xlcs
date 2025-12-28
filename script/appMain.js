@@ -1836,6 +1836,17 @@ async function prepareIntroExperience({ resume = false } = {}) {
   }
   showIntroImage()
 
+  try {
+    if (
+      window.ImagePreloader &&
+      typeof window.ImagePreloader.preloadImage === "function"
+    ) {
+      ImagePreloader.preloadImage(1)
+    }
+  } catch (e) {
+    console.warn("[介绍页] 预加载首张图片失败:", e)
+  }
+
   state.introStep = INTRO_STEPS.INTRO_OVERLAY
   saveSessionSnapshot("intro_step", { immediate: true })
 
@@ -1910,7 +1921,12 @@ async function prepareIntroExperience({ resume = false } = {}) {
 
   // 设置"进入"按钮的点击事件（只在操作反应测试完成后才可点击）
   const handleEnterClick = () => {
-    ImagePreloader.preloadAll()
+    if (
+      window.ImagePreloader &&
+      typeof window.ImagePreloader.preloadImage === "function"
+    ) {
+      ImagePreloader.preloadImage(1)
+    }
     if (!enterBtn.disabled) {
       enterBtn.removeEventListener("click", handleEnterClick)
       enterTestExperience()
@@ -2911,6 +2927,23 @@ function navigate(direction) {
       }
     }
 
+    try {
+      const nextImageNumber = state.currentIndex + 2
+      if (nextImageNumber <= state.totalImages) {
+        const preloadDelay = Math.max(2000, (NEXT_BUTTON_COOLDOWN * 1000) / 4)
+        setTimeout(() => {
+          ImagePreloader.preloadImage(nextImageNumber)
+          setTimeout(() => {
+            const isLoading = ImagePreloader.isLoadingImage()
+            const currentLoadingIndex = ImagePreloader.getCurrentLoadingIndex()
+            const isLoaded = ImagePreloader.isImageLoaded(nextImageNumber)
+          }, 5000)
+        }, preloadDelay)
+      }
+    } catch (e) {
+      console.warn("[图片切换] 预加载下一张图片失败:", e)
+    }
+
     // 延迟加载图片，让用户能看到背景动画过渡效果和渐隐渐显效果
     setTimeout(() => {
       loadImage(state.currentIndex)
@@ -2986,8 +3019,7 @@ function loadImage(index) {
     }
 
     // 确保图片加载后加载该图版的画布状态
-    if (rorschachImage.complete) {
-      // 图片已缓存，立即加载画布状态
+    const onImageLoadComplete = () => {
       resizeCanvas()
       loadCanvasState(index)
       // 渐显效果：移除淡出类，触发淡入
@@ -2996,17 +3028,21 @@ function loadImage(index) {
       setTimeout(() => {
         rorschachImage.classList.remove("image-fade-in")
       }, 800) // 增加渐显动画时间到800ms，让效果更慢
+
+      const nextImageNumber = index + 2 // 当前图片编号 + 1
+      if (nextImageNumber <= state.totalImages) {
+        setTimeout(() => {
+          ImagePreloader.preloadImage(nextImageNumber)
+        }, 1000)
+      }
+    }
+
+    if (rorschachImage.complete) {
+      onImageLoadComplete()
     } else {
       // 图片需要加载，等待加载完成
       rorschachImage.onload = () => {
-        resizeCanvas()
-        loadCanvasState(index)
-        // 渐显效果：移除淡出类，触发淡入
-        rorschachImage.classList.remove("image-fade-out")
-        rorschachImage.classList.add("image-fade-in")
-        setTimeout(() => {
-          rorschachImage.classList.remove("image-fade-in")
-        }, 800) // 增加渐显动画时间到800ms，让效果更慢
+        onImageLoadComplete()
         rorschachImage.onload = null
       }
     }
