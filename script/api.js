@@ -805,7 +805,7 @@
       formData.append("file", file, "trajectory.json")
 
       // 保存文件到本地
-      saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
+      // saveFileToLocal(blob, `trajectory_${userId}_${Date.now()}.json`)
 
       // 添加 user_id 到 FormData（对应 Python 的 data 参数）
       formData.append("user_id", userId)
