@@ -77,8 +77,12 @@ export default defineConfig({
         // JS 文件命名
         chunkFileNames: "js/[name]-[hash].js",
         entryFileNames: "js/[name]-[hash].js",
-        // 手动代码分割（可选）
-        manualChunks: undefined, // 使用默认的自动分割策略
+        // 手动代码分割 - 将大型依赖库分离
+        manualChunks: {
+          three: ["three"],
+          vconsole: ["vconsole"],
+          vendor: ["axios", "lamejs", "driver.js"],
+        },
       },
     },
 
@@ -97,6 +101,13 @@ export default defineConfig({
     port: 8080,
     open: false,
     cors: true,
+    proxy: {
+      "/api": {
+        target: "http://14.103.237.160:29876",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
   },
 
   // 预览服务器配置
@@ -104,6 +115,18 @@ export default defineConfig({
     port: 8080,
     open: false,
     cors: true,
+    proxy: {
+      "/api": {
+        target: "http://14.103.237.160:29876",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/xlcp/api": {
+        target: "http://14.103.237.160:29876",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/xlcp\/api/, ""),
+      },
+    },
   },
 
   // 公共基础路径
@@ -115,8 +138,8 @@ export default defineConfig({
 
   // 优化配置
   optimizeDeps: {
-    // 预构建的依赖（axios 使用 CDN，不需要预构建）
-    include: [],
+    // 预构建的依赖
+    include: ["axios", "three", "lamejs", "vconsole"],
   },
 
   // 插件配置

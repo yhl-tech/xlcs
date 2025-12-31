@@ -3,6 +3,9 @@
  * 收集所有PCM数据，转换为MP3格式，一次性提交
  */
 
+import lamejs from "lamejs"
+window.lamejs = lamejs
+
 ;(function (window) {
   "use strict"
 

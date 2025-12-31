@@ -28,6 +28,9 @@
  * const themeCount = BlackHoleBackground.getThemeCount(); // 返回 10
  */
 
+import * as THREE from "three"
+window.THREE = THREE
+
 ;(function () {
   "use strict"
 

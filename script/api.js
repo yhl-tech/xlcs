@@ -3,6 +3,9 @@
  * 用于与后端进行数据交互
  */
 
+import axios from "axios"
+window.axios = axios
+
 ;(function (window) {
   "use strict"
 
