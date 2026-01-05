@@ -42,10 +42,10 @@ const OPERATION_STEPS = [
     requiresDrawing: true,
   },
   {
-    id: "erase",
-    action: "erase",
-    text: "请点击擦除按钮",
-    buttonSelector: '[data-action="erase"]',
+    id: "clear",
+    action: "clear",
+    text: "请点击一键擦除按钮",
+    buttonSelector: '[data-action="clear"]',
   },
 ]
 

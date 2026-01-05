@@ -483,6 +483,9 @@
     </div>
   </div>
 
+  <!-- 登录页面配置 -->
+  <script type="module" src="./script/loginConfig.js"></script>
+
   <!-- 配置文件 -->
   <script type="module" src="./script/config.js"></script>
 
@@ -557,6 +560,20 @@
       const phoneNumberInput = document.getElementById("phone-number")
       const verificationCodeInput =
         document.getElementById("verification-code")
+
+      // 检查环境变量，控制用户名登录 tab 显示
+      const showUsernameLogin = window.LOGIN_CONFIG?.showUsernameLogin !== false
+      if (!showUsernameLogin && usernameTab) {
+        // 隐藏用户名登录 tab
+        usernameTab.style.display = "none"
+        // 如果只有一个 tab，隐藏整个 tabs 容器
+        const visibleTabs = Array.from(loginTabs.querySelectorAll('.login-tab')).filter(
+          tab => tab.style.display !== 'none'
+        )
+        if (visibleTabs.length <= 1 && loginTabs) {
+          loginTabs.style.display = "none"
+        }
+      }
 
       // 验证码倒计时相关
       let countdownTimer = null

@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:proxy": "node proxy-server.js",
+    "dev:no-username": "vite --mode prod-no-username",
     "build": "vite build",
     "build:prod": "vite build --mode production",
+    "build:no-username": "vite build --mode prod-no-username",
     "preview": "vite preview",
     "serve": "vite preview --port 8080"
   },

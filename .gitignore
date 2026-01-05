@@ -20,7 +20,7 @@ dist-ssr
 # 注意：pnpm-lock.yaml 应该提交到版本控制
 
 # 环境变量文件
-.env
+# .env
 .env.local
 .env.*.local
 
