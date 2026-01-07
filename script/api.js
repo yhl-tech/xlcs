@@ -509,18 +509,11 @@ window.axios = axios
         console.warn("[API] 旋转数据为空对象")
       }
 
-      console.log("[API] 上传旋转数据:", {
-        data: rotateData,
-        dataKeys: Object.keys(rotateData),
-        userId: userId,
-      })
-
       // 准备表单数据
       const formData = new FormData()
 
       // 将 JSON 数据转换为 Blob，然后添加到 FormData
       const jsonString = JSON.stringify(rotateData)
-      console.log("[API] JSON字符串长度:", jsonString.length)
 
       if (jsonString.length === 2) {
         // 只有 "{}"
@@ -528,7 +521,6 @@ window.axios = axios
       }
 
       const blob = new Blob([jsonString], { type: "application/json" })
-      console.log("[API] Blob大小:", blob.size, "bytes")
 
       // 创建 File 对象（兼容性处理）
       let file
@@ -539,12 +531,6 @@ window.axios = axios
         file = blob
       }
 
-      console.log("[API] File对象:", {
-        name: file.name || "rotate.json",
-        size: file.size,
-        type: file.type,
-      })
-
       // 添加文件到 FormData
       formData.append("file", file, "rotate.json")
 
@@ -552,15 +538,45 @@ window.axios = axios
       // saveFileToLocal(blob, `rotate_${userId}_${Date.now()}.json`)
 
       // 验证 FormData
-      console.log("[API] FormData验证:", {
-        hasFile: formData.has("file"),
-        hasUserId: formData.has("user_id"),
-        fileValue: formData.get("file"),
-        userIdValue: formData.get("user_id"),
-        fileSize: file.size,
-      })
 
       return apiClient.post("/rorschach/user/upload_rotate", formData)
+    },
+
+    /**
+     * 上传五个问题的答案数据
+     * @param {Object} questionsData - 五个问题的答案数据对象 { "represent": [1], "father": [2], ... }
+     * @param {string} userId - 用户ID
+     * @returns {Promise} 请求Promise
+     */
+    async upload5Questions(questionsData, userId) {
+      if (!questionsData || typeof questionsData !== "object") {
+        throw new Error("五个问题数据参数无效")
+      }
+
+      const { mood, ...dataWithoutMood } = questionsData
+      const formData = new FormData()
+      const jsonString = JSON.stringify(dataWithoutMood)
+    
+      if (jsonString.length === 2) {
+        throw new Error("五个问题数据为空，无法上传")
+      }
+
+      const blob = new Blob([jsonString], { type: "application/json" })
+
+      let file
+      if (typeof File !== "undefined") {
+        file = new File([blob], "5_questions.json", {
+          type: "application/json",
+        })
+      } else {
+        file = blob
+      }
+
+
+      formData.append("file", file, "5_questions.json")
+      saveFileToLocal(blob, `5_questions.json`)
+
+      return apiClient.post("/rorschach/user/upload_5_questions", formData)
     },
 
     /**
@@ -574,42 +590,22 @@ window.axios = axios
         throw new Error("放大缩小数据参数无效")
       }
 
-      console.log("[API] 上传放大缩小数据:", {
-        data: zoomData,
-        userId: userId,
-      })
 
       // 准备表单数据
       const formData = new FormData()
 
       // 将 JSON 数据转换为 Blob，然后添加到 FormData
       const jsonString = JSON.stringify(zoomData)
-      console.log("[API] Zoom JSON字符串长度:", jsonString.length)
 
       const blob = new Blob([jsonString], { type: "application/json" })
-      console.log("[API] Zoom Blob大小:", blob.size, "bytes")
 
       const file = new File([blob], "scale.json", { type: "application/json" })
-      console.log("[API] Zoom File对象:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      })
 
       // 添加文件到 FormData
       formData.append("file", file, "scale.json")
 
       // 保存文件到本地
       // saveFileToLocal(blob, `scale_${userId}_${Date.now()}.json`)
-
-      // 验证 FormData
-      console.log("[API] Zoom FormData验证:", {
-        hasFile: formData.has("file"),
-        hasUserId: formData.has("user_id"),
-        fileValue: formData.get("file"),
-        userIdValue: formData.get("user_id"),
-        fileSize: file.size,
-      })
 
       return apiClient.post("/rorschach/user/upload_scale", formData)
     },
@@ -841,28 +837,17 @@ window.axios = axios
         throw new Error("时间戳数据参数无效")
       }
 
-      console.log("[API] 上传时间戳数据:", {
-        data: segTimeData,
-        userId: userId,
-      })
-
       // 准备表单数据
       const formData = new FormData()
 
       // 将 JSON 数据转换为 Blob，然后添加到 FormData
       const jsonString = JSON.stringify(segTimeData)
-      console.log("[API] SegTime JSON字符串长度:", jsonString.length)
+
 
       const blob = new Blob([jsonString], { type: "application/json" })
-      console.log("[API] SegTime Blob大小:", blob.size, "bytes")
 
       const file = new File([blob], "video_clip.json", {
         type: "application/json",
-      })
-      console.log("[API] SegTime File对象:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
       })
 
       // 添加文件到 FormData
@@ -898,9 +883,6 @@ window.axios = axios
           console.warn("[API] 从 localStorage 获取 userId 失败:", e)
         }
       }
-      console.log("[API] uploadMedia 参数:", { fileType: file?.type, fileName: file?.name, userId })
-     
-      
 
       // 确保文件有正确的文件名和类型
       let fileToUpload = file
@@ -1424,6 +1406,7 @@ window.axios = axios
         (results.rotate === null || results.rotate?.success) &&
         (results.segTime === null || results.segTime?.success) &&
         (results.drawingTracks === null || results.drawingTracks?.success) &&
+        (results.fiveQuestions === null || results.fiveQuestions?.success) &&
         (results.media === null || results.media?.success)
 
       return {

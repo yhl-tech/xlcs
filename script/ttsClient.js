@@ -677,6 +677,9 @@ import { getWebSocketUrl } from "./config.js"
         this.micSource = null
       }
 
+      // 清理混合录音 destination
+      // this.mixedStreamDestination = null
+
       if (this.mediaStream) {
         this.mediaStream.getTracks().forEach((track) => track.stop())
         this.mediaStream = null

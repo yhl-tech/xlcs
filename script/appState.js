@@ -120,11 +120,11 @@ export const FINAL_PROMPT_TEXT = "提示：请点击下一张图片继续..."
 
 export const POST_TEST_QUESTIONS = [
   {
-    key: "represent",
+    key: "self",
     text: "好了，到此为止，十张墨迹图片就已经全部看完了，你现在可以看到所有的十张图片。还有几个问题需要你回答一下，第一个问题是，哪一张图片最能代表你自己？你可以说出图片的编号，或者点击对应的图片来告诉我。",
   },
   {
-    key: "represent_why",
+    key: "self_why",
     text: "请解释一下为什么，图片中哪些地方，哪些特点最能代表你自己。",
   },
   {
@@ -145,11 +145,11 @@ export const POST_TEST_QUESTIONS = [
   },
 
   {
-    key: "like",
+    key: "favorite",
     text: "好的，下一个问题是，十张图片里，你最喜欢哪一张？",
   },
   {
-    key: "like_why",
+    key: "favorite_why",
     text: "为什么呢？",
   },
   {

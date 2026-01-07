@@ -1348,10 +1348,11 @@
         rotate: null,
         segTime: null,
         drawingTracks: null,
+        fiveQuestions: null,
         media: null,
       }
 
-      const totalSteps = 5
+      const totalSteps = 6
       let currentStep = 0
 
       const reportProgress = (name, success = true) => {
@@ -1401,7 +1402,25 @@
         reportProgress("轨迹数据", false)
       }
 
-      // 5. 提交音频文件
+      // 5. 提交五个问题数据
+      try {
+        if (window.state && window.state.postTestAnswers && window.API && window.API.upload5Questions) {
+          const questionsData = window.state.postTestAnswers
+          const fiveQuestionsResult = await window.API.upload5Questions(questionsData, userId)
+          console.log("[InteractionTracker] 五个问题数据提交结果:", fiveQuestionsResult)
+          results.fiveQuestions = { success: true, data: fiveQuestionsResult }
+          reportProgress("五个问题数据", true)
+        } else {
+          results.fiveQuestions = { success: false, error: "postTestAnswers 或 upload5Questions API 不可用" }
+          reportProgress("五个问题数据", false)
+        }
+      } catch (error) {
+        console.error("[InteractionTracker] 提交五个问题数据时出错:", error)
+        results.fiveQuestions = { success: false, error: error.message }
+        reportProgress("五个问题数据", false)
+      }
+
+      // 6. 提交音频文件
       try {
         let audioFileToUpload = audioBlob
 
