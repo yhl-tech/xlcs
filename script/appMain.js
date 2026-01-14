@@ -1164,11 +1164,22 @@ function hideReportCheckLoading() {
     }
 
     // 此时介绍页已经可见，如果允许播报欢迎语，则在检查结束后再播
-    if (shouldPlayWelcomeMessage) {
-      // 异步调用，避免阻塞 UI
-      playWelcomeMessage().catch((error) => {
-        console.warn("[欢迎页] 播放欢迎语失败:", error)
-      })
+    // 只在信息填写阶段播放欢迎语音，如果已经进入测试介绍或测试阶段则不播放
+    if (
+      shouldPlayWelcomeMessage &&
+      state.introStep === INTRO_STEPS.INFO_FORM
+    ) {
+      // 延迟播放，确保页面已完全加载
+      welcomeMessageTimer = setTimeout(() => {
+        if (
+          shouldPlayWelcomeMessage &&
+          state.introStep === INTRO_STEPS.INFO_FORM
+        ) {
+          playWelcomeMessage().catch((error) => {
+            console.warn("[欢迎页] 播放欢迎语失败:", error)
+          })
+        }
+      }, 1000)
     }
   } else {
     console.log("[hideReportCheckLoading] 已在主流程中，不恢复介绍页")
@@ -4959,27 +4970,40 @@ function stopAllPlayback() {
 
 async function playWelcomeMessage() {
   if (!shouldPlayWelcomeMessage || isCheckingReportStatus) {
+    console.log("[欢迎页] 跳过播放欢迎语音:", {
+      shouldPlayWelcomeMessage,
+      isCheckingReportStatus,
+    })
     return
   }
+
+  // 检查当前阶段，只在信息填写阶段播放
+  if (state.introStep !== INTRO_STEPS.INFO_FORM) {
+    console.log("[欢迎页] 当前不在信息填写阶段，跳过欢迎语音:", {
+      introStep: state.introStep,
+      expectedStep: INTRO_STEPS.INFO_FORM,
+    })
+    return
+  }
+
   hideIntroImage()
-  // displayWelcomeText()
-  const welcomeText = getWelcomeText()
 
   try {
-    // 欢迎语属于测试前阶段，使用 pretest phase；确保TTS已初始化
-    TTS.currentPhase = "pretest"
-    await ensureTTSInit("audio", "pretest")
-
-    // 构造播报查询
-    const welcomeQuery = buildTTSQuery(welcomeText)
-
-    // 发送播报请求
-    await sendTextQuery(welcomeQuery, { ensure: false })
-
-    console.log("[欢迎页] 欢迎信息播报已发送")
+    console.log("[欢迎页] 开始播放欢迎语音")
+    await playAudioFile("audio/welcome.MP3")
+    console.log("[欢迎页] 欢迎信息播放完成")
   } catch (error) {
-    console.warn("[欢迎页] 欢迎信息播报失败:", error)
+    console.warn("[欢迎页] 欢迎信息播放失败:", error)
   }
+}
+
+function playAudioFile(src) {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(src)
+    audio.onended = resolve
+    audio.onerror = reject
+    audio.play().catch(reject)
+  })
 }
 
 //知己心探心理测试需要坐在电脑前，使用本网站，采用语音交互完成。
@@ -5588,11 +5612,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("[Init] 初始化失败:", error)
     })
   })
-  welcomeMessageTimer = setTimeout(() => {
-    if (shouldPlayWelcomeMessage) {
-      playWelcomeMessage()
-    }
-  }, 1000)
 
   // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
