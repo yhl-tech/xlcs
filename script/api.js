@@ -1164,6 +1164,52 @@ window.axios = axios
     },
 
     /**
+     * 获取报告解读版（HTML）
+     * @param {string} userId - 用户ID
+     * @returns {Promise} 请求Promise，返回Response对象
+     */
+    async getPublicityReport(userId) {
+      if (!userId) {
+        throw new Error('用户ID不能为空')
+      }
+
+      try {
+        const token =
+          typeof localStorage !== 'undefined'
+            ? localStorage.getItem('token')
+            : null
+
+        const headers = {
+          Accept: 'text/html',
+        }
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        const response = await apiClient.post(
+          '/rorschach/user/get_report_publicity',
+          { user_id: userId },
+          {
+            responseType: 'text',
+            timeout: 60000,
+            headers: headers,
+            transformResponse: [(data) => data],
+          }
+        )
+
+        return response
+      } catch (error) {
+        console.error('[API] 获取报告解读版失败:', error)
+        throw new APIError(
+          error.message || '报告解读版获取失败，请稍后重试',
+          error.status || 0,
+          { originalError: error }
+        )
+      }
+    },
+
+    /**
      * 检查用户是否已提交过测试数据
      * @param {string} userId - 用户ID
      * @returns {Promise} 请求Promise

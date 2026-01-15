@@ -4264,6 +4264,13 @@ function renderSummaryReportSection(container, grid, statusInfo) {
     downloadBtn.textContent = "📥 下载测试报告"
     downloadBtn.addEventListener("click", downloadReport)
     reportCard.appendChild(downloadBtn)
+
+    const publicityBtn = document.createElement("button")
+    publicityBtn.id = "publicity-report-btn"
+    publicityBtn.textContent = "📄 报告解读版"
+    publicityBtn.style.marginLeft = "10px"
+    publicityBtn.addEventListener("click", openPublicityReport)
+    reportCard.appendChild(publicityBtn)
   }
 
   // 将 reportCard 插入到 summary-view 中，在 grid 之前
@@ -4415,6 +4422,45 @@ function buildReportStatusFromResponse(response) {
   }
 
   return normalizeReportStatusPayload(statusInfo)
+}
+
+// 打开报告解读版
+async function openPublicityReport() {
+  try {
+    const userId = getCurrentUserId()
+    if (!userId) {
+      alert("用户信息不存在，请重新登录")
+      return
+    }
+
+    const publicityBtn = document.getElementById("publicity-report-btn")
+    if (!publicityBtn) return
+
+    const originalText = publicityBtn.textContent
+    publicityBtn.textContent = "📄 加载中..."
+    publicityBtn.disabled = true
+
+    // 调用后台 API 获取 HTML
+    const response = await window.API.getPublicityReport(userId)
+    const htmlContent = response.data || response
+
+    // 使用 Blob URL 在新窗口打开
+    const blob = new Blob([htmlContent], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    window.open(url, "_blank")
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    publicityBtn.textContent = originalText
+    publicityBtn.disabled = false
+  } catch (error) {
+    console.error("[报告解读版] 打开失败:", error)
+
+    const publicityBtn = document.getElementById("publicity-report-btn")
+    if (publicityBtn) {
+      publicityBtn.textContent = "📄 报告解读版"
+      publicityBtn.disabled = false
+    }
+  }
 }
 
 // 下载报告进度模拟定时器
@@ -5351,9 +5397,9 @@ async function routeToReportSummaryIfAvailable() {
       const uploadStatus = await window.API.checkUploadFilesStatus(userId)
 
       // 如果用户未提交数据（data 不为 true），不跳转
-      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
-        return false
-      }
+      // if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+      //   return false
+      // }
     } else {
       // 接口不存在，不跳转
       return false
