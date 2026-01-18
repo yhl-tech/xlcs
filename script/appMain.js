@@ -40,8 +40,10 @@ import {
   detectDrawingAction,
 } from "./operationReactionTest.js"
 import { waitingReportManager } from "./waitingReport.js"
+import { reportWaitingFlow } from "./reportWaitingFlow.js"
 import { initImagePan } from "./imagePan.js"
 import { ImagePreloader } from "./imagePreloader.js"
+import { initCanvasTouchDraw } from "./canvasTouchDraw.js"
 
 let sessionSaveTimer = null
 let pendingSessionSnapshot = null
@@ -2712,6 +2714,13 @@ function setupEventListeners() {
   canvas.addEventListener("mousemove", draw)
   canvas.addEventListener("mouseup", stopDrawing)
   canvas.addEventListener("mouseout", stopDrawing)
+
+  initCanvasTouchDraw({
+    canvas,
+    onTouchStart: startDrawing,
+    onTouchMove: draw,
+    onTouchEnd: stopDrawing,
+  })
 }
 
 /**
@@ -3603,8 +3612,10 @@ async function finishAndSaveData() {
 
         console.log("[API] 数据提交结果:", result)
 
+        setTimeout(goToSummary, 1000)
+
         if (hasFailure) {
-          // 有失败项目
+
           console.error("[API] 部分数据提交失败，重试次数:", retryCount)
           if (uploadFill) {
             uploadFill.classList.add("failed")
@@ -3612,9 +3623,9 @@ async function finishAndSaveData() {
           if (uploadStatusText) {
             uploadStatusText.textContent = "上传失败，请重试"
           }
-          // 根据重试次数显示不同按钮
+
           if (retryCount >= MAX_RETRY) {
-            // 已达到最大重试次数，显示重新测试按钮
+
             if (uploadRetryBtn) {
               uploadRetryBtn.style.display = "none"
             }
@@ -3625,7 +3636,7 @@ async function finishAndSaveData() {
               uploadStatusText.textContent = "上传失败，请重新测试"
             }
           } else {
-            // 还可以重试
+
             if (uploadRetryBtn) {
               uploadRetryBtn.style.display = "block"
             }
@@ -3634,14 +3645,14 @@ async function finishAndSaveData() {
             }
           }
         } else {
-          // 全部成功
+       
           if (uploadFill) {
             uploadFill.classList.add("success")
           }
           if (uploadStatusText) {
             uploadStatusText.textContent = "数据上传完成"
           }
-          // 上传成功后延迟 1 秒跳转到汇总页面
+
           setTimeout(goToSummary, 1000)
         }
       } catch (error) {
@@ -3652,7 +3663,6 @@ async function finishAndSaveData() {
         if (uploadStatusText) {
           uploadStatusText.textContent = "上传失败，请重试"
         }
-        // 根据重试次数显示不同按钮
         if (retryCount >= MAX_RETRY) {
           if (uploadRetryBtn) {
             uploadRetryBtn.style.display = "none"
@@ -3733,64 +3743,12 @@ function showWaitingReportOnly() {
 
   // 启动等待报告动画（词云动画会在上传完成后由 finishAndSaveData 中的 goToSummary 停止）
   waitingReportManager.start()
-}
 
-function showWaitingReport() {
-  console.log("[showWaitingReport] 显示等待报告页面")
-
-  // 隐藏其他视图
-  infoScreen.style.display = "none"
-  mainContent.style.display = "none"
-  controlsBar.style.display = "none"
-  postTestView.style.display = "none"
-  summaryView.style.display = "none"
-
-  // 隐藏字幕
-  if (window.subtitleManager) {
-    window.subtitleManager.hide()
+  // 初始化流程展示
+  const flowContainer = document.getElementById("report-flow-container")
+  if (flowContainer) {
+    reportWaitingFlow.init(flowContainer)
   }
-
-  // 隐藏背景动画
-  const bgContainer = document.getElementById("blackhole-bg-container")
-  if (bgContainer) {
-    bgContainer.style.display = "none"
-  }
-
-  // 隐藏能量柱
-  const energyPillarContainer = document.getElementById(
-    "energy-pillar-container"
-  )
-  if (energyPillarContainer) {
-    energyPillarContainer.style.display = "none"
-    energyPillarContainer.classList.remove("visible")
-  }
-
-  // 确保 image-container 隐藏
-  const imageContainer = document.getElementById("image-container")
-  if (imageContainer) {
-    imageContainer.style.display = "none"
-  }
-
-  // 显示等待报告视图
-  appWindow.style.display = "flex"
-  waitingReportView.style.display = "block"
-
-  // 启动等待报告动画
-  waitingReportManager.start()
-
-  // 15秒后跳转到汇总页面（可以改为轮询报告状态）
-  setTimeout(() => {
-    console.log("[showWaitingReport] 准备跳转到汇总页面")
-
-    // 停止动画
-    waitingReportManager.stop()
-
-    // 隐藏等待报告视图
-    waitingReportView.style.display = "none"
-
-    // 显示汇总页面
-    showSummary({ reportStatus: { ...DEFAULT_REPORT_WAITING_STATUS } })
-  }, 12000)
 }
 
 function showSummary(options = {}) {
@@ -3862,37 +3820,37 @@ function showSummary(options = {}) {
   }
   grid.innerHTML = ""
   renderSummaryReportSection(summaryView, grid, latestReportStatus)
-  ImagePreloader.preloadRange(0, state.totalImages - 1)
+  // ImagePreloader.preloadRange(0, state.totalImages - 1)
 
-  const canvasStates = Array.isArray(state.canvasStates)
-    ? state.canvasStates
-    : new Array(state.totalImages).fill(null)
-  state.canvasStates = canvasStates
+  // const canvasStates = Array.isArray(state.canvasStates)
+  //   ? state.canvasStates
+  //   : new Array(state.totalImages).fill(null)
+  // state.canvasStates = canvasStates
 
-  for (let i = 0; i < state.totalImages; i++) {
-    const item = document.createElement("div")
-    item.className = "summary-item"
-    const compositeContainer = document.createElement("div")
-    compositeContainer.style.position = "relative"
-    const baseImage = document.createElement("img")
-    baseImage.src = ImagePreloader.getImageUrl(i + 1)
-    compositeContainer.appendChild(baseImage)
-    if (canvasStates[i]) {
-      const drawingImage = document.createElement("img")
-      drawingImage.src = canvasStates[i]
-      drawingImage.style.position = "absolute"
-      drawingImage.style.top = 0
-      drawingImage.style.left = 0
-      drawingImage.style.width = "100%"
-      drawingImage.style.height = "100%"
-      compositeContainer.appendChild(drawingImage)
-    }
-    item.appendChild(compositeContainer)
-    const heading = document.createElement("h4")
-    heading.textContent = `图 ${i + 1}`
-    item.appendChild(heading)
-    grid.appendChild(item)
-  }
+  // for (let i = 0; i < state.totalImages; i++) {
+  //   const item = document.createElement("div")
+  //   item.className = "summary-item"
+  //   const compositeContainer = document.createElement("div")
+  //   compositeContainer.style.position = "relative"
+  //   const baseImage = document.createElement("img")
+  //   baseImage.src = ImagePreloader.getImageUrl(i + 1)
+  //   compositeContainer.appendChild(baseImage)
+  //   if (canvasStates[i]) {
+  //     const drawingImage = document.createElement("img")
+  //     drawingImage.src = canvasStates[i]
+  //     drawingImage.style.position = "absolute"
+  //     drawingImage.style.top = 0
+  //     drawingImage.style.left = 0
+  //     drawingImage.style.width = "100%"
+  //     drawingImage.style.height = "100%"
+  //     compositeContainer.appendChild(drawingImage)
+  //   }
+  //   item.appendChild(compositeContainer)
+  //   const heading = document.createElement("h4")
+  //   heading.textContent = `图 ${i + 1}`
+  //   item.appendChild(heading)
+  //   grid.appendChild(item)
+  // }
   saveSessionSnapshot("stage_change", { immediate: true })
 }
 
@@ -4232,54 +4190,54 @@ function renderSummaryReportSection(container, grid, statusInfo) {
   const reportCard = document.createElement("div")
   reportCard.className = "summary-report-card"
 
-  const retestBtn = document.createElement("button")
-  retestBtn.id = "restart-test-btn"
-  retestBtn.type = "button"
-  retestBtn.textContent = "重新测试"
-  retestBtn.addEventListener("click", handleRetestClick)
-  reportCard.appendChild(retestBtn)
+  // const retestBtn = document.createElement("button")
+  // retestBtn.id = "restart-test-btn"
+  // retestBtn.type = "button"
+  // retestBtn.textContent = "重新测试"
+  // retestBtn.addEventListener("click", handleRetestClick)
+  // reportCard.appendChild(retestBtn)
 
-  const title = document.createElement("h3")
-  title.textContent = "感谢您的参与！"
-  reportCard.appendChild(title)
+  // 如果报告未就绪，显示专业流程展示
+  if (!isReportReadyStatus(statusInfo)) {
+    const flowContainer = document.createElement("div")
+    flowContainer.id = "summary-flow-container"
+    reportCard.appendChild(flowContainer)
 
-  const message = document.createElement("p")
-  message.textContent = getReportStatusMessage(statusInfo)
-  reportCard.appendChild(message)
+    container.insertBefore(reportCard, grid)
 
-  if (statusInfo?.updatedAt) {
-    const updated = document.createElement("div")
-    updated.textContent = `最近更新：${statusInfo.updatedAt}`
-    reportCard.appendChild(updated)
+    // 初始化流程展示
+    reportWaitingFlow.init(flowContainer)
+    return
   }
 
-  if (isReportReadyStatus(statusInfo)) {
-    const statusEl = document.createElement("div")
-    statusEl.id = "download-report-status"
-    statusEl.style.display = "none" // 直接隐藏 download-report-status 元素
-    reportCard.appendChild(statusEl)
+  // 报告已就绪，显示下载按钮和完成状态的流程
+  const downloadArea = document.createElement("div")
+  downloadArea.style.cssText = "margin-bottom: 2rem; text-align: center;"
 
-    const downloadBtn = document.createElement("button")
-    downloadBtn.id = "download-report-btn"
-    downloadBtn.textContent = "📥 下载测试报告"
-    downloadBtn.addEventListener("click", downloadReport)
-    reportCard.appendChild(downloadBtn)
+  const downloadBtn = document.createElement("button")
+  downloadBtn.id = "download-report-btn"
+  downloadBtn.textContent = "📥 下载测试报告"
+  downloadBtn.addEventListener("click", downloadReport)
+  downloadArea.appendChild(downloadBtn)
 
-    const publicityBtn = document.createElement("button")
-    publicityBtn.id = "publicity-report-btn"
-    publicityBtn.textContent = "📄 报告解读版"
-    publicityBtn.style.marginLeft = "10px"
-    publicityBtn.addEventListener("click", openPublicityReport)
-    reportCard.appendChild(publicityBtn)
-  }
+  const publicityBtn = document.createElement("button")
+  publicityBtn.id = "publicity-report-btn"
+  publicityBtn.textContent = "📄 报告解读版"
+  publicityBtn.style.marginLeft = "10px"
+  publicityBtn.addEventListener("click", openPublicityReport)
+  downloadArea.appendChild(publicityBtn)
 
-  // 将 reportCard 插入到 summary-view 中，在 grid 之前
+  reportCard.appendChild(downloadArea)
+
+  const flowContainer = document.createElement("div")
+  flowContainer.id = "summary-flow-container"
+  reportCard.appendChild(flowContainer)
+
   container.insertBefore(reportCard, grid)
 
-  // 在元素插入到 DOM 后，隐藏"📈 完整测试汇总"标签
-  if (isReportReadyStatus(statusInfo)) {
-    hideSummaryElementsForDownload()
-  }
+  // 初始化流程展示为完成状态
+  reportWaitingFlow.init(flowContainer, { completed: true })
+  hideSummaryElementsForDownload()
 }
 
 function normalizeReportStatus(value) {
@@ -5397,9 +5355,9 @@ async function routeToReportSummaryIfAvailable() {
       const uploadStatus = await window.API.checkUploadFilesStatus(userId)
 
       // 如果用户未提交数据（data 不为 true），不跳转
-      // if (uploadStatus.code != 0 || uploadStatus.data !== true) {
-      //   return false
-      // }
+      if (uploadStatus.code != 0 || uploadStatus.data !== true) {
+        return false
+      }
     } else {
       // 接口不存在，不跳转
       return false
@@ -5643,7 +5601,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 开发调试：直接进入 mood 问题
   // setTimeout(() => {
   //   showPostTestView()
-  //   currentQuestionIndex = 10
+  //   currentQuestionIndex = 8
   //   askNextQuestion()
   // }, 100)
 })

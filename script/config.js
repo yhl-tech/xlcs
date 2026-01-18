@@ -26,10 +26,11 @@ const getApiBaseUrl = () => {
 // WebSocket 配置
 export const WS_CONFIG = {
   // 开发环境 - 直接使用线上地址、
-  // development: "ws://localhost:8765",
-  development: "wss://www.jionlp.com/xlcp/ws/",
+  development: "wss://innerscan.life/xlcp/ws/",
+  // development: "wss://www.jionlp.com/xlcp/ws/",
   // 生产环境（使用域名和 wss:// 因为页面通过 HTTPS 加载）
-  production: "wss://www.jionlp.com/xlcp/ws/",
+  // production: "wss://www.jionlp.com/xlcp/ws/",
+  production: "wss://innerscan.life/xlcp/ws/",
 }
 
 // 获取当前环境的 WebSocket URL

@@ -575,7 +575,7 @@ window.axios = axios
       }
 
       formData.append('file', file, '5_questions.json')
-      saveFileToLocal(blob, `5_questions.json`)
+      // saveFileToLocal(blob, `5_questions.json`)
 
       return apiClient.post('/rorschach/user/upload_5_questions', formData)
     },
