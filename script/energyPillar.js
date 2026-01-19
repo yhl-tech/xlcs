@@ -9,7 +9,7 @@
   // 配置
   const CONFIG = {
     MAX_ENERGY: 1000, // 最大能量值
-    ENERGY_PER_STROKE: 1, // 每次绘画增加的能量（提高以让填充高度更明显）
+    ENERGY_PER_STROKE: 2, // 每次绘画增加的能量（提高以让填充高度更明显）
     PARTICLE_INTERVAL: 100, // 粒子生成间隔 (ms)
     PARTICLE_COLORS: ["cyan", "magenta", "blue", "white"],
     RIPPLE_DURATION: 500, // 波纹持续时间 (ms)
@@ -21,6 +21,8 @@
   let particleTimer = null
   let elements = {}
   let initialized = false
+  let maxEnergyForCurrentPage = 100 // 当前页面的能量上限
+  let lastDetectedIndex = 0 // 上次检测到的图片索引，用于自动检测切换
 
   /**
    * 初始化能量柱
@@ -111,12 +113,33 @@
   }
 
   /**
+   * 检测并更新当前页码（自动检测图片切换）
+   */
+  function detectAndUpdatePage() {
+    if (window.state && typeof window.state.currentIndex === "number") {
+      const stateIndex = window.state.currentIndex
+      if (stateIndex !== lastDetectedIndex) {
+        lastDetectedIndex = stateIndex
+        const pageNumber = stateIndex // currentIndex 是 0-9，页码是 1-10
+        maxEnergyForCurrentPage = pageNumber * 100
+        console.log(
+          `[EnergyPillar] 自动检测到图片切换，当前第${pageNumber}页，能量上限：${maxEnergyForCurrentPage}`
+        )
+      }
+    }
+  }
+
+  /**
    * 增加能量
    */
   function addEnergy(amount = CONFIG.ENERGY_PER_STROKE) {
     if (!initialized) return
 
-    energy = Math.min(energy + amount, CONFIG.MAX_ENERGY)
+    // 自动检测图片切换
+    detectAndUpdatePage()
+
+    // 限制能量不超过当前页面的上限和总上限
+    energy = Math.min(energy + amount, maxEnergyForCurrentPage, CONFIG.MAX_ENERGY)
     updateFillLevel()
 
     // 触发脉冲效果
