@@ -9,7 +9,7 @@
   // 配置
   const CONFIG = {
     MAX_ENERGY: 1000, // 最大能量值
-    ENERGY_PER_STROKE: 5, // 每次绘画增加的能量（提高以让填充高度更明显）
+    ENERGY_PER_STROKE: 1, // 每次绘画增加的能量（提高以让填充高度更明显）
     PARTICLE_INTERVAL: 100, // 粒子生成间隔 (ms)
     PARTICLE_COLORS: ["cyan", "magenta", "blue", "white"],
     RIPPLE_DURATION: 500, // 波纹持续时间 (ms)
@@ -170,9 +170,14 @@
   ) {
     if (!elements.container) return null
 
-    // 如果需要，增加能量
+    // 如果需要，增加能量，画笔和下一页的时候生效
     if (shouldAddEnergy) {
-      addEnergy()
+      if (pillarPos) {
+        // 使用预先传递的位置
+        addEnergy(5)
+      } else {
+        addEnergy()
+      }
     }
 
     // 创建粒子元素
@@ -221,7 +226,7 @@
   }
 
   /**
-   * 生成粒子 (从指定位置飞向能量柱)
+   * 画笔画画时， 生成粒子 (从指定位置飞向能量柱)
    * @param {number} x - 画笔在页面上的X坐标
    * @param {number} y - 画笔在页面上的Y坐标
    */

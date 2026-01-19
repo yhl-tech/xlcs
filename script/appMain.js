@@ -4757,20 +4757,20 @@ function draw(e) {
   }
 
   // 擦除时减少能量（擦除轨迹时）
-  if (
-    state.tool === "eraser" &&
-    window.EnergyPillar &&
-    typeof window.EnergyPillar.removeEnergy === "function"
-  ) {
-    // 擦除时减少能量，使用节流避免减少过快
-    const now = Date.now()
-    if (!window._lastEraseTime) window._lastEraseTime = 0
-    if (now - window._lastEraseTime >= 100) {
-      // 每 100ms 减少一次能量
-      window.EnergyPillar.removeEnergy(5) // 每次减少 5 点能量
-      window._lastEraseTime = now
-    }
-  }
+  // if (
+  //   state.tool === "eraser" &&
+  //   window.EnergyPillar &&
+  //   typeof window.EnergyPillar.removeEnergy === "function"
+  // ) {
+  //   // 擦除时减少能量，使用节流避免减少过快
+  //   const now = Date.now()
+  //   if (!window._lastEraseTime) window._lastEraseTime = 0
+  //   if (now - window._lastEraseTime >= 100) {
+  //     // 每 100ms 减少一次能量
+  //     window.EnergyPillar.removeEnergy(5) // 每次减少 5 点能量
+  //     window._lastEraseTime = now
+  //   }
+  // }
 
   lastX = x
   lastY = y
@@ -4897,24 +4897,24 @@ function clearAllDrawing() {
   saveCanvasState(state.currentIndex)
 
   // 一键擦除时减少能量（减少当前能量的 50%，但至少减少 50 点）
-  if (
-    window.EnergyPillar &&
-    typeof window.EnergyPillar.getEnergy === "function" &&
-    typeof window.EnergyPillar.removeEnergy === "function"
-  ) {
-    const currentEnergy = window.EnergyPillar.getEnergy()
-    if (currentEnergy > 0) {
-      // 减少当前能量的 50%，但至少减少 50 点
-      const reduceAmount = Math.max(50, Math.floor(currentEnergy * 0.5))
-      window.EnergyPillar.removeEnergy(reduceAmount)
-      console.log(
-        "[一键擦除] 能量减少:",
-        reduceAmount,
-        "当前能量:",
-        currentEnergy - reduceAmount
-      )
-    }
-  }
+  // if (
+  //   window.EnergyPillar &&
+  //   typeof window.EnergyPillar.getEnergy === "function" &&
+  //   typeof window.EnergyPillar.removeEnergy === "function"
+  // ) {
+  //   const currentEnergy = window.EnergyPillar.getEnergy()
+  //   if (currentEnergy > 0) {
+  //     // 减少当前能量的 50%，但至少减少 50 点
+  //     const reduceAmount = Math.max(50, Math.floor(currentEnergy * 0.5))
+  //     window.EnergyPillar.removeEnergy(reduceAmount)
+  //     console.log(
+  //       "[一键擦除] 能量减少:",
+  //       reduceAmount,
+  //       "当前能量:",
+  //       currentEnergy - reduceAmount
+  //     )
+  //   }
+  // }
 
   // 记录一键擦除操作
   if (window.InteractionTracker && window.InteractionTracker._trackClearAll) {

@@ -192,6 +192,31 @@
 
     directEnterBtn.addEventListener("click", () => {
       console.log("[测试] 点击直接进入按钮")
+      // 隐藏填表单界面
+      const infoScreen = document.getElementById("info-screen")
+      if (infoScreen) {
+        infoScreen.style.display = "none"
+      }
+      // 隐藏测试准备页面
+      const welcomeTextContainer = document.getElementById(
+        "welcome-text-container"
+      )
+      if (welcomeTextContainer) {
+        welcomeTextContainer.style.display = "none"
+      }
+      // 显示应用窗口
+      const appWindow = document.getElementById("app-window")
+      if (appWindow) {
+        appWindow.style.display = "flex"
+      }
+      // 预加载图片
+      if (
+        window.ImagePreloader &&
+        typeof window.ImagePreloader.preloadImage === "function"
+      ) {
+        window.ImagePreloader.preloadImage(1)
+      }
+      // 进入测试
       if (typeof window.enterTestExperience === "function") {
         window.enterTestExperience()
       } else {
