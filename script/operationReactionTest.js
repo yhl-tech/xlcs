@@ -494,7 +494,7 @@ async function ensureDialogClientConnected() {
     ) {
       const initMsg = JSON.stringify({
         type: "init",
-        speaker: "zh_female_vv_jupiter_bigtts",
+        speaker: "alloy",
         mode: "audio",
       })
       window.dialogClient.ws.send(initMsg)
@@ -618,7 +618,7 @@ async function playTTS(text) {
               ) {
                 const initMsg = JSON.stringify({
                   type: "init",
-                  speaker: "zh_female_vv_jupiter_bigtts",
+                  speaker: "alloy",
                   mode: "audio",
                 })
                 window.dialogClient.ws.send(initMsg)

@@ -98,6 +98,40 @@ html {
   background: var(--bg-gradient);
 }
 
+/* 测试说明和测试准备页面布局：info-screen 和 app-window 左右居中并保持间距 */
+body:has(#intro-overlay[style*="display: block"]),
+body:has(#intro-overlay[style*="display: flex"]),
+body:has(#welcome-text-container:not([style*="display: none"]):not(.hidden)) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  padding: 40px 20px;
+  min-height: 100vh;
+  overflow-x: auto;
+}
+
+/* 测试准备页面时，调整 info-screen 样式 */
+body:has(#welcome-text-container:not([style*="display: none"]):not(.hidden)) #info-screen {
+  position: relative;
+  flex-shrink: 0;
+  max-width: 400px;
+  margin: 0;
+  padding: 40px 20px;
+}
+
+/* 测试准备页面时，调整 app-window 样式 */
+
+body:has(#welcome-text-container:not([style*="display: none"]):not(.hidden)) .app-window {
+  position: relative;
+  flex-shrink: 0;
+  width: 95vw;
+  max-width: 800px;
+  height: 85vh;
+  max-height: 800px;
+}
+
 /* 测试模式下，info-screen 背景透明 */
 .test-mode #info-screen {
   background: transparent;
