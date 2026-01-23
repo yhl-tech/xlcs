@@ -1423,6 +1423,7 @@
       // 6. 提交音频文件
       try {
         let audioFileToUpload = audioBlob
+        console.log("[InteractionTracker] 准备提交音频，audioBlob:", audioBlob ? `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB` : "null")
 
         // 如果未提供音频且录制器有数据，优先使用录制器导出的MP3
         if (
@@ -1432,17 +1433,25 @@
         ) {
           try {
             const status = window.AudioRecorder.getStatus()
+            console.log("[InteractionTracker] AudioRecorder 状态:", status)
             if (status.bufferCount > 0) {
               window.AudioRecorder.stop()
               audioFileToUpload = await window.AudioRecorder.exportMP3()
+              console.log("[InteractionTracker] 从 AudioRecorder 导出音频:", audioFileToUpload ? `${(audioFileToUpload.size / 1024 / 1024).toFixed(2)} MB` : "null")
             }
           } catch (error) {
+            console.warn("[InteractionTracker] 从 AudioRecorder 导出音频失败:", error)
             // 导出失败，继续使用原有的 audioBlob
           }
         }
 
+        console.log("[InteractionTracker] 最终音频文件:", audioFileToUpload ? `${(audioFileToUpload.size / 1024 / 1024).toFixed(2)} MB` : "null")
+        console.log("[InteractionTracker] window.API 存在:", !!window.API)
+        console.log("[InteractionTracker] window.API.uploadMedia 存在:", !!(window.API && window.API.uploadMedia))
+
         // 如果有音频文件且API可用，则上传
         if (audioFileToUpload && window.API && window.API.uploadMedia) {
+          console.log("[InteractionTracker] 开始上传音频文件...")
           const mediaResult = await window.API.uploadMedia(
             audioFileToUpload,
             userId
@@ -1457,13 +1466,16 @@
             reportProgress("音频文件", true)
           }
         } else if (audioFileToUpload) {
+          console.error("[InteractionTracker] uploadMedia API 不可用")
           results.media = { success: false, error: "uploadMedia API 不可用" }
           reportProgress("音频文件", false)
         } else {
+          console.error("[InteractionTracker] 没有可上传的音频文件")
           results.media = { success: false, error: "没有可上传的音频文件" }
           reportProgress("音频文件", false)
         }
       } catch (error) {
+        console.error("[InteractionTracker] 提交音频文件时出错:", error)
         results.media = { success: false, error: error.message }
         reportProgress("音频文件", false)
       }

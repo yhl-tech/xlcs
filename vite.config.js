@@ -25,15 +25,15 @@ export default defineConfig({
     minify: "terser",
     terserOptions: {
       compress: {
-        drop_console: true, // 删除 console
+        drop_console: false, // 删除 console
         drop_debugger: true, // 移除 debugger
-        pure_funcs: [
-          "console.log",
-          "console.info",
-          "console.warn",
-          "console.error",
-          "console.debug",
-        ], // 移除特定的 console 方法
+        // pure_funcs: [
+        //   "console.log",
+        //   "console.info",
+        //   "console.warn",
+        //   "console.error",
+        //   "console.debug",
+        // ], // 移除特定的 console 方法
       },
       mangle: true, // 变量名混淆
       format: {
@@ -53,10 +53,11 @@ export default defineConfig({
 
     // 代码分割配置
     rollupOptions: {
-      // 多入口配置，确保 index.html 和 login.html 都会被打包
+      // 多入口配置
       input: {
-        main: "index.html",
-        login: "login.html",
+        index: "home.html",    // 主入口，构建后成为 dist/index.html（根路径访问）
+        login: "login.html",   // 构建后成为 dist/login.html
+        test: "index.html",    // 原 index.html，构建后成为 dist/test.html
       },
       output: {
         // 资源文件命名

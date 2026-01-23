@@ -460,52 +460,23 @@ async function ensureDialogClientConnected() {
 
   // 检查连接状态
   const isConnected = window.dialogClient.isConnected
-  const wsReady = window.dialogClient.ws?.readyState === WebSocket.OPEN
 
-  // 如果已连接且 WebSocket 状态正常，直接返回
-  if (isConnected && wsReady) {
+  // 如果已连接，直接返回
+  if (isConnected) {
     console.log("[操作反应测试] 连接已就绪，复用现有连接")
     return true
   }
 
   // 需要重连
   try {
-    // 如果已连接但 WebSocket 状态异常，先断开
-    if (isConnected) {
-      console.log("[操作反应测试] 检测到连接状态异常，断开重连...")
-      try {
-        window.dialogClient.disconnect()
-        // 等待连接完全关闭（减少等待时间）
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      } catch (e) {
-        console.warn("[操作反应测试] 断开连接时出错:", e)
-      }
-    }
-
     // 重新连接
     console.log("[操作反应测试] 连接 dialogClient...")
     await window.dialogClient.connect()
     console.log("[操作反应测试] dialogClient 连接成功")
 
-    // 发送初始化消息
-    if (
-      window.dialogClient.ws &&
-      window.dialogClient.ws.readyState === WebSocket.OPEN
-    ) {
-      const initMsg = JSON.stringify({
-        type: "init",
-        speaker: "zh_female_vv_jupiter_bigtts",
-        mode: "audio",
-      })
-      window.dialogClient.ws.send(initMsg)
-      console.log("[操作反应测试] TTS 初始化消息已发送")
-      // 减少初始化等待时间
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    }
-
     return true
   } catch (error) {
-    console.error("[操作反应测试] TTS 连接/初始化失败:", error)
+    console.error("[操作反应测试] 连接失败:", error)
     return false
   }
 }
@@ -611,20 +582,8 @@ async function playTTS(text) {
               }
               // 重新连接
               await window.dialogClient.connect()
-              // 重新发送初始化消息
-              if (
-                window.dialogClient.ws &&
-                window.dialogClient.ws.readyState === WebSocket.OPEN
-              ) {
-                const initMsg = JSON.stringify({
-                  type: "init",
-                  speaker: "zh_female_vv_jupiter_bigtts",
-                  mode: "audio",
-                })
-                window.dialogClient.ws.send(initMsg)
-                console.log("[操作反应测试] TTS 重新初始化消息已发送")
-                await new Promise((resolve) => setTimeout(resolve, 100))
-              }
+              console.log("[操作反应测试] TTS 重新连接成功")
+              await new Promise((resolve) => setTimeout(resolve, 100))
             } catch (error) {
               console.error("[操作反应测试] TTS 重新初始化失败:", error)
             }

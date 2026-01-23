@@ -969,11 +969,11 @@ window.axios = axios
       const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${
         fileToUpload.name
       }`
-      // saveFileToLocal(fileToUpload, mediaFileName)
+      saveFileToLocal(fileToUpload, mediaFileName)
 
-      return apiClient.post('/rorschach/user/upload_media', formData, {
-        timeout: 300000, // 5分钟超时
-      })
+      // return apiClient.post('/rorschach/user/upload_media', formData, {
+      //   timeout: 300000, // 5分钟超时
+      // })
     },
 
     /**

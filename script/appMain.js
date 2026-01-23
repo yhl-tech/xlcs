@@ -259,16 +259,12 @@ async function sendTextQuery(text, { ensure = true } = {}) {
   }
 
   // 双重检查连接状态
-  if (
-    !window.dialogClient.isConnected ||
-    !window.dialogClient.ws ||
-    window.dialogClient.ws.readyState !== WebSocket.OPEN
-  ) {
-    console.warn("[sendTextQuery] WebSocket连接异常，尝试修复")
+  if (!window.dialogClient.isConnected) {
+    console.warn("[sendTextQuery] 连接未建立，尝试修复")
     try {
       await window.dialogClient.connect()
     } catch (e) {
-      throw new Error("无法建立WebSocket连接: " + e.message)
+      throw new Error("无法建立连接: " + e.message)
     }
   }
 
@@ -3467,7 +3463,9 @@ async function finishAndSaveData() {
   // 保存混合录音到 state（优先使用混合录音）
   if (mixedAudioBlob) {
     state.audioBlob = mixedAudioBlob
-    console.log("[测试完成] 使用混合录音作为最终音频")
+    console.log("[测试完成] 使用混合录音作为最终音频，大小:", (mixedAudioBlob.size / 1024 / 1024).toFixed(2), "MB")
+  } else {
+    console.warn("[测试完成] 没有混合录音，state.audioBlob:", state.audioBlob ? `${(state.audioBlob.size / 1024 / 1024).toFixed(2)} MB` : "null")
   }
 
   // 导出交互追踪数据
