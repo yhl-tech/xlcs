@@ -22,6 +22,7 @@ import {
   shouldDisplayQuestion,
 } from "./appState.js"
 import { formatDateTime } from "./utils.js"
+import { getPromptForPhase } from "./prompts.js"
 
 // 判断是否为生产环境（从 appState.js 导入或本地定义）
 const isProduction =
@@ -244,8 +245,11 @@ async function sendTextQuery(text, { ensure = true } = {}) {
   }
 
   // 修复：增强连接检查和重试机制
+  // 获取当前阶段（在重新初始化前保存，避免被重置）
+  const currentPhase = TTS.currentPhase || getCurrentDiagPhase()
+
   if (ensure) {
-    await ensureTTSInit("audio")
+    await ensureTTSInit("audio", currentPhase)
   } else if (!window.dialogClient.isConnected) {
     // 即使ensure=false，也要确保连接是活动的
     console.log("[sendTextQuery] 检测到连接断开，尝试重新连接")
@@ -253,8 +257,8 @@ async function sendTextQuery(text, { ensure = true } = {}) {
       await window.dialogClient.connect()
     } catch (e) {
       console.warn("[sendTextQuery] 重新连接失败:", e)
-      // 如果连接失败，尝试重新初始化
-      await ensureTTSInit("audio")
+      // 如果连接失败，尝试重新初始化（传递正确的 phase）
+      await ensureTTSInit("audio", currentPhase)
     }
   }
 
@@ -3084,7 +3088,7 @@ function updateProgress() {
 }
 
 // 后测试视图
-function showPostTestView(options = {}) {
+async function showPostTestView(options = {}) {
   const restoredSnapshot = options.restoredSnapshot || null
   state.stage = "post"
   stopInactivityMonitoring()
@@ -3169,6 +3173,36 @@ function showPostTestView(options = {}) {
 
   // 初始化问题进度柱
   initQuestionProgressPillar()
+
+  // 重新建立 TTS 连接，使用后测阶段的提示词
+  console.log("[showPostTestView] 准备切换到后测阶段提示词")
+  try {
+    // 获取后测阶段的提示词
+    const posttestPrompt = getPromptForPhase("posttest")
+
+    if (posttestPrompt && window.dialogClient) {
+      // 断开当前连接
+      console.log("[showPostTestView] 断开当前 TTS 连接")
+      await window.dialogClient.disconnect()
+
+      // 等待连接完全关闭
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      // 使用后测提示词重新建立连接
+      console.log("[showPostTestView] 使用后测提示词重新建立连接")
+      await window.dialogClient.connect(posttestPrompt, TTS.speaker, "posttest")
+
+      // 更新 TTS 状态
+      TTS.inited = true
+      TTS.currentMode = "audio"
+      TTS.currentPhase = "posttest"
+
+      console.log("[showPostTestView] 后测阶段 TTS 连接已建立")
+    }
+  } catch (error) {
+    console.error("[showPostTestView] 切换后测提示词失败:", error)
+    // 即使失败，也继续执行后续流程
+  }
 
   askNextQuestion()
   saveSessionSnapshot("stage_change", { immediate: true })
