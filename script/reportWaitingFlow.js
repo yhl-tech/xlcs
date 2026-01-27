@@ -2,11 +2,11 @@
 export class ReportWaitingFlow {
   constructor() {
     this.steps = [
-      { id: 'submit', label: '提交数据', icon: 'upload', desc: '您的测评数据已通过加密通道全程安全传输，系统已为您建立专属分析档案。' },
-      { id: 'validate', label: '数据校验', icon: 'shieldCheck', desc: '智能系统正在对数据进行多重完整性校验与清洗，确保分析基础数据精准无误。' },
-      { id: 'ai', label: 'AI 模型计算', icon: 'brain', desc: '心理大模型正在深度解析多维特征，结合自然语言处理技术构建您的深层心理画像。' },
-      { id: 'review', label: '心理师人工复核', icon: 'userCheck', desc: '资深心理咨询师团队结合临床标准对 AI 结果进行双重复核，确保结论严谨可靠。' },
-      { id: 'generate', label: '报告生成', icon: 'fileText', desc: '您的心理评估报告已生成完成，包含详细的分析维度与专业建议，可立即下载查看。' }
+      { id: 'submit', label: '提交数据', icon: 'upload', desc: '数据已通过 256-bit 高强度加密通道上传至云端分析中心' },
+      { id: 'validate', label: '数据校验', icon: 'shieldCheck', desc: '正在对比历史常模基准，排除极端值与无效作答干扰' },
+      { id: 'ai', label: 'AI 模型计算', icon: 'brain', desc: '深度神经网络正在提取 128 个心理特征维度，匹配 10万+ 样本数据' },
+      { id: 'review', label: '心理师人工复核', icon: 'userCheck', desc: '资深心理专家（执业 5 年以上）将结合 AI 报告进行逻辑校对与深度专业建议' },
+      { id: 'generate', label: '报告生成', icon: 'fileText', desc: '多端适配排版，生成包含 20+ 页的深度心理洞察 PDF 报告' }
     ]
 
     // 模拟当前进度: 第3步 (AI模型计算)
@@ -19,10 +19,16 @@ export class ReportWaitingFlow {
       userCheck: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>',
       fileText: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>',
       check: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
-      loader: '<svg xmlns="http://www.w3.org/2000/svg" class="rf-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>'
+      loader: '<svg xmlns="http://www.w3.org/2000/svg" class="rf-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>',
+      activity: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+      info: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+      search: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>',
+      globe: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+      lock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>'
     }
 
     this.timerInterval = null
+    this.dotCount = 0
   }
 
   init(container, options = {}) {
@@ -35,171 +41,165 @@ export class ReportWaitingFlow {
       this.currentStepIndex = 2 // AI 模型计算
     }
     this.render()
+    this.startDotAnimation()
+  }
+
+  startDotAnimation() {
+    if (this.timerInterval) clearInterval(this.timerInterval)
+    this.timerInterval = setInterval(() => {
+      const dotsElement = document.getElementById('rf-dots')
+      if (dotsElement) {
+        this.dotCount = (this.dotCount + 1) % 4
+        dotsElement.textContent = '.'.repeat(this.dotCount)
+      }
+    }, 500)
   }
 
   render() {
-    const currentStepData = this.steps[this.currentStepIndex]
-    const eta = this.calculateETA()
-
-    // 构建HTML结构
     const html = `
-      <div class="rf-wrapper">
-        <!-- 顶部：安全提示条 -->
-        <div class="rf-notification">
-            <div class="rf-notification-icon-bg">
-                <svg xmlns="http://www.w3.org/2000/svg" class="rf-notification-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <div class="rf-wrapper-new">
+        <!-- 左侧：核心进度看板 -->
+        <div class="rf-left-panel">
+          <div class="rf-card-main">
+            <!-- 头部状态 -->
+        
+
+            <!-- 步骤详情 -->
+            <div class="rf-steps-detail">
+              ${this.steps.map((step, index) => this.renderStepDetail(step, index)).join('')}
             </div>
-            <span class="rf-notification-text">你的测试数据已安全上传，进入专业分析流程</span>
+          </div>
         </div>
 
-        <div class="rf-content-padding">
-            <!-- 标题区 -->
- 
-            <!-- 步骤条区域 -->
-            <div class="rf-progress-area">
-                <!-- 进度条背景 -->
-                <div class="rf-track-bg"></div>
-                
-                <!-- 进度条前景 (动态) -->
-                <div id="rf-progress-bar" class="rf-track-fill" style="width: 0%">
-                    <div class="rf-track-glow"></div>
+        <!-- 右侧：专业背书与辅助信息 -->
+        <div class="rf-right-panel">
+          <!-- 核心背书卡片 -->
+          <div class="rf-endorsement-card">
+            <div class="rf-endorsement-bg"></div>
+            <div class="rf-endorsement-content">
+              <div class="rf-endorsement-header">
+                ${this.icons.info}
+                <span class="rf-endorsement-label">严谨性告知</span>
+              </div>
+              <div class="rf-endorsement-title">
+                严谨，是对每一个<br/>
+                内心真相的起码尊重
+              </div>
+              <div class="rf-endorsement-items">
+                <div class="rf-endorsement-item">
+                  <div class="rf-endorsement-icon">
+                    ${this.icons.search}
+                  </div>
+                  <p><b>非模板化生成：</b> 我们拒绝 1 秒出的快餐式结论。每个报告都需经过高阶算法的深度神经映射模拟计算。</p>
                 </div>
-
-                <!-- 步骤节点容器 -->
-                <div class="rf-steps-container">
-                    ${this.steps.map((step, index) => this.renderStep(step, index)).join('')}
+                <div class="rf-endorsement-item">
+                  <div class="rf-endorsement-icon">
+                    ${this.icons.globe}
+                  </div>
+                  <p><b>常模数据库：</b> 实时对比 10 万+ 中国成年人心理样本，确保您的测评结果具有科学且精准的定位参考。</p>
                 </div>
+                <div class="rf-endorsement-quote">
+                  "正如精密血检需要大型仪器分析，高质量的心理洞察需要深度计算与专家人工复核。请耐心等待，确保结论的可信度。"
+                </div>
+              </div>
             </div>
+          </div>
 
-            <!-- 动态详情卡片区域 -->
-            <div class="rf-detail-card">
-                <!-- 装饰背景圆 -->
-                <div class="rf-detail-bg-deco"></div>
-
-                <!-- 左侧：当前步骤图标 (大) -->
-                <div class="rf-detail-icon-box" id="rf-detail-icon">
-                    ${this.icons[currentStepData.icon]}
-                </div>
-
-                <!-- 中间：文本描述 -->
-                <div class="rf-detail-content">
-                    <div class="rf-detail-meta">
-                        <span class="rf-tag">CURRENT STEP</span>
-                        <span class="rf-counter" id="rf-step-counter">步骤 ${this.currentStepIndex + 1} / ${this.steps.length}</span>
-                    </div>
-                    <h3 class="rf-detail-title">
-                        <span id="rf-detail-title-text">${currentStepData.label}</span>
-                        <span id="rf-ping" class="rf-ping-dot"></span>
-                    </h3>
-                    <p class="rf-detail-desc" id="rf-detail-desc">
-                        ${currentStepData.desc}
-                    </p>
-                </div>
+          <!-- 安全保证板块 -->
+          <div class="rf-security-card">
+            <div class="rf-security-header">
+              ${this.icons.shieldCheck}
+              <h3 class="rf-security-title">数据安全保护</h3>
             </div>
-
-            <!-- 底部：信任背书说明 -->
-            <div class="rf-security-box">
-                <svg xmlns="http://www.w3.org/2000/svg" class="rf-security-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                <div class="rf-security-content">
-                    <p class="rf-security-title">双重验证保障</p>
-                    <p class="rf-security-desc">
-                        我们的报告需资深心理师结合 AI 模型复核，确保结论可靠。在人工复核阶段，专家可能会根据具体情况微调分析参数，以保证结果的个性化与精准度。
-                    </p>
-                </div>
+            <div class="rf-security-body">
+              <div class="rf-security-row">
+                <span class="rf-security-label">数据传输加密</span>
+                <span class="rf-security-value">AES-256 BIT</span>
+              </div>
+              <div class="rf-security-progress">
+                <div class="rf-security-progress-bar"></div>
+              </div>
+              <p class="rf-security-desc">
+                您的隐私受严格保护。分析过程中，所有原始数据均处于隔离计算状态，分析完成后仅保留核心洞察结论。
+              </p>
             </div>
+          </div>
+
+          <!-- 底部小标识 -->
+          <div class="rf-footer-badge">
+            ${this.icons.lock}
+            全链路数据加密
+            <div class="rf-footer-dot"></div>
+            知己心探
+          </div>
         </div>
       </div>
     `
     this.container.innerHTML = html
-
-    // 触发初始动画
-    setTimeout(() => {
-      this.updateProgressBar()
-    }, 100)
   }
 
-  renderStep(step, index) {
+  renderStepDetail(step, index) {
     const isCompleted = index < this.currentStepIndex || (this.isCompleted && index === this.currentStepIndex)
     const isCurrent = index === this.currentStepIndex && !this.isCompleted
+    const isLast = index === this.steps.length - 1
 
-    let circleClass = "rf-step-circle"
-    let iconContent = ''
-    let labelClass = "rf-step-label"
+    let statusBadge = ''
+    let iconClass = 'rf-step-icon'
+    let iconContent = this.icons[step.icon]
 
     if (isCompleted) {
-      circleClass += " is-completed"
+      statusBadge = '<span class="rf-step-badge rf-step-badge-completed">已核准</span>'
+      iconClass += ' rf-step-icon-completed'
       iconContent = this.icons.check
-      labelClass += " is-completed"
     } else if (isCurrent) {
-      circleClass += " is-current"
-      // 如果是最后一步，显示静态图标，否则显示loader
-      if (index === this.steps.length - 1) {
-        iconContent = `<div class="rf-pulse-icon">${this.icons[step.icon]}</div>`
-      } else {
-        iconContent = this.icons.loader
-      }
-      labelClass += " is-current"
+      statusBadge = '<span class="rf-step-badge rf-step-badge-active">处理中</span>'
+      iconClass += ' rf-step-icon-active'
+      iconContent = this.icons.loader
     } else {
-      circleClass += " is-pending"
-      iconContent = this.icons[step.icon]
-      labelClass += " is-pending"
+      iconClass += ' rf-step-icon-pending'
+    }
+
+    const lineClass = isCompleted ? 'rf-step-line rf-step-line-completed' : 'rf-step-line'
+    let titleClass = 'rf-step-title'
+    let descClass = 'rf-step-desc'
+
+    if (isCompleted) {
+      titleClass += ' rf-step-title-completed'
+      descClass += ' rf-step-desc-completed'
+    } else if (isCurrent) {
+      titleClass += ' rf-step-title-active'
+      descClass += ' rf-step-desc-active'
+    } else {
+      titleClass += ' rf-step-title-pending'
+      descClass += ' rf-step-desc-pending'
     }
 
     return `
-      <div class="rf-step-item">
-          <div class="${circleClass}">
-              <div class="rf-icon-inner">${iconContent}</div>
+      <div class="rf-step-detail-item ${!isLast ? lineClass : ''}">
+        <div class="${iconClass}">
+          ${iconContent}
+        </div>
+        <div class="rf-step-content">
+          <div class="rf-step-header">
+            <div>
+              <h3 class="${titleClass}">
+                ${step.label}
+                ${isCurrent ? '<span id="rf-dots" class="rf-dots">...</span>' : ''}
+              </h3>
+              <p class="${descClass}">${step.desc}</p>
+            </div>
+            ${statusBadge}
           </div>
-          <div class="${labelClass}">
-              ${step.label}
-          </div>
+        </div>
       </div>
     `
   }
 
-  updateProgressBar() {
-    const progressBar = document.getElementById('rf-progress-bar')
-    if (progressBar) {
-      const percent = (this.currentStepIndex / (this.steps.length - 1)) * 100
-      // 减去一点宽度以避免覆盖到圆圈中心之后太多
-      progressBar.style.width = `calc(${percent}% - 2rem)`
+  destroy() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval)
+      this.timerInterval = null
     }
-  }
-
-  updateDetailCard() {
-    const step = this.steps[this.currentStepIndex]
-    const iconBox = document.getElementById('rf-detail-icon')
-    if (iconBox) iconBox.innerHTML = this.icons[step.icon]
-
-    const counter = document.getElementById('rf-step-counter')
-    if (counter) counter.innerText = `步骤 ${this.currentStepIndex + 1} / ${this.steps.length}`
-
-    const title = document.getElementById('rf-detail-title-text')
-    if (title) title.innerText = step.label
-
-    const desc = document.getElementById('rf-detail-desc')
-    if (desc) desc.innerText = step.desc
-
-    const ping = document.getElementById('rf-ping')
-    const etaBox = document.getElementById('rf-eta-box')
-
-    if (this.currentStepIndex === this.steps.length - 1) {
-      if (ping) ping.style.display = 'none'
-      if (etaBox) etaBox.style.opacity = '0'
-    } else {
-      if (ping) ping.style.display = 'inline-block'
-      if (etaBox) etaBox.style.opacity = '1'
-    }
-  }
-
-  calculateETA() {
-    const date = new Date()
-    date.setHours(date.getHours() + 2)
-    const month = date.getMonth() + 1
-    const day = date.getDate()
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${month}月${day}日 ${hours}:${minutes}`
   }
 }
 
