@@ -27,13 +27,13 @@ export default defineConfig({
       compress: {
         drop_console: false, // 删除 console
         drop_debugger: true, // 移除 debugger
-        // pure_funcs: [
-        //   "console.log",
-        //   "console.info",
-        //   "console.warn",
-        //   "console.error",
-        //   "console.debug",
-        // ], // 移除特定的 console 方法
+        pure_funcs: [
+          "console.log",
+          "console.info",
+          "console.warn",
+          "console.error",
+          "console.debug",
+        ], // 移除特定的 console 方法
       },
       mangle: true, // 变量名混淆
       format: {
