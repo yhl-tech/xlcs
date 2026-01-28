@@ -119,7 +119,7 @@ import { getWebSocketUrl } from "./config.js"
       this.onRecordingStop = null
     }
 
-    async connect() {
+    async connect(phase = null) {
       // 修复：如果已有连接，先断开以确保干净状态
       if (
         this.ws &&
@@ -144,10 +144,20 @@ import { getWebSocketUrl } from "./config.js"
         let hasResolved = false
 
         try {
-          console.log("[Dialog] 开始连接 WebSocket:", this.config.wsUrl)
+          // 构造 WebSocket URL，如果有 phase 参数则添加到查询字符串
+          let wsUrl = this.config.wsUrl
+          console.log('WebSocket phase', phase);
+          
+          if (phase) {
+            wsUrl += `?phase=${phase}`
+          } else {
+            wsUrl += `?phase=intest1`
+          }
+
+          console.log("[Dialog] 开始连接 WebSocket:", wsUrl)
           console.log("[Dialog] 设备类型:", isMobile ? "移动端" : "桌面端")
 
-          this.ws = new WebSocket(this.config.wsUrl)
+          this.ws = new WebSocket(wsUrl)
 
           // 设置连接超时
           timeoutId = setTimeout(() => {
@@ -488,10 +498,37 @@ import { getWebSocketUrl } from "./config.js"
     }
 
     /**
+     * 更新提示词阶段（不断开连接）
+     * @param {string} phase - 阶段 (pretest/intest1/intest2to10/posttest)
+     */
+    updatePhase(phase) {
+      if (
+        !this.isConnected ||
+        !this.ws ||
+        this.ws.readyState !== WebSocket.OPEN
+      ) {
+        throw new Error("WebSocket未连接，无法更新阶段")
+      }
+
+      const payload = {
+        type: "update_prompt",
+        phase: phase,
+      }
+
+      const message = JSON.stringify(payload)
+      try {
+        console.log("[Dialog] 发送阶段更新消息:", payload)
+      } catch (e) {
+        console.log("[Dialog] 发送阶段更新消息（原始）:", message)
+      }
+      this.ws.send(message)
+    }
+
+    /**
      * 发送初始化消息
      * @param {string} speaker - 说话人
      * @param {string} mode - 模式 (audio/text)
-     * @param {string|null} phase - 阶段 (pretest/intest/posttest)
+     * @param {string|null} phase - 阶段 (pretest/intest1/intest2to10/posttest)
      */
     sendInitMessage(speaker, mode, phase = null) {
       if (
@@ -527,7 +564,7 @@ import { getWebSocketUrl } from "./config.js"
      * @param {boolean} options.start - 是否开始
      * @param {boolean} options.end - 是否结束
      * @param {boolean} options.is_user_querying - 是否用户查询
-     * @param {string|null} options.phase - 阶段 (pretest/intest/posttest)
+     * @param {string|null} options.phase - 阶段 (pretest/intest1/intest2to10/posttest)
      */
     sendTTSText(content, options = {}) {
       const {

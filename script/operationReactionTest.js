@@ -471,7 +471,7 @@ async function ensureDialogClientConnected() {
   try {
     // 重新连接
     console.log("[操作反应测试] 连接 dialogClient...")
-    await window.dialogClient.connect()
+    await window.dialogClient.connect("intest1")
     console.log("[操作反应测试] dialogClient 连接成功")
 
     return true
@@ -581,7 +581,7 @@ async function playTTS(text) {
                 await new Promise((resolve) => setTimeout(resolve, 200))
               }
               // 重新连接
-              await window.dialogClient.connect()
+              await window.dialogClient.connect("intest1")
               console.log("[操作反应测试] TTS 重新连接成功")
               await new Promise((resolve) => setTimeout(resolve, 100))
             } catch (error) {

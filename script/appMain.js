@@ -175,7 +175,31 @@ async function ensureTTSInit(mode = "audio", phase = null) {
     ) {
       return
     }
-    // 模式或阶段不匹配，需要重新初始化
+
+    // 只有 phase 变化，mode 不变：使用 updatePhase 不断开连接
+    if (
+      TTS.inited &&
+      TTS.currentMode === mode &&
+      (TTS.currentPhase || null) !== (phase || null)
+    ) {
+      console.log(
+        "[TTS] 阶段切换（保持连接）:",
+        TTS.currentPhase,
+        "->",
+        phase
+      )
+      try {
+        window.dialogClient.updatePhase(phase)
+        TTS.currentPhase = phase || null
+        console.log("[TTS] 阶段更新完成，混合录音保持连续")
+        return
+      } catch (err) {
+        console.warn("[TTS] 阶段更新失败，将尝试重新连接:", err)
+        // 如果更新失败，继续执行下面的断开重连逻辑
+      }
+    }
+
+    // mode 变化或 updatePhase 失败：需要重新初始化
     console.log(
       "[TTS] 配置不匹配，重新初始化",
       "mode:",
@@ -187,6 +211,25 @@ async function ensureTTSInit(mode = "audio", phase = null) {
       "->",
       phase
     )
+
+    // 在断开连接前，先保存混合录音数据（仅在 mode 变化时需要）
+    let savedAudioBlob = null
+    if (window.dialogClient.isMixedRecording) {
+      try {
+        console.log("[TTS] 保存混合录音数据...")
+        savedAudioBlob = await window.dialogClient.stopMixedRecording()
+        console.log("[TTS] 混合录音数据已保存，大小:", (savedAudioBlob.size / 1024 / 1024).toFixed(2), "MB")
+
+        // 将保存的音频数据存储到全局变量，供后续合并使用
+        if (!window.savedMixedAudioBlobs) {
+          window.savedMixedAudioBlobs = []
+        }
+        window.savedMixedAudioBlobs.push(savedAudioBlob)
+      } catch (err) {
+        console.warn("[TTS] 保存混合录音失败:", err)
+      }
+    }
+
     window.dialogClient.disconnect()
     TTS.inited = false
     TTS.currentMode = null
@@ -198,7 +241,7 @@ async function ensureTTSInit(mode = "audio", phase = null) {
   // 确保连接已完全关闭后再重新连接
   if (!window.dialogClient.isConnected) {
     console.log("[TTS] 建立新连接")
-    await window.dialogClient.connect()
+    await window.dialogClient.connect(phase)
   }
 
   try {
@@ -223,12 +266,13 @@ async function sendTTSText(
   if (!window.dialogClient) {
     throw new Error("dialogClient 未加载")
   }
-  if (!window.dialogClient.isConnected) {
-    await window.dialogClient.connect()
-  }
 
   // 获取当前阶段（如果 opts 中没有指定）
   const phase = opts.phase || TTS.currentPhase || null
+
+  if (!window.dialogClient.isConnected) {
+    await window.dialogClient.connect(phase)
+  }
 
   window.dialogClient.sendTTSText(String(text || ""), {
     start: Boolean(opts.start),
@@ -243,6 +287,9 @@ async function sendTextQuery(text, { ensure = true } = {}) {
     throw new Error("dialogClient 未加载")
   }
 
+  // 获取当前阶段（自动推断）
+  const phase = TTS.currentPhase || getCurrentDiagPhase()
+
   // 修复：增强连接检查和重试机制
   if (ensure) {
     await ensureTTSInit("audio")
@@ -250,7 +297,7 @@ async function sendTextQuery(text, { ensure = true } = {}) {
     // 即使ensure=false，也要确保连接是活动的
     console.log("[sendTextQuery] 检测到连接断开，尝试重新连接")
     try {
-      await window.dialogClient.connect()
+      await window.dialogClient.connect(phase)
     } catch (e) {
       console.warn("[sendTextQuery] 重新连接失败:", e)
       // 如果连接失败，尝试重新初始化
@@ -266,14 +313,11 @@ async function sendTextQuery(text, { ensure = true } = {}) {
   ) {
     console.warn("[sendTextQuery] WebSocket连接异常，尝试修复")
     try {
-      await window.dialogClient.connect()
+      await window.dialogClient.connect(phase)
     } catch (e) {
       throw new Error("无法建立WebSocket连接: " + e.message)
     }
   }
-
-  // 获取当前阶段（自动推断）
-  const phase = TTS.currentPhase || getCurrentDiagPhase()
 
   window.dialogClient.sendTextQuery(String(text || ""), phase)
 }
@@ -2431,7 +2475,8 @@ async function playAudio(src, onendedCallback = null, options = {}) {
       }
       // 确保已连接
       if (!window.dialogClient.isConnected) {
-        await window.dialogClient.connect()
+        const phase = TTS.currentPhase || getCurrentDiagPhase()
+        await window.dialogClient.connect(phase)
       }
 
       // 实际发送 TTS 文本进行播报
@@ -3179,8 +3224,14 @@ function showPostTestView(options = {}) {
 }
 
 async function askNextQuestion() {
-  // 设置后测阶段的 TTS phase
-  TTS.currentPhase = "posttest"
+  // 切换到 posttest 阶段（使用 updatePhase，不会断开连接）
+  try {
+    await ensureTTSInit("audio", "posttest")
+    console.log("[askNextQuestion] TTS 已切换到 posttest 阶段")
+    // 注意：由于使用了 updatePhase，连接和录音都保持连续，不需要重新启动
+  } catch (error) {
+    console.error("[askNextQuestion] TTS 初始化失败:", error)
+  }
 
   // 跳过 why 问题，找到下一个应该显示的问题
   let question = null
@@ -3221,8 +3272,6 @@ async function askNextQuestion() {
     ;(async () => {
       try {
         console.log("[askNextQuestion] 准备发送 TTS 播报请求")
-        // 测试后阶段使用 posttest phase
-        TTS.currentPhase = "posttest"
         const ttsQuery = buildTTSQuery(finishText)
         console.log("[askNextQuestion] TTS Query:", ttsQuery)
         await sendTextQuery(ttsQuery, { ensure: false })
@@ -3438,6 +3487,24 @@ async function finishAndSaveData() {
         (mixedAudioBlob?.size / 1024 / 1024).toFixed(2),
         "MB"
       )
+
+      // 合并所有保存的音频片段
+      if (window.savedMixedAudioBlobs && window.savedMixedAudioBlobs.length > 0) {
+        console.log("[测试完成] 合并音频片段，共", window.savedMixedAudioBlobs.length + 1, "个片段")
+
+        // 将所有音频片段合并成一个
+        const allBlobs = [...window.savedMixedAudioBlobs, mixedAudioBlob]
+        mixedAudioBlob = new Blob(allBlobs, { type: "audio/webm" })
+
+        console.log(
+          "[测试完成] 合并后的音频大小:",
+          (mixedAudioBlob.size / 1024 / 1024).toFixed(2),
+          "MB"
+        )
+
+        // 清空保存的片段
+        window.savedMixedAudioBlobs = []
+      }
     } catch (err) {
       console.warn("[测试完成] 停止混合录音失败:", err)
     }
