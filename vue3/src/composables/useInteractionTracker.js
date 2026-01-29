@@ -419,9 +419,11 @@ export function useInteractionTracker() {
       zoom[plateKey] = values || []
     })
     
-    // 转换旋转数据
+    // 转换旋转数据 - 后端期望的是旋转次数（整数），不是角度数组
+    // 格式: { "1": 0, "2": 4, "3": 22, ... }
     Object.entries(data.rotate).forEach(([plateKey, values]) => {
-      rotate[plateKey] = values || []
+      // 旋转次数 = 数组长度
+      rotate[plateKey] = Array.isArray(values) ? values.length : 0
     })
     
     // 转换时间戳数据（使用相对时间格式）

@@ -250,14 +250,22 @@ export function useApi() {
    * 上传缩放数据（scale.json）
    * POST /rorschach/user/upload_scale
    * 格式: { "1": [1, 1, -1], "2": [], ... }
+   * 注意: 必须包含所有10个图版，空数据也要上传
    */
   const uploadZoom = async (zoomData, userId) => {
     if (!zoomData || typeof zoomData !== 'object') {
       throw new Error('缩放数据参数无效')
     }
 
+    // 确保所有10个图版都存在（补齐缺失的）
+    const completeData = {}
+    for (let i = 1; i <= 10; i++) {
+      const key = String(i)
+      completeData[key] = zoomData[key] || []
+    }
+
     const formData = new FormData()
-    const jsonString = JSON.stringify(zoomData)
+    const jsonString = JSON.stringify(completeData)
     const blob = new Blob([jsonString], { type: 'application/json' })
     const file = new File([blob], 'scale.json', { type: 'application/json' })
     
@@ -266,24 +274,39 @@ export function useApi() {
     // 保存文件到本地
     saveFileToLocal(blob, `scale_${userId || 'unknown'}_${Date.now()}.json`)
     
-    console.log('[API] 上传缩放数据:', { zoomData, userId })
+    console.log('[API] 上传缩放数据:', { originalData: zoomData, completeData, userId })
     
-    // const response = await client.post('/rorschach/user/upload_scale', formData)
-    // return response
+    const response = await client.post('/rorschach/user/upload_scale', formData)
+    return response
   }
 
   /**
    * 上传旋转数据（rotate.json）
    * POST /rorschach/user/upload_rotate
-   * 格式: { "1": [30, -30], "2": [], ... }
+   * 格式: { "1": 0, "2": 4, ... } - 值是旋转次数（整数）
+   * 注意: 必须包含所有10个图版，空数据会抛错
    */
   const uploadRotate = async (rotateData, userId) => {
     if (!rotateData || typeof rotateData !== 'object') {
       throw new Error('旋转数据参数无效')
     }
 
+    // 确保所有10个图版都存在（补齐缺失的为0）
+    const completeData = {}
+    for (let i = 1; i <= 10; i++) {
+      const key = String(i)
+      completeData[key] = rotateData[key] !== undefined ? rotateData[key] : 0
+    }
+
+    const jsonString = JSON.stringify(completeData)
+    
+    // 检查是否全为0（完全没有旋转操作）
+    const hasAnyRotation = Object.values(completeData).some(v => v > 0)
+    if (!hasAnyRotation) {
+      console.warn('[API] 旋转数据全为0，仍然上传')
+    }
+
     const formData = new FormData()
-    const jsonString = JSON.stringify(rotateData)
     const blob = new Blob([jsonString], { type: 'application/json' })
     const file = new File([blob], 'rotate.json', { type: 'application/json' })
     
@@ -292,16 +315,17 @@ export function useApi() {
     // 保存文件到本地
     saveFileToLocal(blob, `rotate_${userId || 'unknown'}_${Date.now()}.json`)
     
-    console.log('[API] 上传旋转数据:', { rotateData, userId })
+    console.log('[API] 上传旋转数据:', { originalData: rotateData, completeData, userId })
     
-    // const response = await client.post('/rorschach/user/upload_rotate', formData)
-    // return response
+    const response = await client.post('/rorschach/user/upload_rotate', formData)
+    return response
   }
 
   /**
-   * 上传笔迹轨迹数据（drawing_tracks.json）
-   * POST /rorschach/user/upload_drawing_tracks
-   * 格式: { canvas_size: [高, 宽], data: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, ... } }
+   * 上传笔迹轨迹数据（trajectory.json）
+   * POST /rorschach/user/upload_trajectory
+   * 格式: { canvas_size: [高, 宽], data: { "1": {}, "2": {}, ... "10": {} } }
+   * 注意: 必须包含所有10个图版（由 normalizeDrawingTracksData 自动补齐）
    */
   const uploadDrawingTracks = async (drawingTracksData, userId, canvasSize = [0, 0]) => {
     if (!drawingTracksData || typeof drawingTracksData !== 'object') {
@@ -320,38 +344,59 @@ export function useApi() {
     const formData = new FormData()
     const jsonString = JSON.stringify(normalizedData)
     const blob = new Blob([jsonString], { type: 'application/json' })
-    const file = new File([blob], 'drawing_tracks.json', { type: 'application/json' })
+    const file = new File([blob], 'trajectory.json', { type: 'application/json' })
     
-    formData.append('file', file, 'drawing_tracks.json')
+    // 添加文件到 FormData（文件名必须是 trajectory.json）
+    formData.append('file', file, 'trajectory.json')
+    
+    // 添加 user_id 到 FormData（原项目要求）
+    formData.append('user_id', userId)
     
     // 保存文件到本地
-    saveFileToLocal(blob, `drawing_tracks_${userId || 'unknown'}_${Date.now()}.json`)
+    saveFileToLocal(blob, `trajectory_${userId || 'unknown'}_${Date.now()}.json`)
     
     console.log('[API] 上传笔迹轨迹数据:', { 
       originalData: drawingTracksData, 
       normalizedData,
-      userId 
+      userId,
+      hasFile: formData.has('file'),
+      hasUserId: formData.has('user_id')
     })
     
-    // const response = await client.post('/rorschach/user/upload_drawing_tracks', formData)
-    // return response
+    const response = await client.post('/rorschach/user/upload_trajectory', formData, {
+      headers: {
+        'User-Id': userId
+      }
+    })
+    return response
   }
 
   /**
    * 上传时间戳切分数据（video_clip.json）
    * POST /rorschach/user/upload_seg_time
-   * 格式: { "start": "00:00", "1": "01:53", "2": "03:45", ..., "select": "25:15", "stop": "30:29" }
+   * 格式: { "start": "00:00", "1": "01:53", ..., "10": "xx:xx", "select": "25:15", "stop": "30:29" }
+   * 注意: 必须包含 start, 1-10, select, stop 所有键
    */
   const uploadSegTime = async (segTimeData, userId) => {
     if (!segTimeData || typeof segTimeData !== 'object') {
       throw new Error('时间戳数据参数无效')
     }
 
-    // 规范化时间格式
+    // 规范化时间格式并确保所有必需的键都存在
     const normalizedSegTime = {}
-    for (const key in segTimeData) {
-      normalizedSegTime[key] = normalizeTimeString(segTimeData[key])
+    
+    // 确保 start 存在
+    normalizedSegTime.start = normalizeTimeString(segTimeData.start || '00:00')
+    
+    // 确保 1-10 图版时间戳存在
+    for (let i = 1; i <= 10; i++) {
+      const key = String(i)
+      normalizedSegTime[key] = normalizeTimeString(segTimeData[key] || '00:00')
     }
+    
+    // 确保 select 和 stop 存在
+    normalizedSegTime.select = normalizeTimeString(segTimeData.select || '00:00')
+    normalizedSegTime.stop = normalizeTimeString(segTimeData.stop || '00:00')
 
     const formData = new FormData()
     const jsonString = JSON.stringify(normalizedSegTime)
@@ -369,80 +414,72 @@ export function useApi() {
       userId 
     })
     
-    // const response = await client.post('/rorschach/user/upload_seg_time', formData)
-    // return response
+    const response = await client.post('/rorschach/user/upload_seg_time', formData)
+    return response
   }
 
   /**
    * 上传五个问题的答案数据（5_questions.json）
    * POST /rorschach/user/upload_5_questions
-   * 格式: { "represent": [1], "father": [2], "mother": [3], "like": [4, 5], "dislike": [6] }
+   * 格式: { "self": [], "father": [], "mother": [], "favorite": [], "dislike": [] }
+   * 注意: 不包含 mood 字段；使用后端期望的键名 self/favorite
    */
   const upload5Questions = async (questionsData, userId) => {
     if (!questionsData || typeof questionsData !== 'object') {
       throw new Error('五个问题数据参数无效')
     }
 
-    // 转换格式：支持两种输入格式
-    // 格式1（旧）: { representSelf: 1, representFather: 2, ... }
-    // 格式2（新）: { self: [1], father: [2], ... }
+    // 转换格式并使用后端期望的键名
+    // 后端期望: self, father, mother, favorite, dislike
+    // 前端使用: self, father, mother, like, dislike
     const formattedData = {}
     
-    // 处理 self / representSelf -> represent
+    // 处理 self（代表自己）
     if (questionsData.self !== undefined) {
-      formattedData.represent = Array.isArray(questionsData.self) ? questionsData.self : [questionsData.self]
-    } else if (questionsData.representSelf !== null && questionsData.representSelf !== undefined) {
-      formattedData.represent = [questionsData.representSelf]
+      formattedData.self = Array.isArray(questionsData.self) ? questionsData.self : [questionsData.self]
     }
     
-    // 处理 father / representFather -> father
+    // 处理 father（代表父亲）
     if (questionsData.father !== undefined) {
       formattedData.father = Array.isArray(questionsData.father) ? questionsData.father : [questionsData.father]
-    } else if (questionsData.representFather !== null && questionsData.representFather !== undefined) {
-      formattedData.father = [questionsData.representFather]
     }
     
-    // 处理 mother / representMother -> mother
+    // 处理 mother（代表母亲）
     if (questionsData.mother !== undefined) {
       formattedData.mother = Array.isArray(questionsData.mother) ? questionsData.mother : [questionsData.mother]
-    } else if (questionsData.representMother !== null && questionsData.representMother !== undefined) {
-      formattedData.mother = [questionsData.representMother]
     }
     
-    // 处理 like / mostLiked -> like
+    // 处理 like -> favorite（最喜欢）
     if (questionsData.like !== undefined) {
-      formattedData.like = Array.isArray(questionsData.like) ? questionsData.like : [questionsData.like]
-    } else if (questionsData.mostLiked !== null && questionsData.mostLiked !== undefined) {
-      formattedData.like = Array.isArray(questionsData.mostLiked) ? questionsData.mostLiked : [questionsData.mostLiked]
+      formattedData.favorite = Array.isArray(questionsData.like) ? questionsData.like : [questionsData.like]
     }
     
-    // 处理 dislike / mostDisliked -> dislike
+    // 处理 dislike（最不喜欢）
     if (questionsData.dislike !== undefined) {
       formattedData.dislike = Array.isArray(questionsData.dislike) ? questionsData.dislike : [questionsData.dislike]
-    } else if (questionsData.mostDisliked !== null && questionsData.mostDisliked !== undefined) {
-      formattedData.dislike = Array.isArray(questionsData.mostDisliked) ? questionsData.mostDisliked : [questionsData.mostDisliked]
     }
 
-    // 移除空数组
+    // 过滤掉 null 值
     Object.keys(formattedData).forEach(key => {
-      if (Array.isArray(formattedData[key]) && formattedData[key].length === 0) {
-        delete formattedData[key]
-      }
-      // 过滤掉 null 值
       if (Array.isArray(formattedData[key])) {
         formattedData[key] = formattedData[key].filter(v => v !== null && v !== undefined)
-        if (formattedData[key].length === 0) {
-          delete formattedData[key]
-        }
       }
     })
 
+    // 确保所有5个问题字段都存在（使用后端期望的键名）
+    const completeData = {
+      self: formattedData.self || [],
+      father: formattedData.father || [],
+      mother: formattedData.mother || [],
+      favorite: formattedData.favorite || [],
+      dislike: formattedData.dislike || []
+    }
+
     const formData = new FormData()
-    const jsonString = JSON.stringify(formattedData)
+    const jsonString = JSON.stringify(completeData)
     
     if (jsonString === '{}') {
-      console.warn('[API] 五个问题数据为空，跳过上传')
-      return { success: true, message: '无数据上传' }
+      console.warn('[API] 五个问题数据为空，仍按格式上传')
     }
 
     const blob = new Blob([jsonString], { type: 'application/json' })
@@ -453,14 +490,14 @@ export function useApi() {
     // 保存文件到本地
     saveFileToLocal(blob, `5_questions_${userId || 'unknown'}_${Date.now()}.json`)
     
-    // console.log('[API] 上传五个问题数据:', { 
-    //   originalData: questionsData, 
-    //   formattedData,
-    //   userId 
-    // })
+    console.log('[API] 上传五个问题数据:', { 
+      originalData: questionsData, 
+      completeData,
+      userId 
+    })
     
-    // const response = await client.post('/rorschach/user/upload_5_questions', formData)
-    // return response
+    const response = await client.post('/rorschach/user/upload_5_questions', formData)
+    return response
   }
 
   /**
@@ -499,14 +536,14 @@ export function useApi() {
     const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
     saveFileToLocal(fileToUpload, mediaFileName)
     
-    // const response = await client.post('/rorschach/user/upload_media', formData, {
-    //   timeout: 300000, // 5分钟超时
-    //   onUploadProgress: onProgress ? (progressEvent) => {
-    //     const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-    //     onProgress(percent)
-    //   } : undefined
-    // })
-    // return response
+    const response = await client.post('/rorschach/user/upload_media', formData, {
+      timeout: 300000, // 5分钟超时
+      onUploadProgress: onProgress ? (progressEvent) => {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        onProgress(percent)
+      } : undefined
+    })
+    return response
   }
 
   /**
