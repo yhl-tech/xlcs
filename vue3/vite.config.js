@@ -78,7 +78,7 @@ export default defineConfig({
         manualChunks: {
           three: ['three'],
           vconsole: ['vconsole'],
-          vendor: ['axios', 'lamejs', 'driver.js']
+          vendor: ['axios', 'driver.js']
         }
       }
     },
@@ -91,6 +91,6 @@ export default defineConfig({
   publicDir: 'public',
   
   optimizeDeps: {
-    include: ['vue', 'vue-router', 'pinia', 'axios', 'three', 'lamejs']
+    include: ['vue', 'vue-router', 'pinia', 'axios', 'three']
   }
 })

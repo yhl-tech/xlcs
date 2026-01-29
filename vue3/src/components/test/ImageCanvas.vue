@@ -6,7 +6,6 @@
       :src="currentImageSrc"
       :style="imageTransformStyle"
       class="rorschach-image"
-      :class="imageClass"
       @load="handleImageLoad"
       draggable="false"
     />
@@ -67,17 +66,20 @@ const currentStroke = ref([])
 // 内部画笔颜色（可被 setBrushColor 更新）
 const internalBrushColor = ref('#ef4444')
 
-// 图片切换动画类
-const imageClass = ref('')
+// 图片切换状态
+const displayedPlateIndex = ref(props.plateIndex) // 当前显示的图片索引
+const imageOpacity = ref(1) // 图片透明度
+const isTransitioning = ref(false) // 是否正在切换
 
-// 计算属性
+// 计算属性 - 使用 displayedPlateIndex 而不是 props.plateIndex
 const currentImageSrc = computed(() => {
-  return `/images/rorschach-blot-${props.plateIndex + 1}.webp`
+  return `/images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
 })
 
 // 图片变换样式 - 与原始 #rorschach-image 保持一致
 const imageTransformStyle = computed(() => ({
-  transform: `scale(${scale.value}) rotate(${rotation.value}deg)`
+  transform: `scale(${scale.value}) rotate(${rotation.value}deg)`,
+  opacity: imageOpacity.value
 }))
 
 // 画布变换样式 - 与原始 #drawing-canvas 保持一致
@@ -101,23 +103,45 @@ onUnmounted(() => {
   window.removeEventListener('resize', resizeCanvas)
 })
 
-// 监听图版变化 - 添加切换动画
-watch(() => props.plateIndex, (newIndex, oldIndex) => {
-  if (oldIndex !== undefined) {
-    // 淡出动画
-    imageClass.value = 'image-fade-out'
+// 预加载图片
+function preloadImage(index) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = `/images/rorschach-blot-${index + 1}.webp`
+  })
+}
+
+// 监听图版变化 - 添加平滑切换动画
+watch(() => props.plateIndex, async (newIndex, oldIndex) => {
+  if (oldIndex !== undefined && newIndex !== oldIndex && !isTransitioning.value) {
+    isTransitioning.value = true
     
+    // 1. 预加载新图片
+    await preloadImage(newIndex)
+    
+    // 2. 淡出当前图片
+    imageOpacity.value = 0
+    
+    // 3. 等待淡出动画完成后切换图片
     setTimeout(() => {
+      // 重置变换和画布
       resetTransform()
       clearCanvas()
-      // 淡入动画
-      imageClass.value = 'image-fade-in'
       
-      setTimeout(() => {
-        imageClass.value = ''
-      }, 800)
-    }, 400)
-  } else {
+      // 切换到新图片
+      displayedPlateIndex.value = newIndex
+      
+      // 4. 淡入新图片
+      nextTick(() => {
+        imageOpacity.value = 1
+        isTransitioning.value = false
+      })
+    }, 300) // 淡出时间
+  } else if (oldIndex === undefined) {
+    // 首次加载
+    displayedPlateIndex.value = newIndex
     resetTransform()
     clearCanvas()
   }
@@ -394,31 +418,11 @@ defineExpose({
   object-fit: contain;
   border-radius: 8px;
   transform-origin: center center;
-  transition: opacity 0.8s ease-in-out, transform 0.2s ease-out;
-  will-change: transform;
+  // 平滑的透明度过渡，缩放/旋转变换更快
+  transition: opacity 0.3s ease-in-out, transform 0.2s ease-out;
+  will-change: transform, opacity;
   user-select: none;
   pointer-events: none;
-}
-
-// 图片切换动画
-.rorschach-image.image-fade-out {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-.rorschach-image.image-fade-in {
-  animation: imageFadeIn 0.8s ease-out forwards;
-}
-
-@keyframes imageFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(1.02);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 // 画布样式 - 与原始 #drawing-canvas 一致

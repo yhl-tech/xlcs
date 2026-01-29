@@ -6,6 +6,18 @@
 import { ref, reactive } from 'vue'
 import { OPENAI_CONFIG } from '@/utils/constants'
 
+// lamejs 通过 CDN script 标签加载到 window.lamejs
+// 不使用 ES Module import，因为 lamejs 有兼容性问题
+
+// 获取 lamejs 库
+function getLamejs() {
+  // 使用通过 CDN 加载的 window.lamejs
+  if (window.lamejs && window.lamejs.Mp3Encoder) {
+    return window.lamejs
+  }
+  throw new Error('lamejs 库未正确加载，请确保 CDN 脚本已加载')
+}
+
 // 对话配置
 const DIALOG_CONFIG = {
   openai: OPENAI_CONFIG,
@@ -43,6 +55,14 @@ let dc = null
 let audioElement = null
 let audioContext = null
 let mediaStream = null
+
+// 混合录音相关
+const isMixedRecording = ref(false)
+let mixedStreamDestination = null
+let mixedMediaRecorder = null
+let mixedAudioChunks = []
+let micSource = null
+let remoteAudioSource = null
 
 // 回调
 const callbacks = {
@@ -111,6 +131,17 @@ export function useRealtimeDialog() {
         console.log('[Dialog] 收到远程音频轨道')
         audioElement.srcObject = event.streams[0]
         isSpeaking.value = true
+        
+        // 如果混合录音已经开始但远程音频源还没连接，立即连接
+        if (isMixedRecording.value && mixedStreamDestination && !remoteAudioSource) {
+          try {
+            remoteAudioSource = audioContext.createMediaStreamSource(event.streams[0])
+            remoteAudioSource.connect(mixedStreamDestination)
+            console.log('[Dialog] 远程音频已延迟连接到混合流')
+          } catch (err) {
+            console.warn('[Dialog] 连接远程音频到混合流失败:', err)
+          }
+        }
       }
       console.log('[Dialog] ✓ 步骤 5/10: 音频播放元素已创建')
       
@@ -467,6 +498,282 @@ export function useRealtimeDialog() {
     currentTranscript.value = ''
   }
   
+  // ==================== 混合录音功能 ====================
+  
+  /**
+   * 开始混合录音（麦克风 + AI 回复）
+   */
+  async function startMixedRecording() {
+    if (isMixedRecording.value) {
+      console.warn('[Dialog] 混合录音已在进行中')
+      return
+    }
+    
+    if (!audioContext) {
+      console.error('[Dialog] AudioContext 未初始化，请先连接')
+      throw new Error('[Dialog] AudioContext 未初始化，请先连接')
+    }
+    
+    // 确保 AudioContext 是活动状态
+    if (audioContext.state === 'suspended') {
+      console.log('[Dialog] AudioContext 处于暂停状态，正在恢复...')
+      await audioContext.resume()
+    }
+    
+    console.log('[Dialog] 开始设置混合录音...')
+    console.log('[Dialog] - AudioContext 状态:', audioContext.state)
+    console.log('[Dialog] - 麦克风流:', mediaStream ? '存在' : '不存在')
+    console.log('[Dialog] - 音频元素:', audioElement ? '存在' : '不存在')
+    console.log('[Dialog] - 音频元素 srcObject:', audioElement?.srcObject ? '存在' : '不存在')
+    
+    // 创建混合流目标
+    if (!mixedStreamDestination) {
+      mixedStreamDestination = audioContext.createMediaStreamDestination()
+      console.log('[Dialog] 创建了新的混合流目标')
+    }
+    
+    // 连接麦克风音频
+    if (mediaStream && !micSource) {
+      try {
+        micSource = audioContext.createMediaStreamSource(mediaStream)
+        micSource.connect(mixedStreamDestination)
+        console.log('[Dialog] ✓ 麦克风已连接到混合流')
+      } catch (err) {
+        console.error('[Dialog] 连接麦克风失败:', err)
+      }
+    } else if (!mediaStream) {
+      console.warn('[Dialog] 麦克风流不存在，无法录制麦克风音频')
+    }
+    
+    // 连接远程音频（AI 回复）- 如果已准备好
+    if (audioElement && audioElement.srcObject && !remoteAudioSource) {
+      try {
+        remoteAudioSource = audioContext.createMediaStreamSource(audioElement.srcObject)
+        remoteAudioSource.connect(mixedStreamDestination)
+        console.log('[Dialog] ✓ 远程音频已连接到混合流')
+      } catch (err) {
+        console.error('[Dialog] 连接远程音频失败:', err)
+      }
+    } else if (!audioElement?.srcObject) {
+      console.log('[Dialog] 远程音频尚未准备好，将在 ontrack 时连接')
+    }
+    
+    // 检查支持的 mimeType
+    const mimeTypes = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4'
+    ]
+    
+    let selectedMimeType = null
+    for (const mimeType of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        selectedMimeType = mimeType
+        break
+      }
+    }
+    
+    if (!selectedMimeType) {
+      console.error('[Dialog] 没有支持的音频格式')
+      throw new Error('没有支持的音频录制格式')
+    }
+    
+    console.log('[Dialog] 使用音频格式:', selectedMimeType)
+    
+    // 创建 MediaRecorder 录制混合流
+    mixedAudioChunks = []
+    mixedMediaRecorder = new MediaRecorder(mixedStreamDestination.stream, {
+      mimeType: selectedMimeType
+    })
+    
+    mixedMediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        mixedAudioChunks.push(event.data)
+        console.log('[Dialog] 收到音频数据块，大小:', event.data.size, '总块数:', mixedAudioChunks.length)
+      }
+    }
+    
+    mixedMediaRecorder.onerror = (event) => {
+      console.error('[Dialog] MediaRecorder 错误:', event.error)
+    }
+    
+    // 每秒收集一次数据，确保数据不丢失
+    mixedMediaRecorder.start(1000)
+    isMixedRecording.value = true
+    console.log('[Dialog] ✓ 混合录音已开始，MediaRecorder 状态:', mixedMediaRecorder.state)
+  }
+  
+  /**
+   * 停止混合录音并返回音频 Blob
+   */
+  async function stopMixedRecording() {
+    console.log('[Dialog] 停止混合录音...')
+    console.log('[Dialog] - isMixedRecording:', isMixedRecording.value)
+    console.log('[Dialog] - mixedMediaRecorder:', mixedMediaRecorder ? mixedMediaRecorder.state : '不存在')
+    console.log('[Dialog] - mixedAudioChunks 数量:', mixedAudioChunks.length)
+    
+    if (!isMixedRecording.value || !mixedMediaRecorder) {
+      console.warn('[Dialog] 混合录音未在进行中')
+      // 即使没有在录音，如果有数据块也返回
+      if (mixedAudioChunks.length > 0) {
+        const audioBlob = new Blob(mixedAudioChunks, { type: 'audio/webm' })
+        console.log('[Dialog] 返回已有的音频数据，大小:', (audioBlob.size / 1024 / 1024).toFixed(2), 'MB')
+        mixedAudioChunks = []
+        return audioBlob
+      }
+      return null
+    }
+    
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.warn('[Dialog] 停止录音超时，强制返回已有数据')
+        const audioBlob = new Blob(mixedAudioChunks, { type: 'audio/webm' })
+        isMixedRecording.value = false
+        mixedAudioChunks = []
+        resolve(audioBlob)
+      }, 5000)
+      
+      mixedMediaRecorder.onstop = () => {
+        clearTimeout(timeout)
+        const audioBlob = new Blob(mixedAudioChunks, { type: 'audio/webm' })
+        console.log('[Dialog] ✓ 混合录音已停止')
+        console.log('[Dialog] - 音频块数量:', mixedAudioChunks.length)
+        console.log('[Dialog] - 音频大小:', (audioBlob.size / 1024 / 1024).toFixed(2), 'MB')
+        isMixedRecording.value = false
+        mixedAudioChunks = []
+        resolve(audioBlob)
+      }
+      
+      try {
+        if (mixedMediaRecorder.state === 'recording') {
+          mixedMediaRecorder.stop()
+        } else {
+          console.log('[Dialog] MediaRecorder 不在录音状态:', mixedMediaRecorder.state)
+          clearTimeout(timeout)
+          const audioBlob = new Blob(mixedAudioChunks, { type: 'audio/webm' })
+          isMixedRecording.value = false
+          mixedAudioChunks = []
+          resolve(audioBlob)
+        }
+      } catch (err) {
+        console.error('[Dialog] 停止 MediaRecorder 失败:', err)
+        clearTimeout(timeout)
+        const audioBlob = new Blob(mixedAudioChunks, { type: 'audio/webm' })
+        isMixedRecording.value = false
+        mixedAudioChunks = []
+        resolve(audioBlob)
+      }
+    })
+  }
+  
+  /**
+   * 获取混合录音状态
+   */
+  function getMixedRecordingStatus() {
+    const status = {
+      isRecording: isMixedRecording.value,
+      chunksCount: mixedAudioChunks.length,
+      recorderState: mixedMediaRecorder ? mixedMediaRecorder.state : 'none',
+      hasData: mixedAudioChunks.length > 0
+    }
+    console.log('[Dialog] 混合录音状态:', status)
+    return status
+  }
+  
+  /**
+   * 将 WebM Blob 转换为 MP3 Blob
+   */
+  async function convertWebMToMP3(webmBlob) {
+    try {
+      console.log('[Dialog] 开始转换 WebM 到 MP3')
+      console.log('[Dialog] - WebM 大小:', (webmBlob.size / 1024 / 1024).toFixed(2), 'MB')
+      
+      if (!webmBlob || webmBlob.size === 0) {
+        console.warn('[Dialog] WebM blob 为空，跳过转换')
+        return null
+      }
+      
+      // 1. 读取并解码 WebM
+      console.log('[Dialog] 步骤 1: 读取 WebM 数据...')
+      const arrayBuffer = await webmBlob.arrayBuffer()
+      console.log('[Dialog] - ArrayBuffer 大小:', arrayBuffer.byteLength)
+      
+      // 创建新的 AudioContext（避免使用可能已关闭的）
+      console.log('[Dialog] 步骤 2: 创建 AudioContext 并解码...')
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 })
+      
+      let audioBuffer
+      try {
+        audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0))
+        console.log('[Dialog] - 解码成功，时长:', audioBuffer.duration.toFixed(2), '秒')
+        console.log('[Dialog] - 采样率:', audioBuffer.sampleRate)
+        console.log('[Dialog] - 声道数:', audioBuffer.numberOfChannels)
+      } catch (decodeError) {
+        console.error('[Dialog] 解码 WebM 失败:', decodeError)
+        ctx.close()
+        throw new Error(`解码音频失败: ${decodeError.message}`)
+      }
+      
+      // 2. 提取并转换 PCM 数据
+      console.log('[Dialog] 步骤 3: 提取 PCM 数据...')
+      const float32Data = audioBuffer.getChannelData(0)
+      const sampleRate = audioBuffer.sampleRate
+      const int16Data = new Int16Array(float32Data.length)
+      
+      for (let i = 0; i < float32Data.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32Data[i]))
+        int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+      }
+      console.log('[Dialog] - PCM 样本数:', int16Data.length)
+      
+      // 3. 使用 lamejs 编码为 MP3
+      console.log('[Dialog] 步骤 4: 初始化 lamejs...')
+      
+      // 获取 lamejs
+      const Lame = getLamejs()
+      console.log('[Dialog] - lamejs 状态: 已加载')
+      
+      const mp3encoder = new Lame.Mp3Encoder(1, sampleRate, 128)
+      const sampleBlockSize = 1152
+      const mp3Data = []
+      
+      let processedSamples = 0
+      for (let i = 0; i < int16Data.length; i += sampleBlockSize) {
+        const sampleChunk = int16Data.subarray(
+          i,
+          Math.min(i + sampleBlockSize, int16Data.length)
+        )
+        const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
+        if (mp3buf.length > 0) {
+          mp3Data.push(new Int8Array(mp3buf))
+        }
+        processedSamples += sampleChunk.length
+      }
+      
+      const mp3buf = mp3encoder.flush()
+      if (mp3buf.length > 0) {
+        mp3Data.push(new Int8Array(mp3buf))
+      }
+      
+      console.log('[Dialog] - 处理了', processedSamples, '个样本')
+      console.log('[Dialog] - 生成了', mp3Data.length, '个 MP3 数据块')
+      
+      // 4. 创建 MP3 Blob
+      const mp3Blob = new Blob(mp3Data, { type: 'audio/mpeg' })
+      console.log('[Dialog] ✓ MP3 转换完成，大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
+      
+      // 关闭临时创建的 AudioContext
+      ctx.close()
+      
+      return mp3Blob
+      
+    } catch (error) {
+      console.error('[Dialog] WebM 转 MP3 失败:', error)
+      throw new Error(`WebM 转 MP3 失败: ${error.message}`)
+    }
+  }
+  
   // 注意：不在 onUnmounted 中断开连接，因为这是全局单例
   // 连接的生命周期由 App.vue 管理
   
@@ -479,6 +786,7 @@ export function useRealtimeDialog() {
     connectionError,
     isSpeaking,
     isListening,
+    isMixedRecording,
     transcripts,
     currentTranscript,
     
@@ -489,7 +797,13 @@ export function useRealtimeDialog() {
     sendTextMessage,
     updateSession,
     setCallbacks,
-    clearTranscripts
+    clearTranscripts,
+    
+    // 混合录音方法
+    startMixedRecording,
+    stopMixedRecording,
+    getMixedRecordingStatus,
+    convertWebMToMP3
   }
 }
 

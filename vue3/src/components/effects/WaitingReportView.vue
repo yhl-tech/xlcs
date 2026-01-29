@@ -1,5 +1,6 @@
 <template>
   <div class="waiting-report-view">
+    <!-- 主容器 -->
     <div class="waiting-content">
       <!-- 标题 -->
       <h2 class="waiting-title">报告生成中</h2>
@@ -66,8 +67,14 @@
         </div>
       </div>
 
+      <!-- 报告下载区域（完成后显示） -->
+      <div v-if="isReportReady" class="report-actions">
+        <button class="download-btn" @click="handleDownload">📥 下载测试报告</button>
+        <button class="publicity-btn" @click="handlePublicity">📄 报告解读版</button>
+      </div>
+
       <!-- 提示信息 -->
-      <div class="waiting-hint">
+      <div v-else class="waiting-hint">
         <p>预计等待时间：6-8 小时</p>
         <p class="hint-secondary">报告生成完成后，您可以登录查看</p>
       </div>
@@ -77,6 +84,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useApi } from '@/composables/useApi'
 
 const props = defineProps({
   sessionId: {
@@ -85,15 +93,18 @@ const props = defineProps({
   }
 })
 
+const api = useApi()
+
 const steps = [
-  { id: 'submit', label: '提交数据', desc: '测评数据已安全传输' },
+  { id: 'submit', label: '数据提交', desc: '测评数据已安全传输' },
   { id: 'validate', label: '数据校验', desc: '系统正在校验数据完整性' },
   { id: 'ai', label: 'AI 模型分析', desc: '心理大模型深度解析中' },
   { id: 'review', label: '专家复核', desc: '心理师团队双重复核' },
   { id: 'generate', label: '报告生成', desc: '生成个性化评估报告' }
 ]
 
-const currentStepIndex = ref(2) // 模拟当前在 AI 分析阶段
+const currentStepIndex = ref(2) // 默认在 AI 分析阶段
+const isReportReady = ref(false)
 const totalSteps = steps.length
 const currentStep = computed(() => currentStepIndex.value + 1)
 
@@ -104,26 +115,46 @@ const progressOffset = computed(() => {
   return circumference * (1 - progress)
 })
 
-// 模拟进度更新（实际应该从后端获取）
-let progressTimer = null
+// 检查报告状态
+let checkTimer = null
+
+async function checkReportStatus() {
+  try {
+    const status = await api.checkReportStatus(props.sessionId)
+    if (status?.ready) {
+      isReportReady.value = true
+      currentStepIndex.value = totalSteps - 1
+      if (checkTimer) {
+        clearInterval(checkTimer)
+      }
+    }
+  } catch (error) {
+    console.warn('检查报告状态失败:', error)
+  }
+}
+
+function handleDownload() {
+  api.downloadReport(props.sessionId)
+}
+
+function handlePublicity() {
+  api.getPublicityReport(props.sessionId)
+}
 
 onMounted(() => {
-  // 模拟进度更新
-  progressTimer = setInterval(() => {
-    if (currentStepIndex.value < totalSteps - 1) {
-      // 实际项目中应该调用 API 查询状态
-    }
-  }, 5000)
+  // 定期检查报告状态
+  checkReportStatus()
+  checkTimer = setInterval(checkReportStatus, 30000) // 每30秒检查一次
 })
 
 onUnmounted(() => {
-  if (progressTimer) {
-    clearInterval(progressTimer)
+  if (checkTimer) {
+    clearInterval(checkTimer)
   }
 })
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .waiting-report-view {
   width: 100%;
   min-height: 100vh;
@@ -143,6 +174,10 @@ onUnmounted(() => {
   color: white;
   font-size: 28px;
   margin-bottom: 40px;
+  background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .progress-ring {
@@ -271,6 +306,44 @@ onUnmounted(() => {
 .step-desc {
   color: rgba(255, 255, 255, 0.5);
   font-size: 12px;
+}
+
+.report-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  
+  button {
+    padding: 14px 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+    max-width: 280px;
+  }
+  
+  .download-btn {
+    background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+    color: #fff;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+    }
+  }
+  
+  .publicity-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  }
 }
 
 .waiting-hint {

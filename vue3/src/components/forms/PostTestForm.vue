@@ -1,38 +1,42 @@
 <template>
-  <div class="post-test-view">
-    <!-- 头部 -->
-    <div class="post-test-header">
-      <h2>综合测试</h2>
+  <div class="ptf-container">
+    <!-- 页面标题栏 -->
+    <div class="ptf-title-bar">
+      <h2 class="ptf-title">
+        综合测试
+      </h2>
       <button 
-        v-if="!isComplete" 
-        class="next-question-btn"
-        :disabled="isButtonDisabled"
+        class="ptf-next-btn"
         @click="goToNextQuestion"
       >
         {{ isLastQuestion ? '确认提交' : '下一页' }}
       </button>
     </div>
 
-    <!-- 问题文本 -->
-    <p class="question-text">{{ currentQuestionText }}</p>
+    <!-- 问题文本框 -->
+    <div class="ptf-instruction-box">
+      <p class="ptf-question-text">
+        {{ currentQuestionText }}
+      </p>
+    </div>
 
     <!-- 图版网格 -->
-    <div v-if="!isComplete" class="image-grid" id="post-test-grid">
+    <div class="ptf-grid">
       <div
         v-for="i in 10"
         :key="i"
-        class="grid-item"
+        class="ptf-card"
         :class="{ selected: isImageSelected(i) }"
         @click="handleImageSelection(i)"
       >
-        <img :src="`/images/rorschach-blot-${i}.webp`" :alt="`Image ${i}`" />
-        <h4>图 {{ i }}</h4>
+        <div class="ptf-card-image-wrapper">
+          <img
+            :src="`/images/rorschach-blot-${i}.webp`"
+            :alt="`Image ${i}`"
+          >
+        </div>
+        <span class="ptf-card-label">图 {{ i }}</span>
       </div>
-    </div>
-
-    <!-- 完成提示 -->
-    <div v-else class="complete-message">
-      <p>感谢您完成问卷！正在提交数据...</p>
     </div>
   </div>
 </template>
@@ -56,7 +60,6 @@ const displayableQuestions = computed(() => {
 // 状态
 const currentQuestionIndex = ref(0)
 const answers = reactive({})
-const isComplete = ref(false)
 
 // WebRTC 对话
 const dialog = useRealtimeDialog()
@@ -84,15 +87,6 @@ const currentQuestionText = computed(() => {
 // 是否是最后一个问题
 const isLastQuestion = computed(() => {
   return currentQuestionIndex.value >= displayableQuestions.value.length - 1
-})
-
-// 按钮是否禁用（mood问题不需要选择图片）
-const isButtonDisabled = computed(() => {
-  if (!currentQuestion.value) return true
-  // mood 问题不需要选择图片
-  if (currentQuestion.value.key === 'mood') return false
-  // 其他问题需要至少选择一张图片
-  return answers[currentQuestion.value.key]?.length === 0
 })
 
 // 图片是否被选中
@@ -163,162 +157,175 @@ function goToNextQuestion() {
 
 // 完成问卷
 function finishQuestionnaire() {
-  isComplete.value = true
+  console.log('[PostTestForm] 问卷完成，准备提交')
   
   // 转换答案格式以匹配 API 要求
-  // 原始格式: { self: [1, 2], father: [3], ... }
-  // API 格式: { represent: [1, 2], father: [3], ... }
   const formattedAnswers = {
-    representSelf: answers.self?.[0] || null,
-    representFather: answers.father?.[0] || null,
-    representMother: answers.mother?.[0] || null,
-    mostLiked: answers.like || [],
-    mostDisliked: answers.dislike || []
+    self: answers.self || [],
+    father: answers.father || [],
+    mother: answers.mother || [],
+    like: answers.like || [],
+    dislike: answers.dislike || []
   }
   
-  // 播报结束语
-  const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约1-2天，请您耐心等待'
-  if (dialog.isConnected.value) {
-    const ttsQuery = `[TTS-READ-ONLY] ${finishText}`
-    dialog.sendTextMessage(ttsQuery).catch(() => {})
-  }
+  console.log('[PostTestForm] 提交答案:', formattedAnswers)
   
-  // 延迟提交，让用户看到完成提示
-  setTimeout(() => {
-    emit('submit', formattedAnswers)
-  }, 2000)
+  // 立即提交，让父组件处理后续流程
+  emit('submit', formattedAnswers)
 }
 </script>
 
 <style lang="less" scoped>
-.post-test-view {
+.ptf-container {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 20px 40px;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-  overflow-y: auto;
+  overflow: hidden;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.post-test-header {
+/* Title Bar */
+.ptf-title-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 16px 24px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  margin-bottom: 20px;
-
-  h2 {
-    color: #fff;
-    font-size: 20px;
-    margin: 0;
-    background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+  margin-bottom: 16px;
+  position: relative;
 }
 
-.next-question-btn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-  border: none;
-  border-radius: 8px;
+.ptf-title {
+  font-size: 26px;
+  font-weight: 700;
   color: #fff;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.ptf-next-btn {
+  position: absolute;
+  right: 0;
+  background: rgba(16, 23, 42, 0.6);
+  border: 1px solid rgba(64, 224, 255, 0.5);
+  color: #fff;
+  padding: 8px 24px;
+  border-radius: 20px;
   font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  
+  &:hover {
+    background: rgba(64, 224, 255, 0.2);
+    border-color: rgba(64, 224, 255, 0.8);
   }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  
+  &:active {
+    transform: translateY(1px);
   }
 }
 
-.question-text {
+/* Instruction Box */
+.ptf-instruction-box {
+  background: transparent;
+  padding: 16px 0;
+  margin-bottom: 16px;
+}
+
+.ptf-question-text {
   color: rgba(255, 255, 255, 0.9);
   font-size: 16px;
   line-height: 1.6;
-  padding: 20px 24px;
-  background: rgba(139, 92, 246, 0.1);
-  border-radius: 12px;
-  border-left: 4px solid #8b5cf6;
-  margin-bottom: 24px;
+  margin: 0;
+  font-weight: 500;
 }
 
-.image-grid {
+/* Grid */
+.ptf-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 16px;
-  flex: 1;
-
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
+  align-content: start; /* Align items to top */
 }
 
-.grid-item {
-  aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.1);
+/* Card */
+.ptf-card {
+  background: #0f172a; /* Dark background matching the image roughly */
+  border: 1px solid rgba(64, 224, 255, 0.3);
   border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.3s;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  img {
-    width: 80%;
-    height: 70%;
-    object-fit: contain;
-  }
-
-  h4 {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
-    margin: 8px 0 0;
-  }
-
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  
   &:hover {
-    border-color: rgba(139, 92, 246, 0.5);
-    transform: scale(1.02);
-    background: rgba(139, 92, 246, 0.1);
+    transform: translateY(-2px);
+    border-color: rgba(64, 224, 255, 0.8);
+    box-shadow: 0 0 15px rgba(64, 224, 255, 0.2);
   }
-
+  
   &.selected {
-    border-color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.2);
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
-
-    h4 {
-      color: #fff;
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    
+    .ptf-card-label {
+      color: #38bdf8;
+      font-weight: 700;
     }
   }
 }
 
-.complete-message {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ptf-card-image-wrapper {
+  background: #fff; /* White background for image */
+  border-radius: 8px;
+  overflow: hidden;
+}
 
-  p {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 18px;
-    text-align: center;
+.ptf-card-image-wrapper img {
+  width: 100%;
+  height: auto;
+  display: block;
+  padding: 4px;
+}
+
+.ptf-card-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+  display: block;
+  margin-top: 6px;
+}
+
+/* Responsive adjustments */
+@media (max-height: 800px) {
+  .ptf-grid {
+    gap: 10px;
+  }
+  
+  .ptf-container {
+    padding: 16px;
+  }
+  
+  .ptf-instruction-box {
+    padding: 12px 20px;
+    margin-bottom: 16px;
+  }
+  
+  .header-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .ptf-grid {
+    grid-template-columns: repeat(3, 1fr);
+    overflow-y: auto;
   }
 }
 </style>

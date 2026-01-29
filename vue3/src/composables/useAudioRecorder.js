@@ -3,7 +3,8 @@
  * 收集 PCM 数据并转换为 MP3 格式
  */
 import { ref, computed, onUnmounted } from 'vue'
-import lamejs from 'lamejs'
+
+// lamejs 通过 CDN script 标签加载到 window.lamejs
 
 export function useAudioRecorder() {
   // ==================== 状态 ====================
@@ -114,7 +115,11 @@ export function useAudioRecorder() {
   async function convertPCMToMP3(pcmData, rate = 24000) {
     return new Promise((resolve, reject) => {
       try {
-        const mp3encoder = new lamejs.Mp3Encoder(1, rate, 128) // 单声道，128kbps
+        // 使用通过 CDN 加载的 window.lamejs
+        if (!window.lamejs || !window.lamejs.Mp3Encoder) {
+          throw new Error('lamejs 库未正确加载')
+        }
+        const mp3encoder = new window.lamejs.Mp3Encoder(1, rate, 128) // 单声道，128kbps
         const sampleBlockSize = 1152 // MP3 编码块大小
         const mp3Data = []
         

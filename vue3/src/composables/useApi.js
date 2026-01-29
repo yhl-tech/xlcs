@@ -13,6 +13,28 @@ const API_CONFIG = {
 }
 
 /**
+ * 保存文件到本地（下载）
+ * @param {Blob|File} fileData - 文件数据
+ * @param {string} fileName - 文件名
+ */
+function saveFileToLocal(fileData, fileName) {
+  try {
+    const blob = fileData instanceof Blob ? fileData : new Blob([fileData])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    console.log('[API] 文件已保存到本地:', fileName)
+  } catch (error) {
+    console.warn('[API] 保存文件到本地失败:', fileName, error)
+  }
+}
+
+/**
  * 获取用户信息中的 username
  */
 function getUserInfoFromStorage() {
@@ -241,10 +263,13 @@ export function useApi() {
     
     formData.append('file', file, 'scale.json')
     
+    // 保存文件到本地
+    saveFileToLocal(blob, `scale_${userId || 'unknown'}_${Date.now()}.json`)
+    
     console.log('[API] 上传缩放数据:', { zoomData, userId })
     
-    const response = await client.post('/rorschach/user/upload_scale', formData)
-    return response
+    // const response = await client.post('/rorschach/user/upload_scale', formData)
+    // return response
   }
 
   /**
@@ -264,10 +289,13 @@ export function useApi() {
     
     formData.append('file', file, 'rotate.json')
     
+    // 保存文件到本地
+    saveFileToLocal(blob, `rotate_${userId || 'unknown'}_${Date.now()}.json`)
+    
     console.log('[API] 上传旋转数据:', { rotateData, userId })
     
-    const response = await client.post('/rorschach/user/upload_rotate', formData)
-    return response
+    // const response = await client.post('/rorschach/user/upload_rotate', formData)
+    // return response
   }
 
   /**
@@ -296,14 +324,17 @@ export function useApi() {
     
     formData.append('file', file, 'drawing_tracks.json')
     
+    // 保存文件到本地
+    saveFileToLocal(blob, `drawing_tracks_${userId || 'unknown'}_${Date.now()}.json`)
+    
     console.log('[API] 上传笔迹轨迹数据:', { 
       originalData: drawingTracksData, 
       normalizedData,
       userId 
     })
     
-    const response = await client.post('/rorschach/user/upload_drawing_tracks', formData)
-    return response
+    // const response = await client.post('/rorschach/user/upload_drawing_tracks', formData)
+    // return response
   }
 
   /**
@@ -329,14 +360,17 @@ export function useApi() {
     
     formData.append('file', file, 'video_clip.json')
     
+    // 保存文件到本地
+    saveFileToLocal(blob, `video_clip_${userId || 'unknown'}_${Date.now()}.json`)
+    
     console.log('[API] 上传时间戳数据:', { 
       originalData: segTimeData, 
       normalizedData: normalizedSegTime,
       userId 
     })
     
-    const response = await client.post('/rorschach/user/upload_seg_time', formData)
-    return response
+    // const response = await client.post('/rorschach/user/upload_seg_time', formData)
+    // return response
   }
 
   /**
@@ -416,14 +450,17 @@ export function useApi() {
     
     formData.append('file', file, '5_questions.json')
     
-    console.log('[API] 上传五个问题数据:', { 
-      originalData: questionsData, 
-      formattedData,
-      userId 
-    })
+    // 保存文件到本地
+    saveFileToLocal(blob, `5_questions_${userId || 'unknown'}_${Date.now()}.json`)
     
-    const response = await client.post('/rorschach/user/upload_5_questions', formData)
-    return response
+    // console.log('[API] 上传五个问题数据:', { 
+    //   originalData: questionsData, 
+    //   formattedData,
+    //   userId 
+    // })
+    
+    // const response = await client.post('/rorschach/user/upload_5_questions', formData)
+    // return response
   }
 
   /**
@@ -458,14 +495,18 @@ export function useApi() {
       userId 
     })
     
-    const response = await client.post('/rorschach/user/upload_media', formData, {
-      timeout: 300000, // 5分钟超时
-      onUploadProgress: onProgress ? (progressEvent) => {
-        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        onProgress(percent)
-      } : undefined
-    })
-    return response
+    // 保存文件到本地
+    const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
+    saveFileToLocal(fileToUpload, mediaFileName)
+    
+    // const response = await client.post('/rorschach/user/upload_media', formData, {
+    //   timeout: 300000, // 5分钟超时
+    //   onUploadProgress: onProgress ? (progressEvent) => {
+    //     const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+    //     onProgress(percent)
+    //   } : undefined
+    // })
+    // return response
   }
 
   /**

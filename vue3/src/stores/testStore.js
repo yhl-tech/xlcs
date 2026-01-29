@@ -17,7 +17,7 @@ export const useTestStore = defineStore('test', () => {
     OPERATION_TEST: 'operationTest', // 操作反应测试
     TEST: 'test',           // 正式测试
     POST_TEST: 'postTest',  // 后测问卷
-    SUMMARY: 'summary',     // 汇总
+    UPLOADING: 'uploading', // 上传文件
     WAITING: 'waiting'      // 等待报告
   }
   

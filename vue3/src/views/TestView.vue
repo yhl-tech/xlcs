@@ -3,6 +3,22 @@
     <!-- 黑洞背景 -->
     <BlackHoleBackground :enabled="true" :theme="uiStore.backgroundTheme" :z-index="0" />
     
+    <!-- 开发测试按钮 -->
+    <div class="dev-test-buttons">
+      <button class="dev-btn" @click="handleDevSubmitAll">
+        测试提交文件
+      </button>
+      <button class="dev-btn" @click="handleDevSkipToPostTest">
+        五个问题
+      </button>
+      <button class="dev-btn" @click="handleDevSkipToUploading">
+        上传页面
+      </button>
+      <button class="dev-btn" @click="handleDevSkipToWaiting">
+        等待报告
+      </button>
+    </div>
+    
     <!-- 正式测试阶段 -->
     <div v-if="testStore.phase === 'test'" class="test-screen">
       <!-- 图版展示区域 -->
@@ -53,15 +69,12 @@
       <PostTestForm @submit="handlePostTestSubmit" />
     </div>
 
-    <!-- 汇总阶段 -->
-    <div v-else-if="testStore.phase === 'summary'" class="summary-screen">
-      <div class="summary-card">
-        <h2>测试完成</h2>
-        <p>您已完成所有测试内容，报告正在生成中...</p>
-        <BaseButton variant="primary" @click="handleSubmit">
-          提交并生成报告
-        </BaseButton>
-      </div>
+    <!-- 上传文件阶段 -->
+    <div v-else-if="testStore.phase === 'uploading'" class="uploading-screen">
+      <UploadingView 
+        :session-id="testStore.sessionId" 
+        @upload-complete="handleUploadComplete"
+      />
     </div>
 
     <!-- 等待报告阶段 -->
@@ -83,6 +96,7 @@ import ImageCanvas from '@/components/test/ImageCanvas.vue'
 import ControlsBar from '@/components/test/ControlsBar.vue'
 import EnergyPillar from '@/components/test/EnergyPillar.vue'
 import PostTestForm from '@/components/forms/PostTestForm.vue'
+import UploadingView from '@/components/effects/UploadingView.vue'
 import WaitingReportView from '@/components/effects/WaitingReportView.vue'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 
@@ -91,11 +105,10 @@ import { useSession } from '@/composables/useSession'
 import { useInteractionTracker } from '@/composables/useInteractionTracker'
 import { useImagePreloader } from '@/composables/useImagePreloader'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
-import { useAudioRecorder } from '@/composables/useAudioRecorder'
 import { useSubtitle } from '@/composables/useSubtitle'
 import { useGuide } from '@/composables/useGuide'
 import { useApi } from '@/composables/useApi'
-import { POSTTEST_PROMPT } from '@/utils/constants'
+import { SYSTEM_PROMPT, POSTTEST_PROMPT } from '@/utils/constants'
 import { stopAllAudios } from '@/utils/audioManager'
 
 const router = useRouter()
@@ -110,7 +123,7 @@ const tracker = useInteractionTracker()
 const imagePreloader = useImagePreloader()
 // 使用全局 WebRTC 单例（连接由 App.vue 自动管理）
 const dialog = useRealtimeDialog()
-const audioRecorder = useAudioRecorder()
+// audioRecorder 已被 dialog.startMixedRecording() 替代
 const subtitle = useSubtitle()
 const guide = useGuide()
 const api = useApi()
@@ -193,7 +206,7 @@ onMounted(async () => {
   stopAllAudios()
   
   // 如果不是测试阶段，重定向
-  if (testStore.phase !== 'test' && testStore.phase !== 'postTest' && testStore.phase !== 'summary' && testStore.phase !== 'waiting') {
+  if (testStore.phase !== 'test' && testStore.phase !== 'postTest' && testStore.phase !== 'uploading' && testStore.phase !== 'waiting') {
     console.log('[TestView] 当前阶段不是测试阶段，重定向到准备页面')
     router.push('/prep')
     return
@@ -240,6 +253,10 @@ onMounted(async () => {
         guide.showTestGuide()
       }, 1000)
     }
+    
+    // 在测试阶段启动语音对话（带正确的系统提示词）
+    console.log('[TestView] 测试阶段，启动 WebRTC 语音对话...')
+    await startVoiceDialog()
     
     // 播放开场白（仅第一次进入时）
     if (!hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
@@ -398,16 +415,25 @@ function handlePreviousPlate() {
   uiStore.setBackgroundTheme(testStore.currentPlate)
 }
 
-// 后测问卷提交
+// 后测问卷提交 - 直接进入上传阶段
 async function handlePostTestSubmit(answers) {
   // 停止语音对话
   await stopVoiceDialog()
   
+  // 保存问卷答案
   Object.entries(answers).forEach(([key, value]) => {
     testStore.setPostTestAnswer(key, value)
   })
-  testStore.setPhase('summary')
   session.saveSnapshot('posttest_complete')
+  
+  // 直接进入上传阶段
+  testStore.setPhase('uploading')
+}
+
+// 上传完成后进入等待报告阶段
+function handleUploadComplete() {
+  session.markCompleted()
+  testStore.setPhase('waiting')
 }
 
 // 恢复会话
@@ -422,22 +448,40 @@ function handleDiscardSession() {
   showRestoreDialog.value = false
 }
 
+// 根据当前阶段获取对应的提示词
+function getPromptForCurrentPhase() {
+  if (testStore.phase === 'postTest') {
+    return POSTTEST_PROMPT
+  }
+  return SYSTEM_PROMPT
+}
+
 // 开始语音对话
 async function startVoiceDialog() {
   try {
+    const currentPrompt = getPromptForCurrentPhase()
+    console.log('[TestView] 当前阶段:', testStore.phase, '使用提示词:', currentPrompt.substring(0, 50) + '...')
+    
     // 如果尚未连接，先建立连接
     if (!dialog.isConnected.value && !dialog.isConnecting.value) {
       console.log('[TestView] WebRTC 未连接，正在建立连接...')
-      await dialog.connect(POSTTEST_PROMPT, 'alloy')
+      await dialog.connect(currentPrompt, 'alloy')
     } else if (dialog.isConnected.value) {
       // 如果已连接，更新 session 指令
       console.log('[TestView] WebRTC 已连接，更新 session 配置...')
-      await dialog.updateSession({
-        instructions: POSTTEST_PROMPT
+      dialog.updateSession({
+        systemPrompt: currentPrompt
       })
     }
     
-    audioRecorder.start()
+    // 开始混合录音（麦克风 + AI 回复）
+    try {
+      await dialog.startMixedRecording()
+      console.log('[TestView] 混合录音已启动')
+    } catch (error) {
+      console.warn('[TestView] 启动混合录音失败:', error)
+    }
+    
     dialog.setCallbacks({
       onTranscript: (transcript) => {
         subtitle.show(transcript.text, transcript.speaker)
@@ -451,8 +495,7 @@ async function startVoiceDialog() {
 
 // 结束语音对话
 async function stopVoiceDialog() {
-  audioRecorder.stop()
-  // 不断开连接，只是停止录音
+  // 停止混合录音（保持连接）
   console.log('[TestView] 停止语音对话（保持连接）')
 }
 
@@ -529,13 +572,25 @@ async function handleSubmit() {
     await api.upload5Questions(testStore.postTestAnswers, userId)
     console.log('[TestView] 问卷答案已上传')
     
-    // 7. 上传音频（如果有）
+    // 7. 上传音频（如果有混合录音）
     try {
-      if (audioRecorder.status.value && audioRecorder.status.value.bufferCount > 0) {
-        uiStore.loadingMessage = '正在上传音频...'
-        const audioBlob = await audioRecorder.exportMP3()
-        await api.uploadMedia(audioBlob, userId)
-        console.log('[TestView] 音频已上传')
+      const recordingStatus = dialog.getMixedRecordingStatus()
+      if (recordingStatus.isRecording || recordingStatus.chunksCount > 0) {
+        uiStore.loadingMessage = '正在停止录音...'
+        // 停止混合录音并获取 WebM
+        const webmBlob = await dialog.stopMixedRecording()
+        
+        if (webmBlob && webmBlob.size > 0) {
+          uiStore.loadingMessage = '正在转换音频格式...'
+          // 转换为 MP3
+          const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
+          
+          uiStore.loadingMessage = '正在上传音频...'
+          await api.uploadMedia(mp3Blob, userId)
+          console.log('[TestView] 音频已上传')
+        }
+      } else {
+        console.log('[TestView] 无混合录音数据')
       }
     } catch (audioError) {
       console.warn('[TestView] 音频上传失败:', audioError)
@@ -558,15 +613,152 @@ async function handleSubmit() {
     uiStore.hideLoading()
   }
 }
+
+// ==================== 开发测试函数 ====================
+
+// 开发测试 - 提交所有文件（使用真实数据）
+async function handleDevSubmitAll() {
+  uiStore.showLoading('正在提交所有文件（真实数据）...')
+  
+  try {
+    const userId = authStore.userInfo?.username || authStore.userInfo?.phone || 'test_user'
+    console.log('[DevTest] 开始提交真实数据，用户ID:', userId)
+    
+    // 停止追踪并获取真实交互数据
+    tracker.stop()
+    const interactionData = tracker.formatForUpload()
+    console.log('[DevTest] 真实交互数据:', interactionData)
+    
+    // 基本信息已在准备页面提交，无需再次上传
+    
+    // 1. 上传缩放数据（真实数据）
+    uiStore.loadingMessage = '正在上传缩放数据...'
+    await api.uploadZoom(interactionData.zoom, userId)
+    console.log('[DevTest] 缩放数据已上传:', interactionData.zoom)
+    
+    // 2. 上传旋转数据（真实数据）
+    uiStore.loadingMessage = '正在上传旋转数据...'
+    await api.uploadRotate(interactionData.rotate, userId)
+    console.log('[DevTest] 旋转数据已上传:', interactionData.rotate)
+    
+    // 3. 上传画笔轨迹数据（真实数据）
+    uiStore.loadingMessage = '正在上传画笔轨迹...'
+    const canvasSize = imageCanvasRef.value ? 
+      [imageCanvasRef.value.$el?.clientHeight || 600, imageCanvasRef.value.$el?.clientWidth || 800] : 
+      [600, 800]
+    await api.uploadDrawingTracks(interactionData.drawingTracks, userId, canvasSize)
+    console.log('[DevTest] 画笔轨迹已上传:', interactionData.drawingTracks)
+    
+    // 4. 上传时间戳数据（真实数据）
+    uiStore.loadingMessage = '正在上传时间戳数据...'
+    const audioTimestamps = tracker.getAudioTimestamps()
+    await api.uploadSegTime(audioTimestamps, userId)
+    console.log('[DevTest] 时间戳数据已上传:', audioTimestamps)
+    
+    // 5. 上传五个问题答案（真实数据或空数据）
+    uiStore.loadingMessage = '正在上传问卷答案...'
+    const postTestAnswers = testStore.postTestAnswers || { self: [], father: [], mother: [], like: [], dislike: [] }
+    await api.upload5Questions(postTestAnswers, userId)
+    console.log('[DevTest] 问卷答案已上传:', postTestAnswers)
+    
+    // 6. 上传音频（真实录音数据）
+    uiStore.loadingMessage = '正在处理音频...'
+    try {
+      const recordingStatus = dialog.getMixedRecordingStatus()
+      console.log('[DevTest] 录音状态:', recordingStatus)
+      
+      if (recordingStatus.isRecording || recordingStatus.chunksCount > 0) {
+        uiStore.loadingMessage = '正在停止录音...'
+        const webmBlob = await dialog.stopMixedRecording()
+        
+        if (webmBlob && webmBlob.size > 0) {
+          console.log('[DevTest] WebM 录音大小:', (webmBlob.size / 1024 / 1024).toFixed(2), 'MB')
+          
+          uiStore.loadingMessage = '正在转换音频格式...'
+          const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
+          console.log('[DevTest] MP3 音频大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
+          
+          uiStore.loadingMessage = '正在上传音频...'
+          await api.uploadMedia(mp3Blob, userId)
+          console.log('[DevTest] 音频已上传')
+        } else {
+          console.log('[DevTest] 无有效录音数据')
+        }
+      } else {
+        console.log('[DevTest] 无混合录音')
+      }
+    } catch (audioError) {
+      console.warn('[DevTest] 音频处理失败:', audioError)
+    }
+    
+    uiStore.showSuccess('所有真实数据文件已成功上传！')
+  } catch (error) {
+    uiStore.showError('提交失败: ' + error.message)
+    console.error('[DevTest] 提交失败:', error)
+  } finally {
+    uiStore.hideLoading()
+  }
+}
+
+// 开发测试 - 跳到后测问卷（五个问题）
+function handleDevSkipToPostTest() {
+  testStore.setPhase('postTest')
+  // 启动语音对话（使用后测提示词）
+  startVoiceDialog()
+}
+
+// 开发测试 - 跳到上传页面
+function handleDevSkipToUploading() {
+  testStore.setPhase('uploading')
+}
+
+// 开发测试 - 跳到等待报告页面
+function handleDevSkipToWaiting() {
+  testStore.setPhase('waiting')
+}
 </script>
 
 <style lang="less" scoped>
 .test-view {
   width: 100%;
   height: 100vh;
+  padding-top: 70px; /* 为头部导航栏留出空间 */
   position: relative;
   overflow: hidden;
   background: #000;
+  box-sizing: border-box;
+}
+
+// 开发测试按钮
+.dev-test-buttons {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  gap: 10px;
+}
+
+.dev-btn {
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.9);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: rgba(239, 68, 68, 1);
+    transform: translateY(-1px);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
 }
 
 .test-screen {
@@ -643,15 +835,26 @@ async function handleSubmit() {
   51%, 100% { opacity: 0; }
 }
 
-.post-test-screen,
-.summary-screen,
+.post-test-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.uploading-screen,
 .waiting-screen {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 0;
   position: relative;
   z-index: 1;
 }

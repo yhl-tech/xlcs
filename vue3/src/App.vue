@@ -7,8 +7,8 @@
       :enabled="backgroundEnabled"
     />
     
-    <!-- 全局用户信息栏 -->
-    <UserBar v-if="showUserBar" />
+    <!-- 全局头部导航栏 -->
+    <AppHeader v-if="showHeader" />
     
     <!-- 路由视图 -->
     <router-view v-slot="{ Component }">
@@ -34,7 +34,7 @@ import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { stopAllAudios } from '@/utils/audioManager'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
-import UserBar from '@/components/common/UserBar.vue'
+import AppHeader from '@/components/common/AppHeader.vue'
 
 const route = useRoute()
 const uiStore = useUiStore()
@@ -49,9 +49,9 @@ const showBackground = computed(() => {
   return !['Home', 'Login', 'Prep', 'Intro'].includes(route.name)
 })
 
-// 控制用户栏显示
-const showUserBar = computed(() => {
-  // 在非首页和登录页时显示（不依赖登录状态，因为"直接进入"按钮始终可用）
+// 控制头部导航栏显示
+const showHeader = computed(() => {
+  // 在非首页和登录页时显示
   return !['Home', 'Login'].includes(route.name)
 })
 
