@@ -32,6 +32,7 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { stopAllAudios } from '@/utils/audioManager'
+import { SYSTEM_PROMPT } from '@/utils/constants'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -76,9 +77,10 @@ watch(() => route.name, async (routeName, oldRouteName) => {
   if (routeName === 'Test' && authStore.isLoggedIn) {
     if (!realtimeDialog.isConnected.value && !realtimeDialog.isConnecting.value) {
       console.log('[App] 进入测试页面，初始化 WebRTC 连接...')
+      console.log('[App] 使用完整提示词:', SYSTEM_PROMPT.substring(0, 100) + '...')
       try {
-        const testPrompt = '你是一个友好、专业的心理测试助手。请用温和、鼓励的语气与用户交流，帮助他们完成心理测试。'
-        await realtimeDialog.connect(testPrompt, 'alloy')
+        // 使用完整的测试提示词（包含详细施测指导语）
+        await realtimeDialog.connect(SYSTEM_PROMPT, 'alloy')
         console.log('[App] WebRTC 连接已建立')
       } catch (error) {
         console.error('[App] WebRTC 连接失败:', error)

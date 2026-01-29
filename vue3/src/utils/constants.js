@@ -14,17 +14,6 @@ export const API_CONFIG = {
   timeout: 30000
 }
 
-// ==================== WebSocket 配置 ====================
-
-export const WS_CONFIG = {
-  development: 'wss://innerscan.life/xlcp/ws/',
-  production: 'wss://innerscan.life/xlcp/ws/'
-}
-
-export const getWebSocketUrl = () => {
-  return isProduction ? WS_CONFIG.production : WS_CONFIG.development
-}
-
 // ==================== OpenAI 配置 ====================
 
 export const getOpenAIApiKey = () => {

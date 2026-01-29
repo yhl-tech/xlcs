@@ -393,16 +393,11 @@ async function startUpload() {
       console.error('[Uploading] 音频处理失败:', audioError)
       // 不抛出错误，继续后续流程
     }
-    uploadProgress.value = 90
-    
-    // 7. 触发分析
-    progressText.value = '正在启动分析...'
-    await api.analyzeTest(userId)
     uploadProgress.value = 100
-    console.log('[Uploading] 分析已启动')
     
     uploadStatus.value = 'success'
     progressText.value = '上传完成！正在跳转...'
+    console.log('[Uploading] 所有数据上传完成')
     
     // 延迟后触发完成事件
     setTimeout(() => {
