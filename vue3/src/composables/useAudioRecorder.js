@@ -4,7 +4,7 @@
  */
 import { ref, computed, onUnmounted } from 'vue'
 
-// lamejs 通过 CDN script 标签加载到 window.lamejs
+// lamejs 通过 script 标签加载到 window.lamejs
 
 export function useAudioRecorder() {
   // ==================== 状态 ====================

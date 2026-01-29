@@ -376,7 +376,6 @@ async function startUpload() {
         if (webmBlob && webmBlob.size > 0) {
           progressText.value = '正在转换音频格式...'
           console.log('[Uploading] 开始转换为 MP3...')
-          console.log('[Uploading] lamejs 状态:', window.lamejs ? '已加载' : '未加载')
           
           const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
           

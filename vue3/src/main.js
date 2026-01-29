@@ -2,6 +2,24 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
+import lamejsUrl from 'lamejs/lame.min.js?url'
+
+function loadLamejs() {
+  if (window.lamejs && window.lamejs.Mp3Encoder) return
+
+  const script = document.createElement('script')
+  script.src = lamejsUrl
+  script.async = true
+  script.onload = () => {
+    console.log('[App] lamejs 已加载')
+  }
+  script.onerror = () => {
+    console.error('[App] lamejs 加载失败')
+  }
+  document.head.appendChild(script)
+}
+
+loadLamejs()
 
 // 导入全局样式
 import './assets/styles/app.css'

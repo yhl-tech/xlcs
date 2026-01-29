@@ -483,7 +483,7 @@ pnpm format
 
 1. **WebRTC 连接**：需要 HTTPS 或 localhost 环境
 2. **麦克风权限**：首次使用需要用户授权
-3. **lamejs 加载**：通过 CDN 加载，确保网络正常
+3. **lamejs**：在 `main.js` 中通过 `lamejs/lame.min.js?url` 注入 script，挂载到 `window.lamejs`
 4. **图片预加载**：进入测试前会预加载所有墨迹图版
 
 ## License

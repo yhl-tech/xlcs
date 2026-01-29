@@ -6,16 +6,15 @@
 import { ref, reactive } from 'vue'
 import { OPENAI_CONFIG } from '@/utils/constants'
 
-// lamejs 通过 CDN script 标签加载到 window.lamejs
-// 不使用 ES Module import，因为 lamejs 有兼容性问题
+// lamejs 通过 script 标签加载到 window.lamejs
+// lamejs ES Module 有兼容性问题（MPEGMode is not defined），必须使用 script 方式
 
 // 获取 lamejs 库
 function getLamejs() {
-  // 使用通过 CDN 加载的 window.lamejs
   if (window.lamejs && window.lamejs.Mp3Encoder) {
     return window.lamejs
   }
-  throw new Error('lamejs 库未正确加载，请确保 CDN 脚本已加载')
+  throw new Error('lamejs 库未正确加载，请确保 script 已加载')
 }
 
 // 对话配置
