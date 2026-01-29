@@ -523,10 +523,22 @@ export function useApi() {
   // ==================== 报告相关 ====================
 
   const checkReportStatus = async (userId) => {
-    const response = await client.get('/rorschach/check_report_status', {
-      params: { user_id: userId }
-    })
-    return response
+    if (!userId) {
+      console.warn('[API] checkReportStatus: 用户ID为空')
+      return { ready: false }
+    }
+    
+    try {
+      const response = await client.post('/rorschach/user/get_report_status', {
+        user_id: userId
+      })
+      console.log('[API] 检查报告状态:', response)
+      return response
+    } catch (error) {
+      console.warn('[API] 检查报告状态失败:', error)
+      // 接口失败时返回默认状态，不抛出错误
+      return { ready: false }
+    }
   }
 
   const downloadReport = async (userId) => {

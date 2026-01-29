@@ -505,8 +505,13 @@ export function useRealtimeDialog() {
    */
   async function startMixedRecording() {
     if (isMixedRecording.value) {
-      console.warn('[Dialog] 混合录音已在进行中')
+      console.warn('[Dialog] 混合录音已在进行中，当前数据块数:', mixedAudioChunks.length)
       return
+    }
+    
+    // 如果有已存在的数据，不要清空（可能是之前的录音数据）
+    if (mixedAudioChunks.length > 0) {
+      console.log('[Dialog] 发现已有录音数据，块数:', mixedAudioChunks.length, '，继续使用')
     }
     
     if (!audioContext) {
@@ -532,9 +537,15 @@ export function useRealtimeDialog() {
       console.log('[Dialog] 创建了新的混合流目标')
     }
     
+    // 检查混合流状态
+    const mixedTracks = mixedStreamDestination.stream.getTracks()
+    console.log('[Dialog] 混合流当前轨道数:', mixedTracks.length)
+    
     // 连接麦克风音频
     if (mediaStream && !micSource) {
       try {
+        const micTracks = mediaStream.getTracks()
+        console.log('[Dialog] 麦克风轨道数:', micTracks.length, '活动状态:', micTracks.map(t => t.readyState))
         micSource = audioContext.createMediaStreamSource(mediaStream)
         micSource.connect(mixedStreamDestination)
         console.log('[Dialog] ✓ 麦克风已连接到混合流')
@@ -543,6 +554,8 @@ export function useRealtimeDialog() {
       }
     } else if (!mediaStream) {
       console.warn('[Dialog] 麦克风流不存在，无法录制麦克风音频')
+    } else if (micSource) {
+      console.log('[Dialog] 麦克风源已存在，跳过连接')
     }
     
     // 连接远程音频（AI 回复）- 如果已准备好
@@ -582,7 +595,13 @@ export function useRealtimeDialog() {
     console.log('[Dialog] 使用音频格式:', selectedMimeType)
     
     // 创建 MediaRecorder 录制混合流
-    mixedAudioChunks = []
+    // 注意：不再清空 mixedAudioChunks，保留已有数据
+    // 只有在确实没有数据时才初始化
+    if (mixedAudioChunks.length === 0) {
+      mixedAudioChunks = []
+    } else {
+      console.log('[Dialog] 保留已有录音数据，块数:', mixedAudioChunks.length)
+    }
     mixedMediaRecorder = new MediaRecorder(mixedStreamDestination.stream, {
       mimeType: selectedMimeType
     })
@@ -601,7 +620,13 @@ export function useRealtimeDialog() {
     // 每秒收集一次数据，确保数据不丢失
     mixedMediaRecorder.start(1000)
     isMixedRecording.value = true
-    console.log('[Dialog] ✓ 混合录音已开始，MediaRecorder 状态:', mixedMediaRecorder.state)
+    
+    // 检查最终的混合流轨道
+    const finalTracks = mixedStreamDestination.stream.getTracks()
+    console.log('[Dialog] ✓ 混合录音已开始')
+    console.log('[Dialog] - MediaRecorder 状态:', mixedMediaRecorder.state)
+    console.log('[Dialog] - 混合流轨道数:', finalTracks.length)
+    console.log('[Dialog] - 轨道详情:', finalTracks.map(t => ({ kind: t.kind, readyState: t.readyState, enabled: t.enabled })))
   }
   
   /**

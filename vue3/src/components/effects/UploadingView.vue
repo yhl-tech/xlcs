@@ -362,35 +362,45 @@ async function startUpload() {
     // 6. 上传音频
     progressText.value = '正在处理音频...'
     try {
+      console.log('[Uploading] ========== 开始音频处理 ==========')
+      console.log('[Uploading] WebRTC 连接状态:', dialog.isConnected.value)
+      
       const recordingStatus = dialog.getMixedRecordingStatus()
-      console.log('[Uploading] 录音状态:', recordingStatus)
+      console.log('[Uploading] 录音状态:', JSON.stringify(recordingStatus))
       
       if (recordingStatus.isRecording || recordingStatus.hasData || recordingStatus.chunksCount > 0) {
-        console.log('[Uploading] 正在停止混合录音...')
+        console.log('[Uploading] 有录音数据，正在停止混合录音...')
         const webmBlob = await dialog.stopMixedRecording()
         console.log('[Uploading] WebM blob:', webmBlob ? `${(webmBlob.size / 1024).toFixed(2)} KB` : '无数据')
         
         if (webmBlob && webmBlob.size > 0) {
           progressText.value = '正在转换音频格式...'
           console.log('[Uploading] 开始转换为 MP3...')
+          console.log('[Uploading] lamejs 状态:', window.lamejs ? '已加载' : '未加载')
+          
           const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
           
           if (mp3Blob && mp3Blob.size > 0) {
             progressText.value = '正在上传音频...'
             console.log('[Uploading] MP3 大小:', (mp3Blob.size / 1024).toFixed(2), 'KB')
             await api.uploadMedia(mp3Blob, userId)
-            console.log('[Uploading] ✓ 音频已上传')
+            console.log('[Uploading] ✓ 音频已上传成功')
           } else {
-            console.warn('[Uploading] MP3 转换结果为空')
+            console.warn('[Uploading] ✗ MP3 转换结果为空')
           }
         } else {
-          console.warn('[Uploading] 没有录音数据可上传')
+          console.warn('[Uploading] ✗ 没有录音数据可上传（WebM blob 为空）')
         }
       } else {
-        console.log('[Uploading] 没有进行中的录音，跳过音频上传')
+        console.warn('[Uploading] ✗ 没有进行中的录音，跳过音频上传')
+        console.warn('[Uploading] - isRecording:', recordingStatus.isRecording)
+        console.warn('[Uploading] - hasData:', recordingStatus.hasData)
+        console.warn('[Uploading] - chunksCount:', recordingStatus.chunksCount)
       }
+      console.log('[Uploading] ========== 音频处理完成 ==========')
     } catch (audioError) {
-      console.error('[Uploading] 音频处理失败:', audioError)
+      console.error('[Uploading] ✗ 音频处理失败:', audioError)
+      console.error('[Uploading] - 错误信息:', audioError.message)
       // 不抛出错误，继续后续流程
     }
     uploadProgress.value = 100

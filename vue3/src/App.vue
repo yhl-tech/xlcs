@@ -32,7 +32,6 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { stopAllAudios } from '@/utils/audioManager'
-import { SYSTEM_PROMPT } from '@/utils/constants'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -59,32 +58,18 @@ const showHeader = computed(() => {
 const backgroundEnabled = computed(() => showBackground.value)
 const backgroundTheme = computed(() => uiStore.backgroundTheme)
 
-// 监听路由，管理 WebRTC 连接和音频播放
-watch(() => route.name, async (routeName, oldRouteName) => {
+// 监听路由，管理音频播放
+// 注意：WebRTC 连接由 TestView.vue 管理，这里只处理音频
+watch(() => route.name, (routeName, oldRouteName) => {
   console.log('[App] 路由切换:', oldRouteName, '→', routeName)
   
-  // 路由切换时，停止之前页面的音频（除非是进入测试页面）
+  // 路由切换时，停止之前页面的音频
   if (oldRouteName && routeName !== oldRouteName) {
     // 从准备页面离开 → 停止欢迎语音频
     // 从说明页面离开 → 停止说明音频
     if (oldRouteName === 'Prep' || oldRouteName === 'Intro') {
       console.log('[App] 离开', oldRouteName, '，停止音频播放')
       stopAllAudios()
-    }
-  }
-  
-  // 进入测试页面时建立 WebRTC 连接
-  if (routeName === 'Test' && authStore.isLoggedIn) {
-    if (!realtimeDialog.isConnected.value && !realtimeDialog.isConnecting.value) {
-      console.log('[App] 进入测试页面，初始化 WebRTC 连接...')
-      console.log('[App] 使用完整提示词:', SYSTEM_PROMPT.substring(0, 100) + '...')
-      try {
-        // 使用完整的测试提示词（包含详细施测指导语）
-        await realtimeDialog.connect(SYSTEM_PROMPT, 'alloy')
-        console.log('[App] WebRTC 连接已建立')
-      } catch (error) {
-        console.error('[App] WebRTC 连接失败:', error)
-      }
     }
   }
 }, { immediate: false })

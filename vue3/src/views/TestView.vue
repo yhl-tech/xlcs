@@ -383,12 +383,39 @@ async function handleNextPlate() {
   // 结束当前图版的追踪（会自动保存未完成的画笔轨迹）
   tracker.stopTracking(testStore.currentPlate)
   
-  if (testStore.isTestComplete) {
-    // 记录进入选择阶段的时间
+  // 检查是否是最后一张图（索引 9，即第 10 张）
+  const isLastPlate = testStore.currentPlate >= 9
+  console.log('[TestView] handleNextPlate - currentPlate:', testStore.currentPlate, 'isLastPlate:', isLastPlate)
+  
+  if (isLastPlate) {
+    // 最后一张图完成后，进入后测问卷
+    console.log('[TestView] 最后一张图完成，进入后测问卷')
+    
+    // 检查当前录音状态
+    const recordingStatus = dialog.getMixedRecordingStatus()
+    console.log('[TestView] 切换前录音状态:', JSON.stringify(recordingStatus))
+    
+    // 如果录音未启动，尝试启动
+    if (!recordingStatus.isRecording && recordingStatus.chunksCount === 0) {
+      console.warn('[TestView] ⚠️ 录音未启动或无数据，尝试重新启动录音')
+      try {
+        await dialog.startMixedRecording()
+        console.log('[TestView] ✓ 录音已重新启动')
+      } catch (err) {
+        console.error('[TestView] ✗ 重新启动录音失败:', err)
+      }
+    }
+    
     tracker.recordSelectPhase()
     testStore.setPhase('postTest')
-    // 开始后测语音对话
-    startVoiceDialog()
+    // 注意：不要在这里再次调用 startVoiceDialog，避免清空录音数据
+    // 只更新会话的系统提示词
+    if (dialog.isConnected.value) {
+      console.log('[TestView] WebRTC 已连接，更新提示词为后测提示词')
+      dialog.updateSession({
+        systemPrompt: POSTTEST_PROMPT
+      })
+    }
   } else {
     testStore.nextPlate()
     uiStore.setBackgroundTheme(testStore.currentPlate)
@@ -476,10 +503,14 @@ async function startVoiceDialog() {
     
     // 开始混合录音（麦克风 + AI 回复）
     try {
+      console.log('[TestView] 正在启动混合录音...')
+      console.log('[TestView] - WebRTC 连接状态:', dialog.isConnected.value)
       await dialog.startMixedRecording()
-      console.log('[TestView] 混合录音已启动')
+      const status = dialog.getMixedRecordingStatus()
+      console.log('[TestView] ✓ 混合录音已启动:', status)
     } catch (error) {
-      console.warn('[TestView] 启动混合录音失败:', error)
+      console.error('[TestView] ✗ 启动混合录音失败:', error)
+      console.error('[TestView] - 错误详情:', error.message)
     }
     
     dialog.setCallbacks({

@@ -2,59 +2,61 @@
  * 交互追踪
  * 记录用户的缩放、旋转、绘画等交互数据
  * 参考原始 script/interactionTracker.js 实现
+ * 
+ * 单例模式：所有组件共享同一个追踪实例
  */
 import { ref, reactive } from 'vue'
 
-export function useInteractionTracker() {
-  // ==================== 核心数据结构 ====================
-  
-  // 交互数据 - 与原始格式完全一致
-  const data = reactive({
-    zoom: {},           // 放大缩小操作: { "1": [1, 1, -1], "2": [], ... }
-    rotate: {},         // 旋转操作: { "1": [30, -30], "2": [], ... }
-    navigation: {},     // 导航操作: { "1": ["prev"], "2": ["next"], ... }
-    drawingTracks: {}   // 画笔轨迹: { "1": { "0": [{"coords": [y,x,y,x], "color": "red", "time": "00:07"}] }, ... }
-  })
-  
-  // 时间戳追踪 - 记录每个图版的起始时间
-  const timestamps = reactive({
-    start: null,     // 测试开始时间
-    plates: {},      // 图版时间戳: { "1": timestamp, "2": timestamp, ... }
-    select: null,    // 进入选择阶段时间
-    stop: null       // 测试结束时间
-  })
-  
-  // 当前绘制的轨迹状态
-  const currentTrack = ref(null)         // 当前轨迹的线段数组
-  const currentTrackStartTime = ref(null) // 当前轨迹开始时间
-  const currentTrackPlateKey = ref(null)  // 当前轨迹所属的图版键
-  const currentTrackColor = ref(null)     // 当前轨迹的颜色
-  const lastDrawingPoint = ref(null)      // 上一个绘制点 { x, y }
-  const strokeCountByPlate = reactive({}) // 每个图版的笔画计数 { "1": 0, "2": 1, ... }
-  
-  // 状态管理
-  const status = ref('idle') // 'idle' | 'active' | 'paused' | 'stopped'
-  const testStartTime = ref(null)
-  const currentPlateIndex = ref(null)
-  const isTracking = ref(false)
-  
-  // ==================== 初始化 ====================
-  
-  /**
-   * 初始化数据结构 - 为10个图版创建空数组
-   */
-  function initializeDataStructure() {
-    for (let i = 1; i <= 10; i++) {
-      const plateKey = String(i)
-      data.zoom[plateKey] = []
-      data.rotate[plateKey] = []
-      data.navigation[plateKey] = []
-      data.drawingTracks[plateKey] = 0 // 初始化为0
-    }
+// ==================== 单例状态（所有组件共享） ====================
+
+// 交互数据 - 与原始格式完全一致
+const data = reactive({
+  zoom: {},           // 放大缩小操作: { "1": [1, 1, -1], "2": [], ... }
+  rotate: {},         // 旋转操作: { "1": [30, -30], "2": [], ... }
+  navigation: {},     // 导航操作: { "1": ["prev"], "2": ["next"], ... }
+  drawingTracks: {}   // 画笔轨迹: { "1": { "0": [{"coords": [y,x,y,x], "color": "red", "time": "00:07"}] }, ... }
+})
+
+// 时间戳追踪 - 记录每个图版的起始时间
+const timestamps = reactive({
+  start: null,     // 测试开始时间
+  plates: {},      // 图版时间戳: { "1": timestamp, "2": timestamp, ... }
+  select: null,    // 进入选择阶段时间
+  stop: null       // 测试结束时间
+})
+
+// 当前绘制的轨迹状态
+let currentTrack = ref(null)         // 当前轨迹的线段数组
+let currentTrackStartTime = ref(null) // 当前轨迹开始时间
+let currentTrackPlateKey = ref(null)  // 当前轨迹所属的图版键
+let currentTrackColor = ref(null)     // 当前轨迹的颜色
+let lastDrawingPoint = ref(null)      // 上一个绘制点 { x, y }
+const strokeCountByPlate = reactive({}) // 每个图版的笔画计数 { "1": 0, "2": 1, ... }
+
+// 状态管理
+const status = ref('idle') // 'idle' | 'active' | 'paused' | 'stopped'
+const testStartTime = ref(null)
+const currentPlateIndex = ref(null)
+const isTracking = ref(false)
+
+/**
+ * 初始化数据结构 - 为10个图版创建空数组
+ */
+function initializeDataStructure() {
+  for (let i = 1; i <= 10; i++) {
+    const plateKey = String(i)
+    if (!data.zoom[plateKey]) data.zoom[plateKey] = []
+    if (!data.rotate[plateKey]) data.rotate[plateKey] = []
+    if (!data.navigation[plateKey]) data.navigation[plateKey] = []
+    if (data.drawingTracks[plateKey] === undefined) data.drawingTracks[plateKey] = 0
   }
-  
-  // 初始化
-  initializeDataStructure()
+}
+
+// 首次加载时初始化
+initializeDataStructure()
+
+export function useInteractionTracker() {
+  // ==================== 返回单例状态和方法 ====================
   
   // ==================== 工具方法 ====================
   
@@ -107,7 +109,7 @@ export function useInteractionTracker() {
   // ==================== 追踪控制 ====================
   
   /**
-   * 开始追踪某个图版
+   * 开始追踪某个图版（进入测试页面时调用）
    */
   function startTracking(plateIndex) {
     // 如果有未完成的轨迹，先结束它
@@ -122,7 +124,6 @@ export function useInteractionTracker() {
     if (!testStartTime.value) {
       testStartTime.value = Date.now()
       timestamps.start = testStartTime.value
-      status.value = 'active'
     }
     
     const plateKey = String(plateIndex + 1)
@@ -136,15 +137,13 @@ export function useInteractionTracker() {
   }
   
   /**
-   * 结束追踪某个图版
+   * 结束追踪某个图版（切换图版时调用）
    */
   function stopTracking(plateIndex) {
     // 如果有未完成的轨迹，先结束它
     if (currentTrack.value) {
       trackDrawingEnd()
     }
-    
-    isTracking.value = false
     
     const plateKey = String(plateIndex + 1)
     console.log('[InteractionTracker] 结束追踪图版:', plateKey)
@@ -163,15 +162,15 @@ export function useInteractionTracker() {
   }
   
   /**
-   * 停止追踪
+   * 停止追踪（测试提交时调用）
    */
   function stop() {
     if (currentTrack.value) {
       trackDrawingEnd()
     }
-    status.value = 'stopped'
     timestamps.stop = Date.now()
     isTracking.value = false
+    console.log('[InteractionTracker] 停止追踪，记录结束时间')
   }
   
   // ==================== 缩放/旋转追踪 ====================
@@ -182,8 +181,6 @@ export function useInteractionTracker() {
    * @param {number} direction - 1表示放大，-1表示缩小
    */
   function trackZoom(plateIndex, direction) {
-    if (status.value !== 'active') return
-    
     const plateKey = String(plateIndex + 1)
     
     if (!data.zoom[plateKey]) {
@@ -192,7 +189,7 @@ export function useInteractionTracker() {
     
     data.zoom[plateKey].push(direction)
     
-    console.log('[InteractionTracker] 记录缩放:', { plateKey, direction, data: data.zoom[plateKey] })
+    console.log('[InteractionTracker] 记录缩放:', { plateKey, direction })
   }
   
   /**
@@ -201,8 +198,6 @@ export function useInteractionTracker() {
    * @param {number} angle - 旋转角度
    */
   function trackRotate(plateIndex, angle) {
-    if (status.value !== 'active') return
-    
     const plateKey = String(plateIndex + 1)
     
     if (!data.rotate[plateKey]) {
@@ -211,7 +206,7 @@ export function useInteractionTracker() {
     
     data.rotate[plateKey].push(angle)
     
-    console.log('[InteractionTracker] 记录旋转:', { plateKey, angle, data: data.rotate[plateKey] })
+    console.log('[InteractionTracker] 记录旋转:', { plateKey, angle })
   }
   
   // ==================== 画笔轨迹追踪 ====================
@@ -223,8 +218,6 @@ export function useInteractionTracker() {
    * @param {string} color - 画笔颜色
    */
   function trackDrawingStart(x, y, color = 'red') {
-    if (status.value !== 'active') return
-    
     const plateKey = getCurrentPlateKey()
     
     currentTrack.value = []
@@ -232,6 +225,8 @@ export function useInteractionTracker() {
     currentTrackPlateKey.value = plateKey
     currentTrackColor.value = color
     lastDrawingPoint.value = { x, y }
+    
+    console.log('[InteractionTracker] 开始画笔轨迹:', { plateKey, x, y, color })
   }
   
   /**
@@ -240,7 +235,8 @@ export function useInteractionTracker() {
    * @param {number} y - y坐标
    */
   function trackDrawingPoint(x, y) {
-    if (status.value !== 'active' || !currentTrack.value || !lastDrawingPoint.value) {
+    // 必须先调用 trackDrawingStart
+    if (!currentTrack.value || !lastDrawingPoint.value) {
       return
     }
     
@@ -266,7 +262,8 @@ export function useInteractionTracker() {
    * 结束追踪画笔轨迹
    */
   function trackDrawingEnd() {
-    if (status.value !== 'active' || !currentTrack.value) {
+    // 必须有当前轨迹才能结束
+    if (!currentTrack.value) {
       return
     }
     
@@ -429,7 +426,7 @@ export function useInteractionTracker() {
     
     // 转换时间戳数据（使用相对时间格式）
     const audioTimestamps = getAudioTimestamps()
-    Object.entries(timestamps.plates).forEach(([plateKey, timestamp]) => {
+    Object.entries(timestamps.plates).forEach(([plateKey]) => {
       segTime[plateKey] = audioTimestamps[plateKey] || '00:00'
     })
     segTime.start = audioTimestamps.start

@@ -31,8 +31,9 @@
       >
         <div class="ptf-card-image-wrapper">
           <img
-            :src="`/images/rorschach-blot-${i}.webp`"
+            :src="getImageSrc(i)"
             :alt="`Image ${i}`"
+            @error="handleImageError"
           >
         </div>
         <span class="ptf-card-label">图 {{ i }}</span>
@@ -66,6 +67,9 @@ const dialog = useRealtimeDialog()
 
 // 初始化答案为数组格式
 onMounted(() => {
+  console.log('[PostTestForm] 组件已挂载')
+  console.log('[PostTestForm] 可显示问题数:', displayableQuestions.value.length)
+  
   displayableQuestions.value.forEach(q => {
     answers[q.key] = []
   })
@@ -88,6 +92,22 @@ const currentQuestionText = computed(() => {
 const isLastQuestion = computed(() => {
   return currentQuestionIndex.value >= displayableQuestions.value.length - 1
 })
+
+// 获取图片路径
+function getImageSrc(imageNumber) {
+  // 使用相对路径，兼容不同的 base 配置
+  return `./images/rorschach-blot-${imageNumber}.webp`
+}
+
+// 图片加载失败处理
+function handleImageError(event) {
+  console.error('[PostTestForm] 图片加载失败:', event.target.src)
+  // 尝试使用绝对路径作为备选
+  const currentSrc = event.target.src
+  if (currentSrc.includes('./images/')) {
+    event.target.src = currentSrc.replace('./images/', '/images/')
+  }
+}
 
 // 图片是否被选中
 function isImageSelected(imageNumber) {

@@ -7,6 +7,7 @@
       :style="imageTransformStyle"
       class="rorschach-image"
       @load="handleImageLoad"
+      @error="handleImageLoadError"
       draggable="false"
     />
 
@@ -73,7 +74,8 @@ const isTransitioning = ref(false) // 是否正在切换
 
 // 计算属性 - 使用 displayedPlateIndex 而不是 props.plateIndex
 const currentImageSrc = computed(() => {
-  return `/images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
+  // 使用相对路径，兼容不同的 base 配置
+  return `./images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
 })
 
 // 图片变换样式 - 与原始 #rorschach-image 保持一致
@@ -184,6 +186,18 @@ function resizeCanvas() {
 
 function handleImageLoad() {
   resizeCanvas()
+}
+
+// 图片加载失败处理
+function handleImageLoadError(event) {
+  console.error('[ImageCanvas] 图片加载失败:', event.target.src)
+  // 尝试使用绝对路径作为备选
+  const currentSrc = event.target.src
+  if (currentSrc.includes('./images/')) {
+    const newSrc = currentSrc.replace('./images/', '/images/')
+    console.log('[ImageCanvas] 尝试备选路径:', newSrc)
+    event.target.src = newSrc
+  }
 }
 
 // 颜色映射（从 hex 到颜色名称）
