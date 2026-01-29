@@ -3,7 +3,7 @@
     <!-- 左侧 Logo 区域 -->
     <div class="header-left">
       <img 
-        src="/images/logo.png" 
+        :src="`${baseUrl}images/logo.png`" 
         alt="InnerScan" 
         class="header-logo"
       >
@@ -43,6 +43,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { stopAllAudios } from '@/utils/audioManager'
+
+// 获取 BASE_URL 用于资源路径
+const baseUrl = import.meta.env.BASE_URL
 
 defineProps({
   centerText: {

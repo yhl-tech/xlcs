@@ -95,18 +95,13 @@ const isLastQuestion = computed(() => {
 
 // 获取图片路径
 function getImageSrc(imageNumber) {
-  // 使用相对路径，兼容不同的 base 配置
-  return `./images/rorschach-blot-${imageNumber}.webp`
+  // 使用 BASE_URL 确保路径正确
+  return `${import.meta.env.BASE_URL}images/rorschach-blot-${imageNumber}.webp`
 }
 
 // 图片加载失败处理
 function handleImageError(event) {
   console.error('[PostTestForm] 图片加载失败:', event.target.src)
-  // 尝试使用绝对路径作为备选
-  const currentSrc = event.target.src
-  if (currentSrc.includes('./images/')) {
-    event.target.src = currentSrc.replace('./images/', '/images/')
-  }
 }
 
 // 图片是否被选中

@@ -74,8 +74,8 @@ const isTransitioning = ref(false) // 是否正在切换
 
 // 计算属性 - 使用 displayedPlateIndex 而不是 props.plateIndex
 const currentImageSrc = computed(() => {
-  // 使用相对路径，兼容不同的 base 配置
-  return `./images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
+  // 使用 BASE_URL 确保路径正确
+  return `${import.meta.env.BASE_URL}images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
 })
 
 // 图片变换样式 - 与原始 #rorschach-image 保持一致
@@ -111,7 +111,7 @@ function preloadImage(index) {
     const img = new Image()
     img.onload = () => resolve(true)
     img.onerror = () => resolve(false)
-    img.src = `/images/rorschach-blot-${index + 1}.webp`
+    img.src = `${import.meta.env.BASE_URL}images/rorschach-blot-${index + 1}.webp`
   })
 }
 
@@ -191,13 +191,6 @@ function handleImageLoad() {
 // 图片加载失败处理
 function handleImageLoadError(event) {
   console.error('[ImageCanvas] 图片加载失败:', event.target.src)
-  // 尝试使用绝对路径作为备选
-  const currentSrc = event.target.src
-  if (currentSrc.includes('./images/')) {
-    const newSrc = currentSrc.replace('./images/', '/images/')
-    console.log('[ImageCanvas] 尝试备选路径:', newSrc)
-    event.target.src = newSrc
-  }
 }
 
 // 颜色映射（从 hex 到颜色名称）

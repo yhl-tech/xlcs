@@ -89,7 +89,7 @@ export const useTestStore = defineStore('test', () => {
   
   // 当前图版图片路径
   const currentImageSrc = computed(() => {
-    return `/images/rorschach-blot-${currentPlateNumber.value}.webp`
+    return `${import.meta.env.BASE_URL}images/rorschach-blot-${currentPlateNumber.value}.webp`
   })
   
   // ==================== 方法 ====================

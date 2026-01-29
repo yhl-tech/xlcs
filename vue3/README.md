@@ -16,7 +16,7 @@
 | lamejs | 1.2.x | MP3 编码 |
 | Less | 4.5.x | CSS 预处理器 |
 
-## 项目结构
+## 项目结构（总计约 16,000+ 行代码）
 
 ```
 vue3/
@@ -24,63 +24,66 @@ vue3/
 │   ├── audio/                 # 音频文件（欢迎语、操作提示音等）
 │   └── images/                # 图片资源（墨迹图版、logo等）
 ├── src/
-│   ├── assets/               # 项目资源
-│   │   └── styles/           # 全局样式
-│   ├── components/           # 组件
-│   │   ├── common/           # 通用组件
-│   │   │   ├── AppHeader.vue       # 应用头部
-│   │   │   ├── BaseButton.vue      # 基础按钮
-│   │   │   ├── BaseModal.vue       # 基础弹窗
-│   │   │   ├── LoadingOverlay.vue  # 加载遮罩
-│   │   │   └── UserBar.vue         # 用户信息栏
-│   │   ├── effects/          # 特效组件
-│   │   │   ├── BlackHoleBackground.vue  # 黑洞背景动画
-│   │   │   ├── UploadingView.vue        # 上传进度视图
-│   │   │   └── WaitingReportView.vue    # 等待报告视图
-│   │   ├── forms/            # 表单组件
-│   │   │   ├── BasicInfoForm.vue   # 基本信息表单
-│   │   │   └── PostTestForm.vue    # 后测问卷表单
-│   │   ├── media/            # 媒体组件
-│   │   │   └── SubtitleDisplay.vue # 字幕显示
-│   │   └── test/             # 测试相关组件
-│   │       ├── ControlsBar.vue     # 控制栏
-│   │       ├── EnergyPillar.vue    # 能量柱进度
-│   │       ├── ImageCanvas.vue     # 图版画布
-│   │       └── IntroOverlay.vue    # 介绍覆盖层
-│   ├── composables/          # 组合式函数
-│   │   ├── useApi.js              # API 请求
-│   │   ├── useAudioRecorder.js    # 音频录制
-│   │   ├── useCanvas.js           # 画布操作
-│   │   ├── useDeviceCheck.js      # 设备检测
-│   │   ├── useGuide.js            # 新手引导
-│   │   ├── useImagePreloader.js   # 图片预加载
-│   │   ├── useInteractionTracker.js # 交互追踪
-│   │   ├── useRealtimeDialog.js   # WebRTC 实时对话
-│   │   ├── useSession.js          # 会话管理
-│   │   └── useSubtitle.js         # 字幕管理
-│   ├── router/               # 路由配置
-│   │   └── index.js
-│   ├── stores/               # Pinia 状态仓库
-│   │   ├── authStore.js      # 认证状态
-│   │   ├── sessionStore.js   # 会话状态
-│   │   ├── testStore.js      # 测试状态
-│   │   └── uiStore.js        # UI 状态
-│   ├── utils/                # 工具函数
-│   │   ├── audioManager.js   # 音频管理
-│   │   ├── constants.js      # 常量配置
-│   │   └── helpers.js        # 辅助函数
-│   ├── views/                # 页面视图
-│   │   ├── HomeView.vue      # 首页
-│   │   ├── IntroView.vue     # 测试说明页
-│   │   ├── LoginView.vue     # 登录页
-│   │   ├── PrepView.vue      # 测试准备页
-│   │   ├── ReportView.vue    # 报告页
-│   │   └── TestView.vue      # 测试页
-│   ├── App.vue               # 根组件
-│   └── main.js               # 入口文件
-├── index.html                # HTML 模板
-├── vite.config.js            # Vite 配置
-└── package.json              # 项目配置
+│   ├── assets/
+│   │   └── styles/
+│   │       ├── app.css                    # 2833 行 - 主样式
+│   │       ├── waiting-report.css         #  862 行 - 等待报告页样式
+│   │       ├── intro-preview-background.css #  800 行 - 介绍页背景样式
+│   │       └── question-progress.css      #  215 行 - 问题进度样式
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── AppHeader.vue              #  250 行 - 应用头部
+│   │   │   ├── BaseButton.vue             #  154 行 - 基础按钮
+│   │   │   ├── BaseModal.vue              #  213 行 - 基础弹窗
+│   │   │   ├── LoadingOverlay.vue         #   73 行 - 加载遮罩
+│   │   │   └── UserBar.vue                #  186 行 - 用户信息栏
+│   │   ├── effects/
+│   │   │   ├── BlackHoleBackground.vue    #  659 行 - 3D 黑洞背景动画
+│   │   │   ├── UploadingView.vue          # 1131 行 - 上传进度视图
+│   │   │   └── WaitingReportView.vue      #  903 行 - 等待报告视图
+│   │   ├── forms/
+│   │   │   ├── BasicInfoForm.vue          #  249 行 - 基本信息表单
+│   │   │   └── PostTestForm.vue           #  351 行 - 后测问卷（五个问题）
+│   │   ├── media/
+│   │   │   └── SubtitleDisplay.vue        #  127 行 - 字幕显示
+│   │   └── test/
+│   │       ├── ControlsBar.vue            #  311 行 - 测试控制栏
+│   │       ├── EnergyPillar.vue           #  114 行 - 能量柱进度
+│   │       ├── ImageCanvas.vue            #  466 行 - 墨迹图版画布
+│   │       └── IntroOverlay.vue           # 1046 行 - 测试介绍覆盖层
+│   ├── composables/
+│   │   ├── useApi.js                      #  643 行 - API 请求封装
+│   │   ├── useAudioRecorder.js            #  229 行 - 音频录制
+│   │   ├── useCanvas.js                   #  289 行 - 画布操作
+│   │   ├── useDeviceCheck.js              #  301 行 - 设备兼容性检测
+│   │   ├── useGuide.js                    #  250 行 - 新手引导
+│   │   ├── useImagePreloader.js           #  236 行 - 图片预加载
+│   │   ├── useInteractionTracker.js       #  544 行 - 用户交互追踪
+│   │   ├── useRealtimeDialog.js           #  834 行 - WebRTC 实时语音对话
+│   │   ├── useSession.js                  #  251 行 - 会话状态管理
+│   │   └── useSubtitle.js                 #  239 行 - 字幕管理
+│   ├── router/
+│   │   └── index.js                       #   99 行 - 路由配置
+│   ├── stores/
+│   │   ├── authStore.js                   #  151 行 - 认证状态
+│   │   ├── sessionStore.js                #  205 行 - 会话状态
+│   │   ├── testStore.js                   #  298 行 - 测试状态
+│   │   └── uiStore.js                     #  196 行 - UI 状态
+│   ├── utils/
+│   │   ├── audioManager.js                #   71 行 - 音频管理
+│   │   ├── constants.js                   #  247 行 - 常量配置
+│   │   └── helpers.js                     #  195 行 - 辅助函数
+│   ├── views/
+│   │   ├── HomeView.vue                   # 1171 行 - 首页
+│   │   ├── LoginView.vue                  #  889 行 - 登录页
+│   │   ├── PrepView.vue                   # 1051 行 - 测试准备页
+│   │   ├── ReportView.vue                 #  252 行 - 报告页
+│   │   └── TestView.vue                   #  928 行 - 测试主页面
+│   ├── App.vue                            #  111 行 - 根组件
+│   └── main.js                            #   55 行 - 入口文件
+├── index.html
+├── vite.config.js
+└── package.json
 ```
 
 ## 快速开始

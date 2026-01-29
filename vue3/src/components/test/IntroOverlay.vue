@@ -10,7 +10,7 @@
               <div class="test-preview-image-frame">
                 <img
                   ref="imageRef"
-                  src="/images/rorschach-blot-example.webp"
+                  :src="`${baseUrl}images/rorschach-blot-example.webp`"
                   alt="示例墨迹图"
                   class="intro-preview-image"
                   :style="imageTransform"
@@ -169,6 +169,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { stopAllAudios } from '@/utils/audioManager'
+
+// 获取 BASE_URL 用于资源路径
+const baseUrl = import.meta.env.BASE_URL
 
 const emit = defineEmits(['start'])
 

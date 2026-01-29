@@ -8,7 +8,7 @@
       <div class="logo-group">
         <div class="logo-wrapper">
           <div class="logo-glow"></div>
-          <img src="/images/logo.png" alt="InnerScan Logo" class="logo-img" />
+          <img :src="`${baseUrl}images/logo.png`" alt="InnerScan Logo" class="logo-img" />
         </div>
         <div class="logo-text">
           <div class="logo-title">
@@ -166,6 +166,9 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, shallowRef, markRaw } from 'vue'
+
+// 获取 BASE_URL 用于资源路径
+const baseUrl = import.meta.env.BASE_URL
 
 const canvasContainer = ref(null)
 

@@ -4,18 +4,21 @@
  */
 import { ref, computed } from 'vue'
 
+// 获取 BASE_URL 用于资源路径
+const baseUrl = import.meta.env.BASE_URL
+
 // 默认罗夏墨迹图列表
 const DEFAULT_IMAGES = [
-  '/images/rorschach-blot-1.webp',
-  '/images/rorschach-blot-2.webp',
-  '/images/rorschach-blot-3.webp',
-  '/images/rorschach-blot-4.webp',
-  '/images/rorschach-blot-5.webp',
-  '/images/rorschach-blot-6.webp',
-  '/images/rorschach-blot-7.webp',
-  '/images/rorschach-blot-8.webp',
-  '/images/rorschach-blot-9.webp',
-  '/images/rorschach-blot-10.webp'
+  `${baseUrl}images/rorschach-blot-1.webp`,
+  `${baseUrl}images/rorschach-blot-2.webp`,
+  `${baseUrl}images/rorschach-blot-3.webp`,
+  `${baseUrl}images/rorschach-blot-4.webp`,
+  `${baseUrl}images/rorschach-blot-5.webp`,
+  `${baseUrl}images/rorschach-blot-6.webp`,
+  `${baseUrl}images/rorschach-blot-7.webp`,
+  `${baseUrl}images/rorschach-blot-8.webp`,
+  `${baseUrl}images/rorschach-blot-9.webp`,
+  `${baseUrl}images/rorschach-blot-10.webp`
 ]
 
 export function useImagePreloader() {
