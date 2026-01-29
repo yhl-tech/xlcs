@@ -44,9 +44,9 @@ export const getWebSocketUrl = () => {
 // OpenAI 配置
 export const OPENAI_CONFIG = {
   // API Key - 从 localStorage 读取或使用环境变量
-  apiKey: typeof localStorage !== "undefined"
-    ? localStorage.getItem("openai_api_key")
-    : (import.meta.env?.VITE_OPENAI_API_KEY || ""),
+  apiKey: (typeof localStorage !== "undefined" && localStorage.getItem("openai_api_key"))
+    || (typeof import.meta !== "undefined" && import.meta.env?.VITE_OPENAI_API_KEY)
+    || "",
 
   // 模型配置
   model: "gpt-4o-realtime-preview-2024-12-17",

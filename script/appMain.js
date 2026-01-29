@@ -3174,30 +3174,40 @@ async function showPostTestView(options = {}) {
   // 初始化问题进度柱
   initQuestionProgressPillar()
 
-  // 重新建立 TTS 连接，使用后测阶段的提示词
+  // 动态更新提示词，无需重新连接
   console.log("[showPostTestView] 准备切换到后测阶段提示词")
   try {
     // 获取后测阶段的提示词
     const posttestPrompt = getPromptForPhase("posttest")
 
     if (posttestPrompt && window.dialogClient) {
-      // 断开当前连接
-      console.log("[showPostTestView] 断开当前 TTS 连接")
-      await window.dialogClient.disconnect()
+      if (window.dialogClient.isConnected) {
+        // 如果已连接，直接更新会话配置（不会中断录音）
+        console.log("[showPostTestView] 动态更新提示词（保持连接）")
+        const success = window.dialogClient.updateSession({
+          systemPrompt: posttestPrompt
+        })
 
-      // 等待连接完全关闭
-      await new Promise((resolve) => setTimeout(resolve, 200))
-
-      // 使用后测提示词重新建立连接
-      console.log("[showPostTestView] 使用后测提示词重新建立连接")
-      await window.dialogClient.connect(posttestPrompt, TTS.speaker, "posttest")
+        if (success) {
+          console.log("[showPostTestView] 提示词已更新")
+        } else {
+          console.warn("[showPostTestView] 提示词更新失败，尝试重新连接")
+          await window.dialogClient.disconnect()
+          await new Promise((resolve) => setTimeout(resolve, 200))
+          await window.dialogClient.connect(posttestPrompt, TTS.speaker, "posttest")
+        }
+      } else {
+        // 如果未连接，建立新连接
+        console.log("[showPostTestView] 建立新连接")
+        await window.dialogClient.connect(posttestPrompt, TTS.speaker, "posttest")
+      }
 
       // 更新 TTS 状态
       TTS.inited = true
       TTS.currentMode = "audio"
       TTS.currentPhase = "posttest"
 
-      console.log("[showPostTestView] 后测阶段 TTS 连接已建立")
+      console.log("[showPostTestView] 后测阶段提示词已设置")
     }
   } catch (error) {
     console.error("[showPostTestView] 切换后测提示词失败:", error)

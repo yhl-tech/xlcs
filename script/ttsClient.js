@@ -371,6 +371,39 @@ import { getOpenAIConfig } from "./config.js"
       }
     }
 
+    // 动态更新会话配置（提示词、语音等）
+    updateSession(options = {}) {
+      if (!this.isConnected) {
+        console.warn("[Dialog] 未连接，无法更新会话")
+        return false
+      }
+
+      const sessionConfig = {}
+
+      if (options.systemPrompt !== undefined) {
+        sessionConfig.instructions = options.systemPrompt
+      }
+
+      if (options.speaker !== undefined) {
+        sessionConfig.voice = options.speaker
+      }
+
+      if (options.turnDetection !== undefined) {
+        sessionConfig.turn_detection = options.turnDetection
+      }
+
+      const success = this.sendEvent({
+        type: "session.update",
+        session: sessionConfig
+      })
+
+      if (success) {
+        console.log("[Dialog] 会话配置已更新:", Object.keys(sessionConfig))
+      }
+
+      return success
+    }
+
     async disconnect() {
       this.isConnected = false
 
@@ -543,6 +576,64 @@ import { getOpenAIConfig } from "./config.js"
       return {
         isRecording: this.isMixedRecording,
         chunksCount: this.mixedAudioChunks.length
+      }
+    }
+
+    // 将 WebM Blob 转换为 MP3 Blob
+    async convertWebMToMP3(webmBlob) {
+      try {
+        console.log('[Dialog] 开始转换 WebM 到 MP3')
+
+        // 1. 读取并解码 WebM
+        const arrayBuffer = await webmBlob.arrayBuffer()
+        const audioContext = this.audioContext || new AudioContext({ sampleRate: 24000 })
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+
+        // 2. 提取并转换 PCM 数据
+        const float32Data = audioBuffer.getChannelData(0)
+        const sampleRate = audioBuffer.sampleRate
+        const int16Data = new Int16Array(float32Data.length)
+
+        for (let i = 0; i < float32Data.length; i++) {
+          const s = Math.max(-1, Math.min(1, float32Data[i]))
+          int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+        }
+
+        // 3. 使用 lamejs 编码为 MP3
+        const Lame = typeof lamejs !== 'undefined' ? lamejs : window.lamejs
+        if (!Lame) {
+          throw new Error('lamejs 库未加载')
+        }
+
+        const mp3encoder = new Lame.Mp3Encoder(1, sampleRate, 128)
+        const sampleBlockSize = 1152
+        const mp3Data = []
+
+        for (let i = 0; i < int16Data.length; i += sampleBlockSize) {
+          const sampleChunk = int16Data.subarray(
+            i,
+            Math.min(i + sampleBlockSize, int16Data.length)
+          )
+          const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
+          if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf))
+          }
+        }
+
+        const mp3buf = mp3encoder.flush()
+        if (mp3buf.length > 0) {
+          mp3Data.push(new Int8Array(mp3buf))
+        }
+
+        // 4. 创建 MP3 Blob
+        const mp3Blob = new Blob(mp3Data, { type: 'audio/mpeg' })
+        console.log('[Dialog] MP3 转换完成，大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
+
+        return mp3Blob
+
+      } catch (error) {
+        console.error('[Dialog] WebM 转 MP3 失败:', error)
+        throw new Error(`WebM 转 MP3 失败: ${error.message}`)
       }
     }
   }
