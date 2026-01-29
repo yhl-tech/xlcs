@@ -1,0 +1,694 @@
+<template>
+  <div class="test-view">
+    <!-- 黑洞背景 -->
+    <BlackHoleBackground :enabled="true" :theme="uiStore.backgroundTheme" :z-index="0" />
+    
+    <!-- 正式测试阶段 -->
+    <div v-if="testStore.phase === 'test'" class="test-screen">
+      <!-- 图版展示区域 -->
+      <div class="image-container" id="image-container">
+        <ImageCanvas
+          ref="imageCanvasRef"
+          :plate-index="testStore.currentPlate"
+          :brush-color="brushColor"
+          @drawing-complete="handleDrawingComplete"
+          @drawing-start="handleDrawingStart"
+          @drawing-move="handleDrawingMove"
+          @drawing-end="handleDrawingEnd"
+        />
+      </div>
+
+      <!-- 能量柱 -->
+      <EnergyPillar :progress="testStore.progress" />
+
+      <!-- 字幕区域 -->
+      <div v-if="showSubtitles" class="subtitle-container">
+        <div class="subtitle-content">
+          <div class="subtitle-text" :class="subtitleClass">
+            {{ currentSubtitle }}
+            <span v-if="isSubtitleTyping" class="typing-cursor"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 控制栏 -->
+      <ControlsBar
+        :current-plate="testStore.currentPlate + 1"
+        :total-plates="10"
+        :min-view-time="1"
+        @tool-change="handleToolChange"
+        @color-change="handleColorChange"
+        @zoom-in="handleZoomIn"
+        @zoom-out="handleZoomOut"
+        @rotate-left="handleRotateLeft"
+        @rotate-right="handleRotateRight"
+        @next="handleNextPlate"
+        @previous="handlePreviousPlate"
+        @clear-all="handleClearAll"
+      />
+    </div>
+
+    <!-- 后测问卷阶段 -->
+    <div v-else-if="testStore.phase === 'postTest'" class="post-test-screen">
+      <PostTestForm @submit="handlePostTestSubmit" />
+    </div>
+
+    <!-- 汇总阶段 -->
+    <div v-else-if="testStore.phase === 'summary'" class="summary-screen">
+      <div class="summary-card">
+        <h2>测试完成</h2>
+        <p>您已完成所有测试内容，报告正在生成中...</p>
+        <BaseButton variant="primary" @click="handleSubmit">
+          提交并生成报告
+        </BaseButton>
+      </div>
+    </div>
+
+    <!-- 等待报告阶段 -->
+    <div v-else-if="testStore.phase === 'waiting'" class="waiting-screen">
+      <WaitingReportView :session-id="testStore.sessionId" />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useTestStore } from '@/stores/testStore'
+import { useSessionStore } from '@/stores/sessionStore'
+import { useUiStore } from '@/stores/uiStore'
+import { useAuthStore } from '@/stores/authStore'
+import BaseButton from '@/components/common/BaseButton.vue'
+import ImageCanvas from '@/components/test/ImageCanvas.vue'
+import ControlsBar from '@/components/test/ControlsBar.vue'
+import EnergyPillar from '@/components/test/EnergyPillar.vue'
+import PostTestForm from '@/components/forms/PostTestForm.vue'
+import WaitingReportView from '@/components/effects/WaitingReportView.vue'
+import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
+
+// Composables
+import { useSession } from '@/composables/useSession'
+import { useInteractionTracker } from '@/composables/useInteractionTracker'
+import { useImagePreloader } from '@/composables/useImagePreloader'
+import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
+import { useAudioRecorder } from '@/composables/useAudioRecorder'
+import { useSubtitle } from '@/composables/useSubtitle'
+import { useGuide } from '@/composables/useGuide'
+import { useApi } from '@/composables/useApi'
+import { POSTTEST_PROMPT } from '@/utils/constants'
+import { stopAllAudios } from '@/utils/audioManager'
+
+const router = useRouter()
+const testStore = useTestStore()
+const sessionStore = useSessionStore()
+const uiStore = useUiStore()
+const authStore = useAuthStore()
+
+// 初始化 composables
+const session = useSession()
+const tracker = useInteractionTracker()
+const imagePreloader = useImagePreloader()
+// 使用全局 WebRTC 单例（连接由 App.vue 自动管理）
+const dialog = useRealtimeDialog()
+const audioRecorder = useAudioRecorder()
+const subtitle = useSubtitle()
+const guide = useGuide()
+const api = useApi()
+
+const imageCanvasRef = ref(null)
+const showSubtitles = ref(false)
+const currentSubtitle = ref('')
+const isSubtitleTyping = ref(false)
+const subtitleSpeaker = ref('assistant')
+const showRestoreDialog = ref(false)
+const brushColor = ref('#ef4444') // 默认红色
+const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
+
+// TTS 播报提示词（让 AI 只朗读不添加额外解释）
+const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
+
+// 构建 TTS 播报查询文本
+function buildTTSQuery(text) {
+  return `${TTS_READ_ONLY_PROMPT}\n${text}`
+}
+
+// 发送 TTS 播报
+async function sendTTSBroadcast(text) {
+  if (!dialog.isConnected.value) {
+    console.warn('[TestView] WebRTC 未连接，无法播报')
+    return false
+  }
+  
+  try {
+    const ttsQuery = buildTTSQuery(text)
+    console.log('[TestView] 发送 TTS 播报:', text)
+    dialog.sendTextMessage(ttsQuery)
+    
+    // 显示字幕
+    showSubtitles.value = true
+    currentSubtitle.value = text
+    subtitleSpeaker.value = 'assistant'
+    
+    return true
+  } catch (error) {
+    console.warn('[TestView] TTS 播报失败:', error)
+    return false
+  }
+}
+
+// 颜色映射
+const colorMap = {
+  red: '#ef4444',
+  green: '#10b981',
+  blue: '#3b82f6',
+  white: '#ffffff'
+}
+
+// 字幕样式类
+const subtitleClass = computed(() => {
+  return subtitleSpeaker.value === 'user' ? 'subtitle-user' : 'subtitle-assistant'
+})
+
+// 监听字幕变化
+watch(() => subtitle.currentText.value, (text) => {
+  currentSubtitle.value = text
+  showSubtitles.value = subtitle.isVisible.value
+  isSubtitleTyping.value = subtitle.isTyping?.value || false
+})
+
+// 监听对话转录
+watch(() => dialog.transcripts, (transcripts) => {
+  if (transcripts.length > 0) {
+    const latest = transcripts[transcripts.length - 1]
+    subtitleSpeaker.value = latest.speaker || 'assistant'
+    subtitle.show(latest.text, latest.speaker)
+    testStore.addDialogEntry(latest)
+  }
+}, { deep: true })
+
+onMounted(async () => {
+  console.log('[TestView] 组件已挂载，当前阶段:', testStore.phase)
+  
+  // 停止所有之前的音频播放（来自准备页面或说明页面）
+  stopAllAudios()
+  
+  // 如果不是测试阶段，重定向
+  if (testStore.phase !== 'test' && testStore.phase !== 'postTest' && testStore.phase !== 'summary' && testStore.phase !== 'waiting') {
+    console.log('[TestView] 当前阶段不是测试阶段，重定向到准备页面')
+    router.push('/prep')
+    return
+  }
+
+  console.log('[TestView] 当前阶段:', testStore.phase)
+
+  // 预加载图片
+  uiStore.showLoading('正在加载测试资源...')
+  try {
+    await imagePreloader.preloadRorschachImages({
+      onProgress: (loaded, total, percent) => {
+        uiStore.loadingMessage = `加载图片 ${loaded}/${total} (${percent}%)`
+      }
+    })
+  } catch (error) {
+    console.error('图片预加载失败:', error)
+  } finally {
+    uiStore.hideLoading()
+  }
+
+  // 初始化会话管理
+  const pendingSession = session.init()
+  if (pendingSession) {
+    showRestoreDialog.value = true
+  }
+
+  // 如果是测试阶段，确保追踪已开始
+  if (testStore.phase === 'test') {
+    console.log('[TestView] 测试阶段，确保追踪已启动')
+    
+    // 设置背景主题
+    uiStore.setBackgroundTheme(testStore.currentPlate)
+    
+    // 如果还没有追踪，开始追踪当前图版
+    if (!tracker.isTracking.value) {
+      console.log('[TestView] 开始追踪图版:', testStore.currentPlate)
+      tracker.startTracking(testStore.currentPlate)
+    }
+    
+    // 显示新手引导
+    if (!guide.checkHasShown()) {
+      setTimeout(() => {
+        guide.showTestGuide()
+      }, 1000)
+    }
+    
+    // 播放开场白（仅第一次进入时）
+    if (!hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
+      hasPlayedOpeningSpeech.value = true
+      // 延迟播放，等待 WebRTC 连接完成
+      setTimeout(async () => {
+        if (dialog.isConnected.value) {
+          const openingText = '这是第一张墨迹图片，你可以看到一些什么？'
+          console.log('[TestView] 播放开场白:', openingText)
+          await sendTTSBroadcast(openingText)
+        } else {
+          console.log('[TestView] WebRTC 未连接，等待连接后播放开场白')
+          // 监听连接状态
+          const checkConnection = setInterval(() => {
+            if (dialog.isConnected.value) {
+              clearInterval(checkConnection)
+              const openingText = '这是第一张墨迹图片，你可以看到一些什么？'
+              console.log('[TestView] WebRTC 已连接，播放开场白:', openingText)
+              sendTTSBroadcast(openingText)
+            }
+          }, 500)
+          // 10 秒后停止检查
+          setTimeout(() => clearInterval(checkConnection), 10000)
+        }
+      }, 1500)
+    }
+  }
+})
+
+onUnmounted(() => {
+  // 清理
+  session.destroy()
+  // 注意：不断开 WebRTC 连接，因为它是全局单例，由 App.vue 管理
+  tracker.resetInteractionData()
+})
+
+// 开始测试
+function handleStartTest() {
+  console.log('[TestView] handleStartTest 被调用')
+  
+  // 如果测试还未初始化，先初始化
+  if (!testStore.sessionId) {
+    console.log('[TestView] 测试未初始化，先初始化')
+    testStore.startTest()
+  }
+  
+  uiStore.setBackgroundTheme(testStore.currentPlate)
+  
+  // 开始追踪第一张图版
+  if (!tracker.isTracking.value) {
+    tracker.startTracking(testStore.currentPlate)
+  }
+  
+  // 显示新手引导
+  if (!guide.checkHasShown()) {
+    setTimeout(() => {
+      guide.showTestGuide()
+    }, 500)
+  }
+}
+
+// 绘图完成
+function handleDrawingComplete(data) {
+  testStore.recordInteraction('drawingTracks', testStore.currentPlate, data)
+}
+
+// 画笔追踪 - 开始绘制
+function handleDrawingStart({ x, y, color }) {
+  tracker.trackDrawingStart(x, y, color)
+}
+
+// 画笔追踪 - 绘制移动
+function handleDrawingMove({ x, y }) {
+  tracker.trackDrawingPoint(x, y)
+}
+
+// 画笔追踪 - 结束绘制
+function handleDrawingEnd() {
+  tracker.trackDrawingEnd()
+}
+
+// 工具切换
+function handleToolChange(tool) {
+  imageCanvasRef.value?.setTool(tool)
+}
+
+// 颜色切换
+function handleColorChange(color) {
+  brushColor.value = colorMap[color] || '#ef4444'
+  imageCanvasRef.value?.setBrushColor(brushColor.value)
+}
+
+// 缩放
+function handleZoomIn() {
+  imageCanvasRef.value?.zoomIn()
+  tracker.trackZoom(testStore.currentPlate, 1)
+  testStore.markZoomUsed()
+}
+
+function handleZoomOut() {
+  imageCanvasRef.value?.zoomOut()
+  tracker.trackZoom(testStore.currentPlate, -1)
+  testStore.markZoomUsed()
+}
+
+// 旋转
+function handleRotateLeft() {
+  imageCanvasRef.value?.rotateLeft()
+  tracker.trackRotate(testStore.currentPlate, -90)
+}
+
+function handleRotateRight() {
+  imageCanvasRef.value?.rotateRight()
+  tracker.trackRotate(testStore.currentPlate, 90)
+}
+
+// 一键擦除
+function handleClearAll() {
+  imageCanvasRef.value?.clearCanvas()
+}
+
+// 下一张图版
+async function handleNextPlate() {
+  // 结束当前图版的追踪（会自动保存未完成的画笔轨迹）
+  tracker.stopTracking(testStore.currentPlate)
+  
+  if (testStore.isTestComplete) {
+    // 记录进入选择阶段的时间
+    tracker.recordSelectPhase()
+    testStore.setPhase('postTest')
+    // 开始后测语音对话
+    startVoiceDialog()
+  } else {
+    testStore.nextPlate()
+    uiStore.setBackgroundTheme(testStore.currentPlate)
+    imageCanvasRef.value?.resetTransform()
+    
+    // 开始追踪新图版
+    tracker.startTracking(testStore.currentPlate)
+    
+    // 播报当前图片的提示语音
+    try {
+      const promptText = '这张图你可以看到什么？'
+      console.log('[TestView] 切换图片，播报提示:', promptText)
+      await sendTTSBroadcast(promptText)
+    } catch (err) {
+      console.warn('[TestView] 播报提示失败:', err)
+    }
+  }
+  session.saveSnapshot('next_plate')
+}
+
+// 上一张图版
+function handlePreviousPlate() {
+  testStore.previousPlate()
+  uiStore.setBackgroundTheme(testStore.currentPlate)
+}
+
+// 后测问卷提交
+async function handlePostTestSubmit(answers) {
+  // 停止语音对话
+  await stopVoiceDialog()
+  
+  Object.entries(answers).forEach(([key, value]) => {
+    testStore.setPostTestAnswer(key, value)
+  })
+  testStore.setPhase('summary')
+  session.saveSnapshot('posttest_complete')
+}
+
+// 恢复会话
+function handleRestoreSession() {
+  session.restoreSession()
+  showRestoreDialog.value = false
+}
+
+// 放弃恢复会话
+function handleDiscardSession() {
+  session.clearSnapshot()
+  showRestoreDialog.value = false
+}
+
+// 开始语音对话
+async function startVoiceDialog() {
+  try {
+    // 如果尚未连接，先建立连接
+    if (!dialog.isConnected.value && !dialog.isConnecting.value) {
+      console.log('[TestView] WebRTC 未连接，正在建立连接...')
+      await dialog.connect(POSTTEST_PROMPT, 'alloy')
+    } else if (dialog.isConnected.value) {
+      // 如果已连接，更新 session 指令
+      console.log('[TestView] WebRTC 已连接，更新 session 配置...')
+      await dialog.updateSession({
+        instructions: POSTTEST_PROMPT
+      })
+    }
+    
+    audioRecorder.start()
+    dialog.setCallbacks({
+      onTranscript: (transcript) => {
+        subtitle.show(transcript.text, transcript.speaker)
+      }
+    })
+  } catch (error) {
+    console.error('语音对话启动失败:', error)
+    uiStore.showError('语音对话启动失败，请检查麦克风权限')
+  }
+}
+
+// 结束语音对话
+async function stopVoiceDialog() {
+  audioRecorder.stop()
+  // 不断开连接，只是停止录音
+  console.log('[TestView] 停止语音对话（保持连接）')
+}
+
+// 提交测试
+async function handleSubmit() {
+  uiStore.showLoading('正在提交测试数据...')
+  
+  try {
+    // 获取用户ID（优先使用 username，与原始代码一致）
+    const userId = authStore.userInfo?.username || authStore.userInfo?.phone || authStore.userId
+    console.log('[TestView] 开始提交测试数据，用户ID:', userId)
+    
+    // 停止追踪并记录结束时间
+    tracker.stop()
+    
+    // 获取交互数据
+    const interactionData = tracker.formatForUpload()
+    
+    // 打印完整统计数据
+    tracker.printAllPlatesStatistics()
+    
+    // 格式化当前时间
+    const now = new Date()
+    const testTime = now.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).replace(/\//g, '-')
+    
+    // 1. 上传基本信息（转换为中文字段名，确保年龄是字符串）
+    uiStore.loadingMessage = '正在上传基本信息...'
+    const basicInfoChinese = {
+      性别: testStore.basicInfo.sex,
+      年龄: String(testStore.basicInfo.age),
+      学历: testStore.basicInfo.education,
+      职业: testStore.basicInfo.occupation,
+      当前心情: testStore.basicInfo.mood,
+      测试时间: testTime
+    }
+    await api.setBasicInfo(userId, basicInfoChinese)
+    console.log('[TestView] 基本信息已上传')
+    
+    // 2. 上传缩放数据（scale.json）
+    uiStore.loadingMessage = '正在上传缩放数据...'
+    await api.uploadZoom(interactionData.zoom, userId)
+    console.log('[TestView] 缩放数据已上传')
+    
+    // 3. 上传旋转数据（rotate.json）
+    uiStore.loadingMessage = '正在上传旋转数据...'
+    await api.uploadRotate(interactionData.rotate, userId)
+    console.log('[TestView] 旋转数据已上传')
+    
+    // 4. 上传笔迹轨迹数据（drawing_tracks.json）
+    uiStore.loadingMessage = '正在上传绘画轨迹...'
+    // 获取画布尺寸
+    const canvasSize = imageCanvasRef.value ? 
+      [imageCanvasRef.value.$el?.clientHeight || 0, imageCanvasRef.value.$el?.clientWidth || 0] : 
+      [0, 0]
+    await api.uploadDrawingTracks(interactionData.drawingTracks, userId, canvasSize)
+    console.log('[TestView] 绘画轨迹已上传')
+    
+    // 5. 上传时间戳数据（video_clip.json）
+    uiStore.loadingMessage = '正在上传时间数据...'
+    const audioTimestamps = tracker.getAudioTimestamps()
+    await api.uploadSegTime(audioTimestamps, userId)
+    console.log('[TestView] 时间戳数据已上传')
+    
+    // 6. 上传后测问题答案（5_questions.json）
+    uiStore.loadingMessage = '正在上传问卷答案...'
+    await api.upload5Questions(testStore.postTestAnswers, userId)
+    console.log('[TestView] 问卷答案已上传')
+    
+    // 7. 上传音频（如果有）
+    try {
+      if (audioRecorder.status.value && audioRecorder.status.value.bufferCount > 0) {
+        uiStore.loadingMessage = '正在上传音频...'
+        const audioBlob = await audioRecorder.exportMP3()
+        await api.uploadMedia(audioBlob, userId)
+        console.log('[TestView] 音频已上传')
+      }
+    } catch (audioError) {
+      console.warn('[TestView] 音频上传失败:', audioError)
+    }
+    
+    // 8. 触发分析
+    uiStore.loadingMessage = '正在启动分析...'
+    await api.analyzeTest(userId)
+    console.log('[TestView] 分析已启动')
+    
+    // 标记完成
+    session.markCompleted()
+    
+    // 进入等待报告阶段
+    testStore.setPhase('waiting')
+  } catch (error) {
+    uiStore.showError('提交失败，请重试')
+    console.error('Submit error:', error)
+  } finally {
+    uiStore.hideLoading()
+  }
+}
+</script>
+
+<style lang="less" scoped>
+.test-view {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.test-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+// 图片容器 - 继承自 ImageCanvas 组件
+.image-container {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+// 字幕样式
+.subtitle-container {
+  position: relative;
+  width: 100%;
+  min-height: 50px;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 20px;
+}
+
+.subtitle-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.subtitle-text {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  border-radius: 20px;
+  min-height: 20px;
+  word-wrap: break-word;
+  word-break: break-all;
+  transition: all 0.25s ease;
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  min-height: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: blink 1s infinite;
+  margin-left: 3px;
+  vertical-align: middle;
+  border-radius: 1px;
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.post-test-screen,
+.summary-screen,
+.waiting-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.summary-card {
+  background: rgba(30, 30, 50, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+
+  h2 {
+    color: white;
+    margin-bottom: 24px;
+  }
+
+  p {
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .image-container {
+    padding: 16px;
+    min-height: min(60vh, 400px);
+  }
+
+  .subtitle-container {
+    padding: 8px 12px;
+  }
+
+  .subtitle-text {
+    font-size: 12px;
+  }
+}
+</style>

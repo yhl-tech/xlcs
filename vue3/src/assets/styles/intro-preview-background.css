@@ -1,0 +1,800 @@
+/* 介绍页和预览窗口页背景样式 */
+/* 与测试页保持一致的粒子动画背景 */
+
+/* 确保主背景容器在信息填写页、介绍页和预览窗口页的样式与测试页一致 */
+#blackhole-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: #000;
+}
+
+/* 当信息填写页显示时，确保背景容器可见 */
+/* info-screen 和 app-window 是兄弟元素，背景容器在 body 下 */
+body:has(#info-screen[style*="display: flex"]) #blackhole-bg-container,
+body:has(#info-screen:not([style*="display: none"])) #blackhole-bg-container {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 0 !important;
+}
+
+/* 默认情况下（非测试模式），显示背景 */
+body:not(.test-mode) #blackhole-bg-container {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 0 !important;
+}
+
+/* 确保主背景容器在介绍页和预览窗口页的样式与测试页一致 */
+.app-window.intro-mode #blackhole-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: #000;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 当介绍页显示时，确保背景容器可见 */
+body:has(#intro-overlay[style*="display: flex"]) #blackhole-bg-container,
+body:has(#intro-overlay[style*="display: block"]) #blackhole-bg-container,
+.app-window.intro-mode #blackhole-bg-container {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 0 !important;
+}
+
+/* 介绍页样式调整 - 玻璃态效果，配合粒子动画背景 */
+#intro-overlay {
+  background: transparent !important;
+  position: relative;
+  z-index: 1;
+  /* 添加微妙的淡入动画 */
+  animation: fadeInIntro 0.8s ease-out;
+}
+
+@keyframes fadeInIntro {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 确保主背景容器在介绍页显示时可见 */
+#intro-overlay[style*="display: flex"],
+#intro-overlay[style*="display: block"] {
+  background: transparent !important;
+}
+
+/* info-screen 背景透明，以显示粒子动画 */
+#info-screen {
+  background: transparent !important;
+}
+
+/* 信息填写卡片样式 - 玻璃态效果，配合粒子动画背景 */
+.info-card {
+  /* 玻璃态效果：半透明深色背景 + 模糊 */
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* 微妙的边框光效 */
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  /* 添加渐变边框效果 */
+  position: relative;
+  overflow: hidden;
+}
+
+/* 信息卡片的渐变边框光效 */
+.info-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.6),
+    rgba(139, 92, 246, 0.6),
+    transparent
+  );
+  opacity: 0.8;
+  z-index: 1;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* 信息卡片标题样式 */
+.info-card h1 {
+  position: relative;
+  z-index: 2;
+  color: rgba(226, 232, 240, 0.95) !important;
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+/* 信息表单组样式 */
+.info-form-group {
+  position: relative;
+  z-index: 2;
+}
+
+.info-form-group label {
+  color: rgba(203, 213, 225, 0.9) !important;
+}
+
+/* 信息表单输入框和选择框样式 */
+.info-card input,
+.info-card select {
+  background: rgba(30, 41, 59, 0.6) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  color: rgba(226, 232, 240, 0.95) !important;
+  transition: all 0.2s ease;
+}
+
+.info-card input::placeholder {
+  color: rgba(148, 163, 184, 0.6) !important;
+}
+
+.info-card input:focus,
+.info-card select:focus {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(99, 102, 241, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2),
+    0 4px 12px rgba(99, 102, 241, 0.3) !important;
+  outline: none;
+}
+
+/* 信息表单选择框选项样式 */
+.info-card select option {
+  background: rgba(15, 23, 42, 0.95);
+  color: rgba(226, 232, 240, 0.95);
+}
+
+/* 开始测试按钮样式 */
+#start-test-btn,
+#resume-test-btn {
+  position: relative;
+  z-index: 2;
+  /* 渐变背景 */
+  background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  color: white !important;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+#start-test-btn:hover,
+#resume-test-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #4f46e5, #7c3aed) !important;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset !important;
+  transform: translateY(-2px);
+}
+
+#start-test-btn:active,
+#resume-test-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+}
+
+/* 错误消息样式 */
+.input-error-message {
+  color: rgba(248, 113, 113, 0.9) !important;
+  text-shadow: 0 0 5px rgba(248, 113, 113, 0.3);
+}
+
+/* title-bar 背景透明 */
+.title-bar {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* 欢迎文本容器样式调整 - 确保在可视窗口内显示 */
+#welcome-text-container {
+  max-height: 100vh;
+  overflow: hidden;
+  padding: 12px 10px !important;
+  box-sizing: border-box;
+}
+
+/* 欢迎文本容器卡片样式 - 玻璃态效果，配合粒子动画背景 */
+.welcome-card {
+  /* 玻璃态效果：半透明深色背景 + 模糊 */
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* 微妙的边框光效 */
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  /* 添加渐变边框效果 */
+  position: relative;
+  overflow: hidden;
+  /* 调整内边距，减少上下间距 */
+  padding: 12px 16px !important;
+  /* 减少元素间距 */
+  gap: 6px !important;
+  /* 确保不超出视口 */
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* 欢迎卡片的渐变边框光效 */
+.welcome-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.6),
+    rgba(139, 92, 246, 0.6),
+    transparent
+  );
+  opacity: 0.8;
+  z-index: 1;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* 欢迎卡片内容样式 */
+.welcome-badge {
+  position: relative;
+  z-index: 2;
+  /* 减少间距 */
+  margin-bottom: 0 !important;
+  gap: 12px !important;
+}
+
+.welcome-badge h2 {
+  color: rgba(226, 232, 240, 0.95) !important;
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+  margin: 0 !important;
+  font-size: 16px !important;
+}
+
+.welcome-label {
+  color: rgba(147, 197, 253, 0.9) !important;
+  margin-bottom: 2px !important;
+}
+
+.welcome-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.8),
+    rgba(99, 102, 241, 0.8)
+  ) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 24px !important;
+}
+
+/* 欢迎介绍文本样式 */
+.welcome-intro {
+  position: relative;
+  z-index: 2;
+  background: rgba(30, 41, 59, 0.6) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  color: rgba(226, 232, 240, 0.9) !important;
+  /* 减少内边距和间距 */
+  padding: 8px 10px !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* 欢迎列表样式 */
+.welcome-list {
+  position: relative;
+  z-index: 2;
+  /* 减少列表间距 */
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* 允许滚动（如果需要） */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.welcome-list li {
+  background: rgba(30, 41, 59, 0.5) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.2s ease;
+  /* 减少内边距 */
+  padding: 5px 8px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  flex-shrink: 0;
+}
+
+.welcome-list li:hover {
+  background: rgba(30, 41, 59, 0.7) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+}
+
+.welcome-dot {
+  background: rgba(99, 102, 241, 0.8) !important;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  width: 7px !important;
+  height: 7px !important;
+  margin-top: 5px !important;
+}
+
+/* 设备检测容器样式 */
+.device-check {
+  position: relative;
+  z-index: 2;
+  background: rgba(30, 41, 59, 0.6) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  /* 减少内边距和间距 */
+  padding: 10px 12px !important;
+  margin-top: 4px !important;
+  flex-shrink: 0;
+}
+
+.device-check-header {
+  color: rgba(226, 232, 240, 0.95) !important;
+  gap: 10px !important;
+  margin-bottom: 6px !important;
+}
+
+.device-check-title {
+  color: rgba(147, 197, 253, 0.9) !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+
+.device-check-tip {
+  color: rgba(203, 213, 225, 0.9) !important;
+  font-size: 12px !important;
+  margin: 2px 0 0 0 !important;
+}
+
+.device-check-desc {
+  color: rgba(203, 213, 225, 0.8) !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  margin: 6px 0 8px 0 !important;
+}
+
+.device-check-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.8),
+    rgba(99, 102, 241, 0.8)
+  ) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 20px !important;
+}
+
+/* 设备检测按钮样式 */
+.device-check-actions {
+  gap: 8px !important;
+  margin-top: 8px !important;
+}
+
+.device-check-actions button {
+  background: rgba(30, 41, 59, 0.7) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  color: rgba(226, 232, 240, 0.9) !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  /* 减少按钮内边距 */
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+  min-width: auto !important;
+  flex: 1;
+}
+
+.device-check-actions button:hover {
+  background: rgba(51, 65, 85, 0.8) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+.device-check-actions button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 设备检测结果样式 */
+.device-check-result {
+  color: rgba(203, 213, 225, 0.9) !important;
+  background: rgba(30, 41, 59, 0.5) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 4px 12px !important;
+  font-size: 11px !important;
+  margin-top: 6px !important;
+}
+
+.device-check[data-status="error"] .device-check-result {
+  color: rgba(239, 68, 68, 0.95) !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+/* 预览窗口页样式调整 - 玻璃态效果，配合粒子动画背景 */
+.intro-preview-panel,
+.test-preview-panel {
+  position: relative;
+  z-index: 10;
+  /* 玻璃态效果：半透明背景 + 模糊 */
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* 微妙的边框光效 */
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* 添加微妙的渐变边框效果 */
+  position: relative;
+  overflow: hidden;
+}
+
+/* 预览面板的渐变边框光效 */
+.intro-preview-panel::before,
+.test-preview-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.6),
+    rgba(139, 92, 246, 0.6),
+    transparent
+  );
+  opacity: 0.8;
+  z-index: 1;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(100%);
+  }
+}
+
+/* 预览窗口内部容器样式 - 符合心理测试风格，减少边框 */
+.test-preview-window {
+  position: relative;
+  z-index: 1;
+  /* 内部容器使用更深的半透明背景 */
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  /* 移除边框，使用阴影代替 */
+  border: none !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 预览窗口主体样式 */
+.test-preview-body {
+  gap: 8px !important;
+}
+
+/* 预览图片区域样式 - 减少边框 */
+.test-preview-image-area {
+  background: rgba(15, 23, 42, 0.5) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* 移除边框，使用阴影代替 */
+  border: none !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 12px !important;
+  padding: 8px !important;
+}
+
+/* 预览图片框架样式 - 减少边框 */
+.test-preview-image-frame {
+  background: rgba(0, 0, 0, 0.3);
+  /* 移除边框 */
+  border: none !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+  border-radius: 10px !important;
+}
+
+/* 预览控制区域样式 - 减少边框 */
+.test-preview-controls {
+  background: transparent !important;
+  /* 移除边框和背景 */
+  border: none !important;
+  box-shadow: none !important;
+  padding-top: 6px !important;
+  margin-top: 6px !important;
+  gap: 6px !important;
+}
+
+/* 控制组样式 - 减少边框 */
+.test-preview-controls .control-group {
+  background: rgba(30, 41, 59, 0.5) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  padding: 4px 6px !important;
+  gap: 10px !important;
+}
+
+.test-preview-controls button {
+  /* 使用更亮的半透明背景，提升可见性 */
+  background: rgba(51, 65, 85, 0.8) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* 移除边框 */
+  border: none !important;
+  color: rgba(226, 232, 240, 0.95) !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  border-radius: 6px;
+  font-weight: 500;
+  /* 添加文字阴影提升可读性 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.test-preview-controls button:hover:not(:disabled) {
+  background: rgba(71, 85, 105, 0.9) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+  transform: translateY(-1px);
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.test-preview-controls button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.test-preview-controls button.selected {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.7),
+    rgba(99, 102, 241, 0.7)
+  ) !important;
+  /* 移除边框，使用阴影代替 */
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  color: white !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.test-preview-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(30, 41, 59, 0.5) !important;
+  color: rgba(148, 163, 184, 0.6) !important;
+}
+
+/* 颜色选择器样式调整 - 优化可见性 */
+.test-preview-controls .color-option {
+  /* 移除边框，使用阴影代替 */
+  border: none !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.test-preview-controls .color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5),
+    0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.test-preview-controls .color-option.selected {
+  /* 移除边框，使用发光效果代替 */
+  border: none !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.7),
+    0 0 16px rgba(99, 102, 241, 0.6), 0 4px 12px rgba(99, 102, 241, 0.5);
+  transform: scale(1.15);
+}
+
+/* 确保背景容器在内容下方 */
+#intro-overlay,
+.intro-preview-layout {
+  position: relative;
+}
+
+/* 介绍信息面板样式 - 玻璃态效果，配合粒子动画背景 */
+.intro-info-panel {
+  position: relative;
+  z-index: 10;
+  /* 玻璃态效果：半透明深色背景 + 模糊 */
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* 微妙的边框和阴影 */
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* 添加渐变边框光效 */
+  position: relative;
+  overflow: hidden;
+}
+
+/* 信息面板的渐变边框光效 */
+.intro-info-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(99, 102, 241, 0.6),
+    rgba(139, 92, 246, 0.6),
+    transparent
+  );
+  opacity: 0.8;
+  z-index: 1;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* 信息面板头部样式调整 */
+.intro-info-header {
+  position: relative;
+  z-index: 2;
+}
+
+/* 信息面板文本样式调整 - 确保在深色背景上可读 */
+.intro-info-text {
+  position: relative;
+  z-index: 2;
+  /* 文本区域使用更深的背景以确保可读性 */
+  background: rgba(30, 41, 59, 0.6) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  /* 文字颜色调整为浅色 */
+  color: rgba(226, 232, 240, 0.95) !important;
+}
+
+/* 信息面板文本段落样式 */
+.intro-info-text p {
+  color: rgba(226, 232, 240, 0.9) !important;
+}
+
+/* 信息面板标签样式 */
+.intro-info-label {
+  color: rgba(147, 197, 253, 0.9) !important;
+}
+
+/* 进入按钮样式调整 - 符合心理测试风格 */
+.intro-enter-btn {
+  position: relative;
+  z-index: 2;
+  /* 渐变背景 */
+  background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6) !important;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  /* 添加微妙的发光效果 */
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.intro-enter-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #4f46e5, #7c3aed) !important;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  transform: translateY(-2px);
+}
+
+.intro-enter-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.intro-enter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(71, 85, 105, 0.6) !important;
+}
+
+/* 重复样式已移除，使用上面定义的减少边框版本 */
+
+/* 信息面板图标样式调整 */
+.intro-info-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.8),
+    rgba(99, 102, 241, 0.8)
+  ) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  #intro-overlay {
+    background: transparent !important;
+  }
+
+  .app-window.intro-mode #blackhole-bg-container {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* 移动端调整玻璃态效果的模糊程度 */
+  .intro-preview-panel,
+  .test-preview-panel,
+  .intro-info-panel {
+    backdrop-filter: blur(15px) saturate(150%);
+    -webkit-backdrop-filter: blur(15px) saturate(150%);
+  }
+}

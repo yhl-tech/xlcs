@@ -1,0 +1,553 @@
+/**
+ * API 调用封装
+ * 基于 axios 的 HTTP 请求封装
+ * 参考原始 script/api.js 实现
+ */
+import axios from 'axios'
+import { useAuthStore } from '@/stores/authStore'
+
+// API 基础配置
+const API_CONFIG = {
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  timeout: 30000
+}
+
+/**
+ * 获取用户信息中的 username
+ */
+function getUserInfoFromStorage() {
+  try {
+    const userInfoStr = localStorage.getItem('userInfo')
+    if (userInfoStr) {
+      const userInfo = JSON.parse(userInfoStr)
+      return userInfo?.username || ''
+    }
+  } catch (error) {
+    console.warn('[API] 读取 userInfo 失败:', error)
+  }
+  return ''
+}
+
+/**
+ * 规范化时间字符串格式，确保分钟和秒数都是两位数
+ */
+function normalizeTimeString(timeStr) {
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
+    return timeStr
+  }
+
+  const parts = timeStr.split(':')
+  if (parts.length !== 2) {
+    return timeStr
+  }
+
+  try {
+    const minutes = parseInt(parts[0], 10)
+    const seconds = parseInt(parts[1], 10)
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  } catch (e) {
+    return timeStr
+  }
+}
+
+/**
+ * 规范化画笔轨迹数据中的时间格式
+ */
+function normalizeDrawingTracksData(drawingTracksData) {
+  if (!drawingTracksData || typeof drawingTracksData !== 'object') {
+    return drawingTracksData
+  }
+
+  const normalized = { ...drawingTracksData }
+  const normalizedData = {}
+
+  const data = drawingTracksData.data || drawingTracksData
+
+  for (const plateKey in data) {
+    const plateData = data[plateKey]
+
+    if (typeof plateData === 'object' && plateData !== null) {
+      const normalizedPlateData = {}
+      for (const strokeKey in plateData) {
+        const strokeData = plateData[strokeKey]
+        if (Array.isArray(strokeData)) {
+          normalizedPlateData[strokeKey] = strokeData.map((segment) => {
+            if (segment && typeof segment === 'object' && segment.time) {
+              return {
+                ...segment,
+                time: normalizeTimeString(segment.time)
+              }
+            }
+            return segment
+          })
+        } else {
+          normalizedPlateData[strokeKey] = strokeData
+        }
+      }
+      normalizedData[plateKey] = Object.keys(normalizedPlateData).length === 0 ? {} : normalizedPlateData
+    } else {
+      normalizedData[plateKey] = plateData
+    }
+  }
+
+  // 确保始终有 10 个图版位置
+  for (let i = 1; i <= 10; i++) {
+    const key = String(i)
+    if (!(key in normalizedData)) {
+      normalizedData[key] = {}
+    }
+  }
+
+  normalized.data = normalizedData
+  return normalized
+}
+
+// 创建 axios 实例
+const createClient = () => {
+  const client = axios.create({
+    baseURL: API_CONFIG.baseURL,
+    timeout: API_CONFIG.timeout,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
+  // 请求拦截器
+  client.interceptors.request.use(
+    (config) => {
+      const authStore = useAuthStore()
+      if (authStore.token) {
+        config.headers.Authorization = `Bearer ${authStore.token}`
+      }
+      
+      // 设置 User-Id header
+      const userId = getUserInfoFromStorage()
+      if (userId) {
+        config.headers['User-Id'] = userId
+      }
+      
+      // FormData 请求时删除 Content-Type，让浏览器自动设置
+      if (config.data instanceof FormData) {
+        delete config.headers['Content-Type']
+      }
+      
+      return config
+    },
+    (error) => {
+      return Promise.reject(error)
+    }
+  )
+
+  // 响应拦截器
+  client.interceptors.response.use(
+    (response) => {
+      if (response.config?.responseType === 'blob') {
+        return response
+      }
+      return response.data
+    },
+    (error) => {
+      if (error.response) {
+        const { status, data } = error.response
+        
+        if (status === 401) {
+          const authStore = useAuthStore()
+          authStore.logout()
+        }
+        
+        const errorMessage = data?.message || data?.msg || '请求失败'
+        console.error(`[API Error] ${status}: ${errorMessage}`)
+      } else if (error.request) {
+        console.error('[API Error] 网络错误，请检查网络连接')
+      }
+      
+      return Promise.reject(error)
+    }
+  )
+
+  return client
+}
+
+/**
+ * useApi composable
+ */
+export function useApi() {
+  const client = createClient()
+
+  // ==================== 认证相关 ====================
+
+  const phoneLogin = async (phone, verificationCode) => {
+    const response = await client.post('/rorschach/user_login_phone', {
+      phone,
+      verification_code: verificationCode
+    })
+    return response
+  }
+
+  const usernameLogin = async (username, password) => {
+    const response = await client.post('/rorschach/user_login', {
+      username,
+      password
+    })
+    return response
+  }
+
+  const sendVerificationCode = async (phone) => {
+    const response = await client.post('/rorschach/send_verification_code', { phone })
+    return response
+  }
+
+  const register = async (data) => {
+    const response = await client.post('/rorschach/user_register', data)
+    return response
+  }
+
+  // ==================== 测试相关 ====================
+
+  const getBasicInfo = async (userId = null) => {
+    const params = userId ? { user_id: userId } : {}
+    const response = await client.get('/rorschach/basic_info', { params })
+    return response
+  }
+
+  /**
+   * 设置用户基本信息
+   * POST /rorschach/user/set_basic_info
+   */
+  const setBasicInfo = async (userId, basicInfo) => {
+    const requestData = {
+      user_id: userId,
+      basic_info: basicInfo
+    }
+    console.log('[API] setBasicInfo 请求数据:', JSON.stringify(requestData, null, 2))
+    const response = await client.post('/rorschach/user/set_basic_info', requestData)
+    return response
+  }
+
+  /**
+   * 上传缩放数据（scale.json）
+   * POST /rorschach/user/upload_scale
+   * 格式: { "1": [1, 1, -1], "2": [], ... }
+   */
+  const uploadZoom = async (zoomData, userId) => {
+    if (!zoomData || typeof zoomData !== 'object') {
+      throw new Error('缩放数据参数无效')
+    }
+
+    const formData = new FormData()
+    const jsonString = JSON.stringify(zoomData)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const file = new File([blob], 'scale.json', { type: 'application/json' })
+    
+    formData.append('file', file, 'scale.json')
+    
+    console.log('[API] 上传缩放数据:', { zoomData, userId })
+    
+    const response = await client.post('/rorschach/user/upload_scale', formData)
+    return response
+  }
+
+  /**
+   * 上传旋转数据（rotate.json）
+   * POST /rorschach/user/upload_rotate
+   * 格式: { "1": [30, -30], "2": [], ... }
+   */
+  const uploadRotate = async (rotateData, userId) => {
+    if (!rotateData || typeof rotateData !== 'object') {
+      throw new Error('旋转数据参数无效')
+    }
+
+    const formData = new FormData()
+    const jsonString = JSON.stringify(rotateData)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const file = new File([blob], 'rotate.json', { type: 'application/json' })
+    
+    formData.append('file', file, 'rotate.json')
+    
+    console.log('[API] 上传旋转数据:', { rotateData, userId })
+    
+    const response = await client.post('/rorschach/user/upload_rotate', formData)
+    return response
+  }
+
+  /**
+   * 上传笔迹轨迹数据（drawing_tracks.json）
+   * POST /rorschach/user/upload_drawing_tracks
+   * 格式: { canvas_size: [高, 宽], data: { "1": { "0": [{"coords": [y,x,y,x], "color": "green", "time": "00:07"}] }, ... } }
+   */
+  const uploadDrawingTracks = async (drawingTracksData, userId, canvasSize = [0, 0]) => {
+    if (!drawingTracksData || typeof drawingTracksData !== 'object') {
+      throw new Error('笔迹轨迹数据参数无效')
+    }
+
+    // 构建带有 canvas_size 的数据结构
+    const dataWithCanvasSize = {
+      canvas_size: canvasSize,
+      data: drawingTracksData
+    }
+
+    // 规范化时间格式
+    const normalizedData = normalizeDrawingTracksData(dataWithCanvasSize)
+
+    const formData = new FormData()
+    const jsonString = JSON.stringify(normalizedData)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const file = new File([blob], 'drawing_tracks.json', { type: 'application/json' })
+    
+    formData.append('file', file, 'drawing_tracks.json')
+    
+    console.log('[API] 上传笔迹轨迹数据:', { 
+      originalData: drawingTracksData, 
+      normalizedData,
+      userId 
+    })
+    
+    const response = await client.post('/rorschach/user/upload_drawing_tracks', formData)
+    return response
+  }
+
+  /**
+   * 上传时间戳切分数据（video_clip.json）
+   * POST /rorschach/user/upload_seg_time
+   * 格式: { "start": "00:00", "1": "01:53", "2": "03:45", ..., "select": "25:15", "stop": "30:29" }
+   */
+  const uploadSegTime = async (segTimeData, userId) => {
+    if (!segTimeData || typeof segTimeData !== 'object') {
+      throw new Error('时间戳数据参数无效')
+    }
+
+    // 规范化时间格式
+    const normalizedSegTime = {}
+    for (const key in segTimeData) {
+      normalizedSegTime[key] = normalizeTimeString(segTimeData[key])
+    }
+
+    const formData = new FormData()
+    const jsonString = JSON.stringify(normalizedSegTime)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const file = new File([blob], 'video_clip.json', { type: 'application/json' })
+    
+    formData.append('file', file, 'video_clip.json')
+    
+    console.log('[API] 上传时间戳数据:', { 
+      originalData: segTimeData, 
+      normalizedData: normalizedSegTime,
+      userId 
+    })
+    
+    const response = await client.post('/rorschach/user/upload_seg_time', formData)
+    return response
+  }
+
+  /**
+   * 上传五个问题的答案数据（5_questions.json）
+   * POST /rorschach/user/upload_5_questions
+   * 格式: { "represent": [1], "father": [2], "mother": [3], "like": [4, 5], "dislike": [6] }
+   */
+  const upload5Questions = async (questionsData, userId) => {
+    if (!questionsData || typeof questionsData !== 'object') {
+      throw new Error('五个问题数据参数无效')
+    }
+
+    // 转换格式：支持两种输入格式
+    // 格式1（旧）: { representSelf: 1, representFather: 2, ... }
+    // 格式2（新）: { self: [1], father: [2], ... }
+    const formattedData = {}
+    
+    // 处理 self / representSelf -> represent
+    if (questionsData.self !== undefined) {
+      formattedData.represent = Array.isArray(questionsData.self) ? questionsData.self : [questionsData.self]
+    } else if (questionsData.representSelf !== null && questionsData.representSelf !== undefined) {
+      formattedData.represent = [questionsData.representSelf]
+    }
+    
+    // 处理 father / representFather -> father
+    if (questionsData.father !== undefined) {
+      formattedData.father = Array.isArray(questionsData.father) ? questionsData.father : [questionsData.father]
+    } else if (questionsData.representFather !== null && questionsData.representFather !== undefined) {
+      formattedData.father = [questionsData.representFather]
+    }
+    
+    // 处理 mother / representMother -> mother
+    if (questionsData.mother !== undefined) {
+      formattedData.mother = Array.isArray(questionsData.mother) ? questionsData.mother : [questionsData.mother]
+    } else if (questionsData.representMother !== null && questionsData.representMother !== undefined) {
+      formattedData.mother = [questionsData.representMother]
+    }
+    
+    // 处理 like / mostLiked -> like
+    if (questionsData.like !== undefined) {
+      formattedData.like = Array.isArray(questionsData.like) ? questionsData.like : [questionsData.like]
+    } else if (questionsData.mostLiked !== null && questionsData.mostLiked !== undefined) {
+      formattedData.like = Array.isArray(questionsData.mostLiked) ? questionsData.mostLiked : [questionsData.mostLiked]
+    }
+    
+    // 处理 dislike / mostDisliked -> dislike
+    if (questionsData.dislike !== undefined) {
+      formattedData.dislike = Array.isArray(questionsData.dislike) ? questionsData.dislike : [questionsData.dislike]
+    } else if (questionsData.mostDisliked !== null && questionsData.mostDisliked !== undefined) {
+      formattedData.dislike = Array.isArray(questionsData.mostDisliked) ? questionsData.mostDisliked : [questionsData.mostDisliked]
+    }
+
+    // 移除空数组
+    Object.keys(formattedData).forEach(key => {
+      if (Array.isArray(formattedData[key]) && formattedData[key].length === 0) {
+        delete formattedData[key]
+      }
+      // 过滤掉 null 值
+      if (Array.isArray(formattedData[key])) {
+        formattedData[key] = formattedData[key].filter(v => v !== null && v !== undefined)
+        if (formattedData[key].length === 0) {
+          delete formattedData[key]
+        }
+      }
+    })
+
+    const formData = new FormData()
+    const jsonString = JSON.stringify(formattedData)
+    
+    if (jsonString === '{}') {
+      console.warn('[API] 五个问题数据为空，跳过上传')
+      return { success: true, message: '无数据上传' }
+    }
+
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const file = new File([blob], '5_questions.json', { type: 'application/json' })
+    
+    formData.append('file', file, '5_questions.json')
+    
+    console.log('[API] 上传五个问题数据:', { 
+      originalData: questionsData, 
+      formattedData,
+      userId 
+    })
+    
+    const response = await client.post('/rorschach/user/upload_5_questions', formData)
+    return response
+  }
+
+  /**
+   * 上传音/视频文件
+   * POST /rorschach/user/upload_media
+   */
+  const uploadMedia = async (file, userId = null, onProgress = null) => {
+    // 确保文件有正确的文件名和类型
+    let fileToUpload = file
+    
+    // 如果是 Blob，转换为 File
+    if (file instanceof Blob && !(file instanceof File)) {
+      const extension = file.type.includes('mp4') ? 'mp4' : 'mp3'
+      const fileName = `audio_${userId || 'unknown'}_${Date.now()}.${extension}`
+      fileToUpload = new File([file], fileName, { type: file.type || 'audio/mp3' })
+    }
+    
+    // 验证文件类型
+    const fileName = fileToUpload.name.toLowerCase()
+    const isValidFormat = fileName.endsWith('.mp3') || fileName.endsWith('.mp4')
+    if (!isValidFormat) {
+      throw new Error('只支持上传MP3/MP4格式文件')
+    }
+
+    const formData = new FormData()
+    formData.append('file', fileToUpload)
+    
+    const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
+    console.log('[API] 上传音频文件:', { 
+      fileName: fileToUpload.name, 
+      size: `${fileSizeMB}MB`,
+      userId 
+    })
+    
+    const response = await client.post('/rorschach/user/upload_media', formData, {
+      timeout: 300000, // 5分钟超时
+      onUploadProgress: onProgress ? (progressEvent) => {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        onProgress(percent)
+      } : undefined
+    })
+    return response
+  }
+
+  /**
+   * 触发分析
+   * POST /rorschach/analyze
+   */
+  const analyzeTest = async (userId) => {
+    const response = await client.post('/rorschach/analyze', {
+      user_id: userId
+    })
+    return response
+  }
+
+  // ==================== 报告相关 ====================
+
+  const checkReportStatus = async (userId) => {
+    const response = await client.get('/rorschach/check_report_status', {
+      params: { user_id: userId }
+    })
+    return response
+  }
+
+  const downloadReport = async (userId) => {
+    const response = await client.get('/rorschach/download_report', {
+      params: { user_id: userId },
+      responseType: 'blob'
+    })
+    return response
+  }
+
+  const getReportData = async (userId) => {
+    const response = await client.get('/rorschach/get_report', {
+      params: { user_id: userId }
+    })
+    return response
+  }
+
+  const checkUploadFilesStatus = async (userId) => {
+    const response = await client.get('/rorschach/check_upload_files_status', {
+      params: { user_id: userId }
+    })
+    return response
+  }
+
+  const getPublicityReport = async (userId) => {
+    const response = await client.get('/rorschach/get_publicity_report', {
+      params: { user_id: userId }
+    })
+    return response
+  }
+
+  // ==================== 返回 ====================
+
+  return {
+    // 认证
+    phoneLogin,
+    usernameLogin,
+    sendVerificationCode,
+    register,
+    
+    // 用户信息
+    getBasicInfo,
+    setBasicInfo,
+    
+    // 测试数据上传（六个文件）
+    uploadZoom,           // 1. scale.json - 缩放数据
+    uploadRotate,         // 2. rotate.json - 旋转数据
+    uploadDrawingTracks,  // 3. drawing_tracks.json - 笔迹轨迹
+    uploadSegTime,        // 4. video_clip.json - 时间戳切分
+    upload5Questions,     // 5. 5_questions.json - 五个问题答案
+    uploadMedia,          // 6. 音频文件
+    
+    // 分析
+    analyzeTest,
+    
+    // 报告
+    checkReportStatus,
+    downloadReport,
+    getReportData,
+    checkUploadFilesStatus,
+    getPublicityReport
+  }
+}
+
+export default useApi
