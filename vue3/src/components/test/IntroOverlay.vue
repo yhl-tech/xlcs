@@ -14,7 +14,7 @@
                   alt="示例墨迹图"
                   class="intro-preview-image"
                   :style="imageTransform"
-                />
+                >
                 <canvas 
                   ref="canvasRef" 
                   class="test-preview-canvas"
@@ -25,7 +25,7 @@
                   @touchstart="handleTouchStart"
                   @touchmove="handleTouchMove"
                   @touchend="handleTouchEnd"
-                ></canvas>
+                />
               </div>
             </div>
 
@@ -89,7 +89,7 @@
                     style="background-color: #ef4444"
                     data-color="red"
                     @click="handleSelectColor('red')"
-                  ></div>
+                  />
                   <div 
                     class="color-option" 
                     :class="{ 
@@ -99,14 +99,14 @@
                     style="background-color: #10b981"
                     data-color="green"
                     @click="handleSelectColor('green')"
-                  ></div>
+                  />
                   <div 
                     class="color-option" 
                     :class="{ selected: currentColor === 'blue' }"
                     style="background-color: #3b82f6"
                     data-color="blue"
                     @click="handleSelectColor('blue')"
-                  ></div>
+                  />
                 </div>
                 <button 
                   :disabled="!operationEnabled"
@@ -133,9 +133,13 @@
       <!-- 右侧：说明文本 -->
       <div class="intro-info-panel">
         <div class="intro-info-header">
-          <div class="intro-info-icon">🎧</div>
+          <div class="intro-info-icon">
+            🎧
+          </div>
           <div>
-            <p class="intro-info-label">测试说明与反应测试</p>
+            <p class="intro-info-label">
+              测试说明与反应测试
+            </p>
           </div>
         </div>
 
@@ -153,13 +157,14 @@
             <strong>4</strong>.如果您确认清楚了测试的流程，那就可以点击"进入"按钮，开始本次正式的心理测试。
           </p>
         </div>
-
+        <!-- :disabled="!canEnter" -->
         <button 
-          v-if="showEnterButton"
           class="intro-enter-btn" 
+          :class="{ 'btn-disabled': !canEnter }"
+
           @click="handleStart"
         >
-          进入
+          {{ canEnter ? '进入' : '进入' }}
         </button>
       </div>
     </div>
@@ -188,9 +193,9 @@ const isDrawing = ref(false)
 // 操作反应测试状态
 const currentStep = ref(null)
 const operationEnabled = ref(true) // 初始就启用，方便用户探索
-const showEnterButton = ref(false)
 const showEnterTip = ref(false)
 const needsGreenColor = ref(false)
+const canEnter = ref(false) // 控制进入按钮是否可点击
 
 // 绘画检测
 let drawingDetected = false
@@ -257,9 +262,9 @@ async function startOperationTest() {
   try {
     console.log('[IntroOverlay] 开始操作反应测试')
     
-    // 立即显示进入按钮（允许用户跳过操作测试）
-    showEnterTip.value = true
-    showEnterButton.value = true
+    // 进入按钮初始不可点击，等所有引导完成后才可点击
+    canEnter.value = false
+    showEnterTip.value = false
     
     // 第一步：播放介绍音频
     console.log('[IntroOverlay] 播放介绍音频...')
@@ -311,13 +316,17 @@ async function startOperationTest() {
     console.log('[IntroOverlay] 播放最终提示')
     await playAudioFile('final')
     
-    console.log('[IntroOverlay] 操作反应测试完成')
+    // 所有引导和语音播放完毕，启用进入按钮
+    showEnterTip.value = true
+    canEnter.value = true
+    
+    console.log('[IntroOverlay] 操作反应测试完成，进入按钮已启用')
   } catch (error) {
     console.error('[IntroOverlay] 操作反应测试失败:', error)
     // 确保按钮可用
     operationEnabled.value = true
     showEnterTip.value = true
-    showEnterButton.value = true
+    canEnter.value = true
   }
 }
 
@@ -1067,6 +1076,20 @@ function handleStart() {
   &:active {
     transform: translateY(0);
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  }
+
+  &.btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #334155;
+    box-shadow: none;
+    color: #94a3b8;
+    
+    &:hover {
+      transform: none;
+      box-shadow: none;
+      background: #334155;
+    }
   }
 }
 

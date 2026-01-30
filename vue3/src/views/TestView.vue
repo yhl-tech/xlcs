@@ -753,7 +753,7 @@ function handleDevSkipToWaiting() {
   padding-top: 70px; /* 为头部导航栏留出空间 */
   position: relative;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -796,49 +796,53 @@ function handleDevSkipToWaiting() {
   flex-direction: column;
   position: relative;
   z-index: 1;
+  background: transparent;
 }
 
 // 图片容器 - 继承自 ImageCanvas 组件
 .image-container {
   flex: 1;
   width: 100%;
+  max-height: calc(100vh - 140px); // 减去控制栏高度，限制图片区域
   position: relative;
   overflow: hidden;
+  background: transparent;
 }
 
-// 字幕样式
+// 字幕样式 - 使用绝对定位避免影响图片大小
 .subtitle-container {
-  position: relative;
-  width: 100%;
-  min-height: 50px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 80px; // 控制栏高度上方
+  width: auto;
+  max-width: 80%;
   z-index: 100;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px 20px;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .subtitle-content {
-  position: relative;
-  width: 100%;
-  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .subtitle-text {
-  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
   text-align: center;
-  border-radius: 20px;
-  min-height: 20px;
   word-wrap: break-word;
   word-break: break-all;
   transition: all 0.25s ease;
@@ -873,6 +877,7 @@ function handleDevSkipToWaiting() {
   position: relative;
   z-index: 1;
   overflow: hidden;
+  background: transparent;
 }
 
 .uploading-screen,
@@ -885,6 +890,7 @@ function handleDevSkipToWaiting() {
   padding: 0;
   position: relative;
   z-index: 1;
+  background: transparent;
 }
 
 .summary-card {
@@ -915,7 +921,9 @@ function handleDevSkipToWaiting() {
   }
 
   .subtitle-container {
-    padding: 8px 12px;
+    bottom: 70px;
+    max-width: 90%;
+    padding: 10px 16px;
   }
 
   .subtitle-text {
