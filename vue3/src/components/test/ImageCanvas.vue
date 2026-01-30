@@ -156,16 +156,25 @@ function resizeCanvas() {
     const image = imageRef.value
     if (!container || !canvas) return
 
-    // 使画布大小与图片实际渲染尺寸一致
+    // 使画布大小与图片显示尺寸一致
     if (image && image.complete && image.naturalWidth) {
-      // 使用图片的实际渲染尺寸
-      const canvasWidth = image.clientWidth
-      const canvasHeight = image.clientHeight
+      const containerWidth = container.clientWidth * 0.9
+      const containerHeight = container.clientHeight * 0.9
+      const aspectRatio = image.naturalWidth / image.naturalHeight
+      
+      let canvasWidth, canvasHeight
+      if (containerWidth / containerHeight > aspectRatio) {
+        canvasHeight = containerHeight
+        canvasWidth = canvasHeight * aspectRatio
+      } else {
+        canvasWidth = containerWidth
+        canvasHeight = canvasWidth / aspectRatio
+      }
       
       canvas.width = canvasWidth
       canvas.height = canvasHeight
       
-      // 设置画布 CSS 尺寸与图片一致
+      // 设置画布 CSS 尺寸
       canvas.style.width = `${canvasWidth}px`
       canvas.style.height = `${canvasHeight}px`
     }
@@ -405,14 +414,14 @@ defineExpose({
   height: 100%;
   background: transparent;
   padding: 24px 24px 0 24px;
-  min-height: min(60vh, 500px);
+  min-height: min(70vh, 640px);
   box-sizing: border-box;
 }
 
 // 图片样式 - 与原始 #rorschach-image 一致
 .rorschach-image {
-  max-width: 85%;
-  max-height: 85%;
+  max-width: 90%;
+  max-height: 90%;
   object-fit: contain;
   border-radius: 8px;
   transform-origin: center center;
@@ -434,8 +443,6 @@ defineExpose({
   will-change: transform;
   touch-action: none;
   cursor: crosshair;
-  background: transparent;
-  pointer-events: auto;
 }
 
 @media (max-width: 768px) {

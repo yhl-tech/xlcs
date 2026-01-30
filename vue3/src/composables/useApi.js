@@ -579,10 +579,16 @@ export function useApi() {
   }
 
   const downloadReport = async (userId) => {
-    const response = await client.get('/rorschach/download_report', {
-      params: { user_id: userId },
-      responseType: 'blob'
-    })
+    const response = await client.post('/rorschach/user/get_report_new', 
+      { user_id: userId },
+      {
+        responseType: 'blob',
+        timeout: 300000, // 5分钟超时
+        headers: {
+          'Accept': 'application/pdf, application/octet-stream'
+        }
+      }
+    )
     return response
   }
 
@@ -594,16 +600,24 @@ export function useApi() {
   }
 
   const checkUploadFilesStatus = async (userId) => {
-    const response = await client.get('/rorschach/check_upload_files_status', {
-      params: { user_id: userId }
+    const response = await client.post('/rorschach/user/get_upload_files_status', {
+      user_id: userId
     })
     return response
   }
 
   const getPublicityReport = async (userId) => {
-    const response = await client.get('/rorschach/get_publicity_report', {
-      params: { user_id: userId }
-    })
+    const response = await client.post('/rorschach/user/get_report_publicity',
+      { user_id: userId },
+      {
+        responseType: 'text',
+        timeout: 60000,
+        headers: {
+          'Accept': 'text/html'
+        },
+        transformResponse: [(data) => data]
+      }
+    )
     return response
   }
 

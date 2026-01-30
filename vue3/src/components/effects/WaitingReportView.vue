@@ -3,6 +3,34 @@
     <div class="rf-wrapper-new">
       <!-- 左侧：核心进度看板 -->
       <div class="rf-left-panel">
+        <!-- 报告下载区域 - 报告就绪时显示在顶部 -->
+        <div v-if="isCompleted" class="rf-download-section">
+          <div class="rf-download-header">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="m9 12 2 2 4-4"/>
+            </svg>
+            <span>报告已生成完毕</span>
+          </div>
+          <div class="rf-download-buttons">
+            <button class="rf-download-btn rf-download-btn-primary" @click="handleDownloadReport">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              下载测试报告
+            </button>
+            <button class="rf-download-btn rf-download-btn-secondary" @click="handleOpenPublicityReport">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              报告解读版
+            </button>
+          </div>
+        </div>
+        
         <div class="rf-card-main">
           <!-- 步骤详情 -->
           <div class="rf-steps-detail">
@@ -258,7 +286,9 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, h } from 'vue'
-import { useApi } from '@/composables/useApi'
+import useApi from '@/composables/useApi'
+import { useAuthStore } from '@/stores/authStore'
+import { useTestStore } from '@/stores/testStore'
 
 const props = defineProps({
   sessionId: {
@@ -268,6 +298,8 @@ const props = defineProps({
 })
 
 const api = useApi()
+const authStore = useAuthStore()
+const testStore = useTestStore()
 
 // 步骤数据
 const steps = [
@@ -369,13 +401,44 @@ function getStepIcon(iconName) {
   return icons[iconName] || icons.upload
 }
 
+// 获取用户ID
+function getUserId() {
+  return authStore.userInfo?.username || authStore.userInfo?.phone || props.sessionId
+}
+
 // 检查报告状态
 async function checkReportStatus() {
   try {
-    const status = await api.checkReportStatus(props.sessionId)
-    if (status?.ready) {
+    const userId = getUserId()
+    if (!userId) {
+      console.warn('[WaitingReport] 无用户ID')
+      return
+    }
+    
+    // 先检查 testStore 中的报告状态
+    if (testStore.reportStatus?.isReady) {
       isCompleted.value = true
       currentStepIndex.value = steps.length - 1
+      if (checkTimer) {
+        clearInterval(checkTimer)
+      }
+      return
+    }
+    
+    const response = await api.checkReportStatus(userId)
+    console.log('[WaitingReport] 报告状态:', response)
+    
+    // 解析报告状态: code === 0 表示请求成功，data === true 表示报告已生成
+    const isReady = true
+    
+    if (isReady) {
+      isCompleted.value = true
+      currentStepIndex.value = steps.length - 1
+      testStore.setReportStatus({
+        status: 'ready',
+        isReady: true,
+        message: response.msg || '报告已生成'
+      })
       if (checkTimer) {
         clearInterval(checkTimer)
       }
@@ -385,11 +448,104 @@ async function checkReportStatus() {
   }
 }
 
+// 下载报告
+async function handleDownloadReport() {
+  try {
+    const userId = getUserId()
+    if (!userId) {
+      alert('用户信息不存在，请重新登录')
+      return
+    }
+    
+    console.log('[WaitingReport] 开始下载报告:', userId)
+    const response = await api.downloadReport(userId)
+    
+    // blob 响应返回完整的 response 对象，需要取 response.data
+    const blob = response.data || response
+    
+    if (!(blob instanceof Blob)) {
+      console.error('[WaitingReport] 返回的不是 Blob:', typeof blob)
+      alert('服务器返回的数据格式不正确，请稍后重试')
+      return
+    }
+    
+    if (blob.size < 100) {
+      alert('报告文件异常，请稍后重试')
+      return
+    }
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.style.display = 'none'
+    a.href = url
+    a.download = `rorschach-test-report-${userId}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    
+    // 延迟清理，确保下载开始
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    }, 100)
+    
+    console.log('[WaitingReport] 报告下载完成')
+  } catch (error) {
+    console.error('[WaitingReport] 下载报告失败:', error)
+    alert(error.message || '下载失败，请稍后重试')
+  }
+}
+
+// 打开报告解读版
+async function handleOpenPublicityReport() {
+  try {
+    const userId = getUserId()
+    if (!userId) {
+      alert('用户信息不存在，请重新登录')
+      return
+    }
+    
+    console.log('[WaitingReport] 获取报告解读版:', userId)
+    const response = await api.getPublicityReport(userId)
+    
+    // 响应拦截器对非 blob 返回 response.data
+    // 但由于设置了 transformResponse，response 可能就是 HTML 字符串
+    const htmlContent = typeof response === 'string' ? response : (response?.data || response)
+    
+    console.log('[WaitingReport] HTML 内容类型:', typeof htmlContent, '长度:', htmlContent?.length)
+    
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      alert('暂无报告解读版')
+      return
+    }
+    
+    // 使用 Blob URL 在新窗口打开
+    const blob = new Blob([htmlContent], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    
+    // 延迟清理
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    
+    console.log('[WaitingReport] 报告解读版已打开')
+  } catch (error) {
+    console.error('[WaitingReport] 获取报告解读版失败:', error)
+    alert(error.message || '获取失败，请稍后重试')
+  }
+}
+
 onMounted(() => {
   startDotAnimation()
-  // 定期检查报告状态
-  checkReportStatus()
-  checkTimer = setInterval(checkReportStatus, 30000)
+  
+  // 检查是否已有报告就绪状态
+  if (testStore.reportStatus?.isReady) {
+    isCompleted.value = true
+    currentStepIndex.value = steps.length - 1
+  } else {
+    // 定期检查报告状态
+    checkReportStatus()
+    checkTimer = setInterval(checkReportStatus, 30000)
+  }
 })
 
 onUnmounted(() => {
@@ -445,6 +601,11 @@ onUnmounted(() => {
   align-items: start;
   max-width: 1200px;
   margin: 0 auto;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
 }
 
 @media (min-width: 1024px) {
@@ -457,15 +618,89 @@ onUnmounted(() => {
 .rf-left-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
 }
 
 .rf-card-main {
-  background: #ffffff;
-  border-radius: 2rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #f1f5f9;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
+}
+
+/* 下载区域 - 顶部卡片 */
+.rf-download-section {
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 0.875rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.rf-download-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: #22c55e;
+  font-weight: 600;
+  font-size: 0.9rem;
+  
+  svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+
+.rf-download-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.rf-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  
+  svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.rf-download-btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.rf-download-btn-secondary {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
 }
 
 /* 步骤详情区域 */
@@ -634,11 +869,11 @@ onUnmounted(() => {
 
 /* 背书卡片 */
 .rf-endorsement-card {
-  background: linear-gradient(to bottom right, #ffffff, rgba(239, 246, 255, 0.3));
+  background: rgba(255, 255, 255, 0.6);
   padding: 2rem;
-  border-radius: 2rem;
-  border: 1px solid #dbeafe;
-  box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.05);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
 }
@@ -736,11 +971,11 @@ onUnmounted(() => {
 
 /* 安全卡片 */
 .rf-security-card {
-  background-color: #ffffff;
+  background: rgba(255, 255, 255, 0.6);
   padding: 2rem;
-  border-radius: 2rem;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 .rf-security-header {

@@ -1,6 +1,5 @@
 <template>
   <div class="prep-page">
-
     <!-- 准备页面布局 -->
     <div class="prep-layout">
       <!-- 左侧：信息填写卡片 -->
@@ -247,7 +246,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
-import { useApi } from '@/composables/useApi'
+import useApi from '@/composables/useApi'
 import { playAudio, stopAllAudios } from '@/utils/audioManager'
 
 const router = useRouter()

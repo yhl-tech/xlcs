@@ -872,7 +872,8 @@ function handleDevSkipToWaiting() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   position: relative;
   z-index: 1;

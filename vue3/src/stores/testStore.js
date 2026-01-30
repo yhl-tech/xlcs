@@ -70,6 +70,13 @@ export const useTestStore = defineStore('test', () => {
   // 每个图版的开始时间
   const plateStartTimes = ref({})
   
+  // 报告状态
+  const reportStatus = ref({
+    status: '',
+    isReady: false,
+    message: ''
+  })
+  
   // ==================== 计算属性 ====================
   
   // 测试进度百分比
@@ -99,6 +106,16 @@ export const useTestStore = defineStore('test', () => {
    */
   function setPhase(newPhase) {
     phase.value = newPhase
+  }
+  
+  /**
+   * 设置报告状态
+   */
+  function setReportStatus(status) {
+    reportStatus.value = {
+      ...reportStatus.value,
+      ...status
+    }
   }
   
   /**
@@ -274,6 +291,7 @@ export const useTestStore = defineStore('test', () => {
     sessionId,
     hasUsedZoom,
     plateStartTimes,
+    reportStatus,
     
     // 计算属性
     progress,
@@ -283,6 +301,7 @@ export const useTestStore = defineStore('test', () => {
     
     // 方法
     setPhase,
+    setReportStatus,
     nextPlate,
     previousPlate,
     goToPlate,

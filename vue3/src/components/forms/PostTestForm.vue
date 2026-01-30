@@ -196,7 +196,8 @@ function finishQuestionnaire() {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px 40px;
+  justify-content: center;
+  padding: 20px 40px 120px 40px; // 底部多加100px使内容整体上移
   box-sizing: border-box;
   overflow: hidden;
   max-width: 1400px;
