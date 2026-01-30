@@ -1,10 +1,10 @@
 <template>
   <div id="app-root">
-    <!-- 全局背景组件 -->
+    <!-- 全局黑洞背景（始终显示） -->
     <BlackHoleBackground 
-      v-if="showBackground" 
       :theme="backgroundTheme" 
-      :enabled="backgroundEnabled"
+      :enabled="true"
+      :z-index="0"
     />
     
     <!-- 全局头部导航栏 -->
@@ -43,19 +43,13 @@ const authStore = useAuthStore()
 // 全局 WebRTC 实时对话服务
 const realtimeDialog = useRealtimeDialog()
 
-// 控制背景显示
-const showBackground = computed(() => {
-  // 登录页、首页、准备页和说明页不显示黑洞背景（这些页面自己渲染背景）
-  return !['Home', 'Login', 'Prep', 'Intro'].includes(route.name)
-})
-
 // 控制头部导航栏显示
 const showHeader = computed(() => {
   // 在非首页和登录页时显示
   return !['Home', 'Login'].includes(route.name)
 })
 
-const backgroundEnabled = computed(() => showBackground.value)
+// 背景主题
 const backgroundTheme = computed(() => uiStore.backgroundTheme)
 
 // 监听路由，管理音频播放
@@ -96,12 +90,13 @@ onMounted(() => {
   height: auto;
   min-height: 100vh;
   position: relative;
+  background: #000;
 }
 
 /* 路由过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
 .fade-enter-from,

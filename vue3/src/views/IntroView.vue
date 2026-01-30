@@ -1,8 +1,5 @@
 <template>
   <div class="intro-view">
-    <!-- 黑洞粒子背景 -->
-    <BlackHoleBackground :enabled="true" :theme="0" :z-index="0" />
-    
     <!-- 测试说明内容 -->
     <IntroOverlay @start="handleStart" />
   </div>
@@ -13,7 +10,6 @@ import { onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTestStore } from '@/stores/testStore'
 import IntroOverlay from '@/components/test/IntroOverlay.vue'
-import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import { stopAllAudios } from '@/utils/audioManager'
 
 const router = useRouter()

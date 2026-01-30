@@ -278,9 +278,11 @@ async function startOperationTest() {
       
       currentStep.value = step.id
       
-      // 画笔步骤需要提示切换绿色
+      // 画笔步骤需要提示切换绿色，并画一个引导圆
       if (step.id === 'pen') {
         needsGreenColor.value = true
+        drawingDetected = false  // 重置绘画检测状态
+        drawGuideCircle()
       }
       
       // 播放操作指令音频
@@ -293,7 +295,8 @@ async function startOperationTest() {
       // 等待用户完成操作
       await waitForUserAction(step)
       
-      // 操作完成，播放反馈音频
+      // 操作完成，等待1秒后播放反馈音频
+      await new Promise(resolve => setTimeout(resolve, 600))
       console.log('[IntroOverlay] 播放完成反馈')
       await playAudioFile('complete')
       
@@ -380,16 +383,21 @@ function waitForUserAction(step) {
     if (step.requiresDrawing) {
       // 画笔操作：需要检测绘画
       console.log('[IntroOverlay] 等待绘画操作...')
-      const checkDrawing = () => {
-        if (drawingDetected) {
-          drawingDetected = false
-          console.log('[IntroOverlay] 绘画操作完成')
-          resolve()
-        } else {
-          setTimeout(checkDrawing, 100)
+      // 确保 drawingDetected 已重置
+      drawingDetected = false
+      // 延迟 500ms 后开始检测，给用户准备时间
+      setTimeout(() => {
+        const checkDrawing = () => {
+          if (drawingDetected) {
+            drawingDetected = false
+            console.log('[IntroOverlay] 绘画操作完成')
+            resolve()
+          } else {
+            setTimeout(checkDrawing, 100)
+          }
         }
-      }
-      checkDrawing()
+        checkDrawing()
+      }, 500)
     } else {
       // 其他操作：点击即完成
       console.log('[IntroOverlay] 等待按钮点击:', step.id)
@@ -475,6 +483,29 @@ function handleClear() {
   }
 }
 
+// 画一个绿色虚线引导圆
+function drawGuideCircle() {
+  if (!ctx || !canvasRef.value) return
+  
+  const canvas = canvasRef.value
+  const centerX = canvas.width / 2
+  const centerY = canvas.height / 2
+  const radius = Math.min(canvas.width, canvas.height) * 0.2
+  
+  ctx.save()
+  ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'
+  ctx.lineWidth = 8
+  ctx.setLineDash([15, 10])
+  ctx.lineCap = 'round'
+  
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+  ctx.stroke()
+  
+  ctx.restore()
+  console.log('[IntroOverlay] 已绘制引导圆')
+}
+
 // 画布交互
 let lastX = 0
 let lastY = 0
@@ -500,7 +531,7 @@ function handleMouseMove(e) {
   const y = (e.clientY - rect.top) * scaleY
 
   ctx.strokeStyle = currentColor.value === 'red' ? '#ef4444' : (currentColor.value === 'green' ? '#10b981' : '#3b82f6')
-  ctx.lineWidth = 3
+  ctx.lineWidth = 5
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
@@ -549,7 +580,7 @@ function handleTouchMove(e) {
   const y = (touch.clientY - rect.top) * scaleY
 
   ctx.strokeStyle = currentColor.value === 'red' ? '#ef4444' : (currentColor.value === 'green' ? '#10b981' : '#3b82f6')
-  ctx.lineWidth = 3
+  ctx.lineWidth = 5
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
@@ -741,11 +772,13 @@ function handleStart() {
 .test-preview-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 12px;
   justify-content: center;
   flex-shrink: 0;
   margin-top: 6px;
+  padding-bottom: 40px;
   background: transparent;
+  overflow: visible;
 }
 
 .control-group {
@@ -757,6 +790,8 @@ function handleStart() {
   display: flex;
   align-items: center;
   gap: 10px;
+  overflow: visible;
+  position: relative;
 
   button {
     background: rgba(51, 65, 85, 0.8);
@@ -771,6 +806,8 @@ function handleStart() {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
     transition: all 0.2s ease;
     cursor: pointer;
+    overflow: visible;
+    position: relative;
 
     &:not(:disabled):hover {
       background: rgba(71, 85, 105, 0.9);
@@ -800,15 +837,16 @@ function handleStart() {
   }
 }
 
-// 闪烁提示动画
+// 闪烁提示动画（与原代码一致）
 .operation-hint-blink {
-  animation: operationHintPulse 1s ease-in-out infinite;
   position: relative;
+  z-index: 100;
+  animation: operationHintPulse 1s ease-in-out infinite;
 
   &::before {
     content: "👆";
     position: absolute;
-    top: -30px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 24px;

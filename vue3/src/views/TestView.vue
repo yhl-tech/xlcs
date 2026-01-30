@@ -1,7 +1,5 @@
 <template>
   <div class="test-view">
-    <!-- 黑洞背景 -->
-    <BlackHoleBackground :enabled="true" :theme="uiStore.backgroundTheme" :z-index="0" />
     
     <!-- 开发测试按钮 -->
     <div class="dev-test-buttons">
@@ -98,7 +96,6 @@ import EnergyPillar from '@/components/test/EnergyPillar.vue'
 import PostTestForm from '@/components/forms/PostTestForm.vue'
 import UploadingView from '@/components/effects/UploadingView.vue'
 import WaitingReportView from '@/components/effects/WaitingReportView.vue'
-import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 
 // Composables
 import { useSession } from '@/composables/useSession'

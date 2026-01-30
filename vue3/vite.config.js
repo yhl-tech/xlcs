@@ -87,7 +87,7 @@ export default defineConfig({
     reportCompressedSize: true
   },
   
-  base: '/xlcp/',  // 部署在 /xlcp 子路径下
+  base: '/',  // 部署在 /xlcp 子路径下
   publicDir: 'public',
   
   optimizeDeps: {

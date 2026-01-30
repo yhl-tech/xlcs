@@ -1,23 +1,42 @@
 <template>
   <div class="prep-page">
-    <!-- 黑洞粒子背景 -->
-    <BlackHoleBackground :enabled="true" :theme="0" :z-index="0" />
 
     <!-- 准备页面布局 -->
     <div class="prep-layout">
       <!-- 左侧：信息填写卡片 -->
       <div class="info-card glass-card">
-        <h1 class="card-title">🎨 知己心探测试</h1>
+        <h1 class="card-title">
+          个人信息
+        </h1>
 
-        <form class="info-form" @submit.prevent="handleStartTest">
+        <form
+          class="info-form"
+          @submit.prevent="handleStartTest"
+        >
           <!-- 性别 -->
           <div class="form-group">
             <label for="sex">性别</label>
-            <select id="sex" v-model="form.sex" required>
-              <option value="男" selected>男</option>
-              <option value="女">女</option>
+            <select
+              id="sex"
+              v-model="form.sex"
+              required
+            >
+              <option
+                value="男"
+                selected
+              >
+                男
+              </option>
+              <option value="女">
+                女
+              </option>
             </select>
-            <div v-if="errors.sex" class="error-message">{{ errors.sex }}</div>
+            <div
+              v-if="errors.sex"
+              class="error-message"
+            >
+              {{ errors.sex }}
+            </div>
           </div>
 
           <!-- 年龄 -->
@@ -32,24 +51,54 @@
               step="1"
               inputmode="numeric"
               required
-            />
-            <div v-if="errors.age" class="error-message">{{ errors.age }}</div>
+            >
+            <div
+              v-if="errors.age"
+              class="error-message"
+            >
+              {{ errors.age }}
+            </div>
           </div>
 
           <!-- 学历 -->
           <div class="form-group">
             <label for="education">学历</label>
-            <select id="education" v-model="form.education" required>
-              <option value="小学">小学</option>
-              <option value="初中">初中</option>
-              <option value="高中">高中</option>
-              <option value="中专">中专</option>
-              <option value="大专">大专</option>
-              <option value="本科">本科</option>
-              <option value="硕士">硕士</option>
-              <option value="博士">博士</option>
+            <select
+              id="education"
+              v-model="form.education"
+              required
+            >
+              <option value="小学">
+                小学
+              </option>
+              <option value="初中">
+                初中
+              </option>
+              <option value="高中">
+                高中
+              </option>
+              <option value="中专">
+                中专
+              </option>
+              <option value="大专">
+                大专
+              </option>
+              <option value="本科">
+                本科
+              </option>
+              <option value="硕士">
+                硕士
+              </option>
+              <option value="博士">
+                博士
+              </option>
             </select>
-            <div v-if="errors.education" class="error-message">{{ errors.education }}</div>
+            <div
+              v-if="errors.education"
+              class="error-message"
+            >
+              {{ errors.education }}
+            </div>
           </div>
 
           <!-- 职业 -->
@@ -61,8 +110,13 @@
               type="text"
               placeholder="例如：工程师"
               required
-            />
-            <div v-if="errors.occupation" class="error-message">{{ errors.occupation }}</div>
+            >
+            <div
+              v-if="errors.occupation"
+              class="error-message"
+            >
+              {{ errors.occupation }}
+            </div>
           </div>
 
           <!-- 当前心情 -->
@@ -74,30 +128,23 @@
               type="text"
               placeholder="例如：平静"
               required
-            />
-            <div v-if="errors.mood" class="error-message">{{ errors.mood }}</div>
+            >
+            <div
+              v-if="errors.mood"
+              class="error-message"
+            >
+              {{ errors.mood }}
+            </div>
           </div>
 
           <!-- 开始测试按钮 -->
-          <button type="submit" class="start-btn">开始测试</button>
-
-          <!-- 恢复未完成测试按钮 -->
-          <button
-            v-if="hasUnfinishedTest"
-            type="button"
-            class="resume-btn"
-            @click="handleResumeTest"
+          <button 
+            type="submit" 
+            class="start-btn"
+         
+            :class="{ 'btn-disabled': !isDeviceTestPassed }"
           >
-            恢复未完成测试
-          </button>
-
-          <!-- 直接进入测试按钮（跳过基本信息填写） -->
-          <button
-            type="button"
-            class="direct-enter-btn"
-            @click="handleDirectEnter"
-          >
-            直接进入测试
+            {{ isDeviceTestPassed ? '开始测试' : '请先完成设备检测' }}
           </button>
         </form>
       </div>
@@ -105,10 +152,16 @@
       <!-- 右侧：准备说明卡片 -->
       <div class="prep-card glass-card">
         <div class="prep-header">
-          <div class="prep-icon">🎧</div>
+          <div class="prep-icon">
+            🎧
+          </div>
           <div>
-            <p class="prep-label">测试准备</p>
-            <h2 class="prep-title">开始之前，请先确认这些事项</h2>
+            <p class="prep-label">
+              测试准备
+            </p>
+            <h2 class="prep-title">
+              开始之前，请先确认这些事项
+            </h2>
           </div>
         </div>
 
@@ -118,34 +171,43 @@
 
         <ul class="prep-list">
           <li>
-            <span class="list-dot"></span>
+            <span class="list-dot" />
             <div>1.首先，请先在网页左侧，填写您的个人信息</div>
           </li>
           <li>
-            <span class="list-dot"></span>
+            <span class="list-dot" />
             <div>2.测试需要在台式电脑或笔记本电脑上进行，请确保您的电脑麦克风和音响正常。您可以在浏览器上配置您的麦克风，并利用下方的设备测试按钮，检测您的麦克风和音响状态。</div>
           </li>
           <li>
-            <span class="list-dot"></span>
+            <span class="list-dot" />
             <div>3.需要提醒您的是，测试时需要保持您周围的环境安静，避免被外界的电话、微信消息打扰，只有这样才能达到最好的测试效果</div>
           </li>
           <li>
-            <span class="list-dot"></span>
+            <span class="list-dot" />
             <div>4.整个心理测试过程采用数字人语音交互完成，确保您的信息隐私安全，请放心。</div>
           </li>
           <li>
-            <span class="list-dot"></span>
+            <span class="list-dot" />
             <div>5.如果以上信息确认完毕，那么请点击蓝色的开始测试按钮，我们将向您介绍心理测试的具体操作流程</div>
           </li>
         </ul>
 
         <!-- 设备检测区域 -->
-        <div class="device-check" :data-status="deviceCheckStatus">
+        <div
+          class="device-check"
+          :data-status="deviceCheckStatus"
+        >
           <div class="device-check-header">
-            <div class="device-check-icon">🎧</div>
+            <div class="device-check-icon">
+              🎧
+            </div>
             <div>
-              <p class="device-check-title">设备检测</p>
-              <p class="device-check-tip">{{ deviceCheckTip }}</p>
+              <p class="device-check-title">
+                设备检测
+              </p>
+              <p class="device-check-tip">
+                {{ deviceCheckTip }}
+              </p>
             </div>
           </div>
 
@@ -156,21 +218,23 @@
           <div class="device-check-actions">
             <button
               type="button"
-              @click="handleSpeakerTest"
               :disabled="isSpeakerTesting"
+              @click="handleSpeakerTest"
             >
               🔊 {{ isSpeakerTesting ? '测试中...' : '测试语音（音响）播放' }}
             </button>
             <button
               type="button"
-              @click="handleMicTest"
               :disabled="isMicTesting"
+              @click="handleMicTest"
             >
               🎙️ {{ isMicTesting ? '检测中...' : '检测麦克风（测试时请说话）' }}
             </button>
           </div>
 
-          <div class="device-check-result">{{ deviceCheckResult }}</div>
+          <div class="device-check-result">
+            {{ deviceCheckResult }}
+          </div>
         </div>
       </div>
     </div>
@@ -178,14 +242,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { useApi } from '@/composables/useApi'
 import { playAudio, stopAllAudios } from '@/utils/audioManager'
-import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -211,8 +274,14 @@ const errors = reactive({
   mood: ''
 })
 
-// 是否有未完成的测试
-const hasUnfinishedTest = ref(false)
+// 设备测试完成状态
+const isSpeakerTestPassed = ref(false)
+const isMicTestPassed = ref(false)
+
+// 计算属性：是否设备测试都通过
+const isDeviceTestPassed = computed(() => {
+  return isSpeakerTestPassed.value && isMicTestPassed.value
+})
 
 // 设备检测状态
 const deviceCheckStatus = ref('pending') // 'pending' | 'checking' | 'ready' | 'error'
@@ -229,10 +298,6 @@ let testAudio = null
 let welcomeMessagePlayed = false
 
 onMounted(async () => {
-  // 检查是否有未完成的测试
-  const savedSession = sessionStore.loadSnapshot()
-  hasUnfinishedTest.value = !!savedSession
-
   console.log('[PrepView] 页面已加载')
   
   // 播放欢迎语音（使用 MP3 文件，不需要 WebRTC）
@@ -344,12 +409,15 @@ async function handleSpeakerTest() {
     // 播放完成
     testAudio.onended = () => {
       deviceCheckResult.value = '✓ 语音播放测试完成'
-      deviceCheckTip.value = '接下来请测试麦克风。'
+      isSpeakerTestPassed.value = true
       isSpeakerTesting.value = false
       
       // 如果麦克风也测试通过，则标记为 ready
-      if (deviceCheckResult.value.includes('麦克风测试完成')) {
+      if (isMicTestPassed.value) {
         deviceCheckStatus.value = 'ready'
+        deviceCheckTip.value = '设备检测完成，可以开始测试了。'
+      } else {
+        deviceCheckTip.value = '接下来请测试麦克风。'
       }
     }
   } catch (error) {
@@ -406,8 +474,15 @@ async function handleMicTest() {
         
         if (maxVolume > 10) {
           deviceCheckResult.value = '✓ 麦克风测试完成'
-          deviceCheckTip.value = '设备检测完成，可以开始测试了。'
-          deviceCheckStatus.value = 'ready'
+          isMicTestPassed.value = true
+          
+          // 如果音响也测试通过，则标记为 ready
+          if (isSpeakerTestPassed.value) {
+            deviceCheckStatus.value = 'ready'
+            deviceCheckTip.value = '设备检测完成，可以开始测试了。'
+          } else {
+            deviceCheckTip.value = '接下来请测试语音播放。'
+          }
         } else {
           deviceCheckResult.value = '✗ 未检测到声音，请检查麦克风'
           deviceCheckTip.value = '请确保麦克风已连接并调高音量。'
@@ -491,53 +566,19 @@ async function handleStartTest() {
   }
 }
 
-// 恢复未完成的测试
-function handleResumeTest() {
-  // 使用 sessionStore 的恢复方法
-  const success = sessionStore.restoreSession()
-  if (success) {
-    // 跳转到测试页面
-    router.push('/test')
-  } else {
-    alert('恢复会话失败，请重新开始测试')
-  }
-}
-
-// 直接进入测试（跳过基本信息填写）
-function handleDirectEnter() {
-  console.log('[PrepView] 直接进入测试')
-  
-  // 停止当前页面的音频
-  stopAllAudios()
-  
-  // 设置默认的基本信息（用于测试）
-  testStore.setBasicInfo({
-    sex: '男',
-    age: '25',
-    education: '本科',
-    occupation: '测试用户',
-    mood: '平静'
-  })
-  
-  // 启动测试
-  testStore.startTest()
-  
-  // 保存会话快照
-  sessionStore.saveSnapshot('direct_enter')
-  
-  // 直接跳转到测试页面
-  router.push('/test')
-}
 </script>
 
 
 <style lang="less" scoped>
-// 变量
+// 变量 - 升级配色方案
 @brand-cyan: #00f2ea;
-@brand-blue: #0055ff;
-@brand-purple: #ff0080;
-@glass-bg: rgba(15, 23, 42, 0.75);
-@glass-border: rgba(99, 102, 241, 0.3);
+@brand-blue: #3b82f6;
+@brand-purple: #8b5cf6;
+@text-primary: #ffffff;
+@text-secondary: #ffffff;
+@glass-bg: rgba(15, 23, 42, 0.65);
+@glass-border: rgba(255, 255, 255, 0.1);
+@input-bg: rgba(30, 41, 59, 0.5);
 
 // 主容器
 .prep-page {
@@ -547,36 +588,32 @@ function handleDirectEnter() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
-  background: transparent; // 改为透明，让黑洞背景显示
+  padding: 80px 24px 40px;
+  background: transparent;
   overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 // 准备页面布局（两栏）
 .prep-layout {
   position: relative;
-  z-index: 10; // 确保内容在背景之上
+  z-index: 10;
   display: flex;
-  gap: 32px;
-  width: min(1160px, 100%);
+  gap: 24px;
+  width: min(1200px, 100%);
   align-items: stretch;
-  animation: slideUp 0.6s ease-out;
+  animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 
-  @media (max-width: 1200px) {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     flex-direction: column;
-    gap: 20px;
+    max-width: 600px;
   }
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(40px);
   }
   to {
     opacity: 1;
@@ -584,75 +621,40 @@ function handleDirectEnter() {
   }
 }
 
-// 玻璃卡片
+// 玻璃卡片通用样式
 .glass-card {
-  background: @glass-bg;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid @glass-border;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(100, 150, 200, 0.2);
   border-radius: 20px;
-  padding: 24px 40px;
+  padding: 24px;
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(99, 102, 241, 0.1),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(100, 150, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(99, 102, 241, 0.6),
-      rgba(139, 92, 246, 0.6),
-      transparent
-    );
-    opacity: 0.8;
-    animation: shimmer 3s ease-in-out infinite;
-  }
-
-  @media (max-width: 768px) {
-    padding: 20px;
-  }
-}
-
-@keyframes shimmer {
-  0%, 100% {
-    opacity: 0.4;
-    transform: translateX(-100%);
-  }
-  50% {
-    opacity: 0.8;
-    transform: translateX(100%);
-  }
 }
 
 // 左侧信息卡片
 .info-card {
-  width: 400px;
+  width: 340px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 
-  @media (max-width: 1200px) {
+  @media (max-width: 1024px) {
     width: 100%;
-    max-width: 460px;
   }
 }
 
 .card-title {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
-  color: rgba(226, 232, 240, 0.95);
-  text-align: center;
+  color: #ffffff;
   margin-bottom: 16px;
-  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
-  position: relative;
-  z-index: 2;
+  letter-spacing: -0.01em;
 }
 
 // 表单
@@ -660,8 +662,7 @@ function handleDirectEnter() {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  position: relative;
-  z-index: 2;
+  flex: 1;
 }
 
 // 表单组
@@ -671,49 +672,78 @@ function handleDirectEnter() {
   gap: 6px;
 
   label {
-    font-size: 14px;
-    font-weight: 600;
-    color: rgba(203, 213, 225, 0.9);
+    font-size: 12px;
+    font-weight: 500;
+    color: @text-secondary;
   }
 
   input,
   select {
-    padding: 12px 14px;
-    background: rgba(30, 41, 59, 0.6);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 2px solid rgba(226, 232, 240, 0.2);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 42px;
+    padding: 0 14px;
+    background: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid rgba(100, 150, 200, 0.3);
     border-radius: 10px;
-    color: rgba(226, 232, 240, 0.95);
+    color: #ffffff !important;
     font-size: 14px;
+    line-height: 42px;
     transition: all 0.2s ease;
     font-family: inherit;
+    box-sizing: border-box;
 
     &::placeholder {
-      color: rgba(148, 163, 184, 0.6);
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    &:hover {
+      background: rgba(15, 23, 42, 0.9) !important;
+      border-color: rgba(100, 150, 200, 0.5);
     }
 
     &:focus {
       outline: none;
-      background: rgba(30, 41, 59, 0.8);
-      border-color: rgba(99, 102, 241, 0.6);
-      box-shadow: 
-        0 0 0 3px rgba(99, 102, 241, 0.2),
-        0 4px 12px rgba(99, 102, 241, 0.3);
+      background: rgba(15, 23, 42, 0.95) !important;
+      border-color: @brand-blue;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }
   }
 
+  input[type="number"] {
+    -moz-appearance: textfield;
+    
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  :deep(input:-webkit-autofill),
+  :deep(input:-webkit-autofill:hover),
+  :deep(input:-webkit-autofill:focus),
+  :deep(textarea:-webkit-autofill),
+  :deep(textarea:-webkit-autofill:hover),
+  :deep(textarea:-webkit-autofill:focus) {
+    -webkit-text-fill-color: #ffffff !important;
+    box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.9) inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
+
   select {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e2e8f0' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 12px 12px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
     cursor: pointer;
+    padding-right: 36px;
 
     option {
-      background: rgba(15, 23, 42, 0.95);
-      color: rgba(226, 232, 240, 0.95);
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px;
     }
   }
 }
@@ -721,110 +751,63 @@ function handleDirectEnter() {
 // 错误信息
 .error-message {
   font-size: 12px;
-  color: rgba(248, 113, 113, 0.9);
-  text-shadow: 0 0 5px rgba(248, 113, 113, 0.3);
-  min-height: 18px;
+  color: #ef4444;
+  margin-top: 4px;
+  padding-left: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  &::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: white;
+    font-size: 9px;
+    font-weight: bold;
+  }
 }
 
 // 开始测试按钮
 .start-btn {
   width: 100%;
-  padding: 14px;
-  margin-top: 10px;
-  background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
-  border: 1px solid rgba(99, 102, 241, 0.5);
-  border-radius: 10px;
-  color: white;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    0 4px 16px rgba(99, 102, 241, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-
-  &:hover {
-    background: linear-gradient(135deg, #2563eb, #4f46e5, #7c3aed);
-    box-shadow: 
-      0 6px 20px rgba(99, 102, 241, 0.6),
-      0 0 0 1px rgba(255, 255, 255, 0.2) inset;
-    transform: translateY(-2px);
-  }
-
-  &:active {
-    transform: translateY(0);
-    box-shadow: 
-      0 2px 8px rgba(99, 102, 241, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-  }
-}
-
-// 恢复测试按钮
-.resume-btn {
-  width: 100%;
   padding: 12px;
-  margin-top: 12px;
-  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
-  border: 1px solid rgba(6, 182, 212, 0.5);
+  margin-top: 8px;
+  background: linear-gradient(135deg, #3b82f6, #4f46e5);
+  border: none;
   border-radius: 10px;
   color: white;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    0 4px 16px rgba(6, 182, 212, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 
   &:hover {
-    background: linear-gradient(135deg, #0284c7, #0891b2);
-    box-shadow: 
-      0 6px 20px rgba(6, 182, 212, 0.6),
-      0 0 0 1px rgba(255, 255, 255, 0.2) inset;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
   }
 
   &:active {
     transform: translateY(0);
-    box-shadow: 
-      0 2px 8px rgba(6, 182, 212, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-  }
-}
-
-// 直接进入测试按钮
-.direct-enter-btn {
-  width: 100%;
-  padding: 12px;
-  margin-top: 12px;
-  background: linear-gradient(135deg, #2196F3, #1976D2);
-  border: 1px solid rgba(33, 150, 243, 0.5);
-  border-radius: 10px;
-  color: white;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    0 4px 16px rgba(33, 150, 243, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-
-  &:hover {
-    background: linear-gradient(135deg, #1E88E5, #1565C0);
-    box-shadow: 
-      0 6px 20px rgba(33, 150, 243, 0.6),
-      0 0 0 1px rgba(255, 255, 255, 0.2) inset;
-    transform: translateY(-2px);
   }
 
-  &:active {
-    transform: translateY(0);
-    box-shadow: 
-      0 2px 8px rgba(33, 150, 243, 0.4),
-      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  &.btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #334155;
+    box-shadow: none;
+    color: #94a3b8;
+    
+    &:hover {
+      transform: none;
+      box-shadow: none;
+    }
   }
 }
 
@@ -833,219 +816,236 @@ function handleDirectEnter() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .prep-header {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  position: relative;
-  z-index: 2;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .prep-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 28px;
-  box-shadow: 0 10px 30px rgba(79, 70, 229, 0.25);
+  font-size: 22px;
+  color: #60a5fa;
 }
 
 .prep-label {
   font-size: 13px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .prep-title {
-  font-size: 22px;
-  color: rgba(226, 232, 240, 0.95);
+  font-size: 17px;
+  font-weight: 600;
+  color: @text-primary;
   margin: 0;
-  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+  line-height: 1.3;
 }
 
 .prep-intro {
-  font-size: 14px;
-  line-height: 1.7;
-  color: rgba(203, 213, 225, 0.9);
-  position: relative;
-  z-index: 2;
+  font-size: 13px;
+  line-height: 1.6;
+  color: @text-secondary;
+  margin: 0;
 }
 
 .prep-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
   margin: 0;
   padding: 0;
-  position: relative;
-  z-index: 2;
 
   li {
     display: flex;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    background: rgba(30, 41, 59, 0.5);
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    color: rgba(226, 232, 240, 0.9);
-    line-height: 1.6;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    transition: all 0.2s ease;
 
-    strong {
-      color: rgba(147, 197, 253, 0.95);
+    &:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    div {
+      font-size: 13px;
+      line-height: 1.5;
+      color: @text-secondary;
     }
   }
 }
 
 .list-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, #0ea5e9, #2563eb);
-  margin-top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: @brand-blue;
+  margin-top: 6px;
   flex-shrink: 0;
 }
 
-// 设备检测
+// 设备检测区域
 .device-check {
-  position: relative;
-  z-index: 2;
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  margin-top: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  padding: 12px 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  overflow: hidden;
+  
+  // 科技感背景纹理
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: 
+      radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
 
   &[data-status="error"] {
-    animation: deviceCheckShake 0.4s ease;
-    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35),
-      0 10px 30px rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
   }
-}
-
-@keyframes deviceCheckShake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-6px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-3px); }
+  
+  &[data-status="ready"] {
+    border-color: rgba(16, 185, 129, 0.4);
+  }
 }
 
 .device-check-header {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .device-check-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 .device-check-title {
   font-size: 14px;
-  font-weight: 700;
-  color: rgba(226, 232, 240, 0.95);
+  font-weight: 600;
+  color: @text-primary;
   margin: 0;
-  letter-spacing: 0.02em;
 }
 
 .device-check-tip {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: rgba(203, 213, 225, 0.9);
+  font-size: 12px;
+  color: @text-secondary;
+  margin: 2px 0 0;
 }
 
 .device-check-desc {
-  font-size: 13px;
+  font-size: 12px;
+  color: #ffffff;
+  margin: 0;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border-left: 2px solid @brand-blue;
   line-height: 1.5;
-  color: rgba(203, 213, 225, 0.8);
 }
 
 .device-check-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 
   button {
     flex: 1;
-    min-width: 150px;
-    border-radius: 10px;
-    border: 2px solid rgba(226, 232, 240, 0.2);
-    background: rgba(30, 41, 59, 0.7);
-    padding: 10px 12px;
-    font-weight: 600;
-    font-size: 13px;
+    min-width: 140px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: @text-primary;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    color: rgba(226, 232, 240, 0.9);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 
     &:hover:not(:disabled) {
-      background: rgba(51, 65, 85, 0.8);
-      border-color: rgba(99, 102, 241, 0.5);
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-      transform: translateY(-1px);
-    }
-
-    &:active:not(:disabled) {
-      transform: translateY(0);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+      border-color: @brand-blue;
     }
 
     &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+      opacity: 0.5;
+      cursor: wait;
     }
   }
 }
 
 .device-check-result {
-  align-self: flex-start;
-  padding: 6px 16px;
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-weight: 500;
   background: rgba(30, 41, 59, 0.5);
-  color: rgba(203, 213, 225, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  text-transform: uppercase;
+  color: @text-secondary;
+  border: 1px solid transparent;
+  width: fit-content;
 }
 
+// 响应状态样式
 .device-check[data-status="ready"] .device-check-result {
-  background: rgba(16, 185, 129, 0.12);
   color: #10b981;
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .device-check[data-status="error"] .device-check-result {
-  background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
 }
 
 .device-check[data-status="checking"] .device-check-result {
-  background: rgba(14, 165, 233, 0.15);
   color: #0ea5e9;
-  border-color: rgba(14, 165, 233, 0.4);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
 }
 </style>
