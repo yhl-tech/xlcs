@@ -454,9 +454,21 @@ async function handlePostTestSubmit(answers) {
 }
 
 // 上传完成后进入等待报告阶段
-function handleUploadComplete() {
-  // session.markCompleted()
-  // testStore.setPhase('waiting')
+async function handleUploadComplete() {
+  console.log('[TestView] 上传完成，关闭 WebRTC 连接')
+  
+  // 关闭 WebRTC 连接
+  try {
+    if (dialog.isConnected.value) {
+      await dialog.disconnect()
+      console.log('[TestView] WebRTC 连接已关闭')
+    }
+  } catch (error) {
+    console.warn('[TestView] 关闭 WebRTC 连接失败:', error)
+  }
+  
+  // 进入等待报告阶段
+  testStore.setPhase('waiting')
 }
 
 // 恢复会话

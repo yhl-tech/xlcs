@@ -315,15 +315,11 @@ function initWordcloudAnimation() {
     }
   }
   
-  // 创建粒子：增加粒子数量以增强"大量数据"的感觉
-  // 如果词太少，就重复利用
-  let particleList = []
-  const baseList = wordList
-  const targetCount = 40 // 保持画面有约40个词在流动
-  
-  for (let i = 0; i < targetCount; i++) {
-    const text = baseList[i % baseList.length]
-    particleList.push(new ConvergingParticle(text, i))
+  // 创建粒子：保持 20 个粒子在流动
+  const particleCount = Math.min(20, wordList.length)
+  const particleList = []
+  for (let i = 0; i < particleCount; i++) {
+    particleList.push(new ConvergingParticle(wordList[i], i))
   }
   
   function animate() {

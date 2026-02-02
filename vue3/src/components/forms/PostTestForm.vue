@@ -48,7 +48,8 @@ import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { 
   POST_TEST_QUESTIONS, 
   shouldDisplayQuestion, 
-  findWhyQuestion 
+  findWhyQuestion,
+  buildTTSQuery
 } from '@/utils/constants'
 
 const emit = defineEmits(['submit'])
@@ -66,16 +67,21 @@ const answers = reactive({})
 const dialog = useRealtimeDialog()
 
 // 初始化答案为数组格式
-onMounted(() => {
+onMounted(async () => {
   console.log('[PostTestForm] 组件已挂载')
   console.log('[PostTestForm] 可显示问题数:', displayableQuestions.value.length)
+  console.log('[PostTestForm] WebRTC 连接状态:', dialog.isConnected.value)
   
   displayableQuestions.value.forEach(q => {
     answers[q.key] = []
   })
   
-  // 播报第一个问题
-  askCurrentQuestion()
+  // 等待一小段时间确保 WebRTC 状态稳定
+  await new Promise(resolve => setTimeout(resolve, 500))
+  
+  // 播报第一个问题（包含开场语）
+  console.log('[PostTestForm] 准备播报第一个问题')
+  await askCurrentQuestion()
 })
 
 // 当前问题
@@ -136,7 +142,10 @@ function handleImageSelection(imageNumber) {
 
 // 播报当前问题
 async function askCurrentQuestion() {
-  if (!currentQuestion.value) return
+  if (!currentQuestion.value) {
+    console.warn('[PostTestForm] 当前问题为空，跳过播报')
+    return
+  }
   
   const question = currentQuestion.value
   const whyQuestion = findWhyQuestion(question.key)
@@ -146,12 +155,18 @@ async function askCurrentQuestion() {
   const whyText = whyQuestion ? whyQuestion.text : ''
   const combinedText = whyText ? `${mainText} ${whyText}` : mainText
   
-  // 使用 WebRTC 播报
+  console.log('[PostTestForm] 准备播报问题:', currentQuestionIndex.value)
+  console.log('[PostTestForm] 问题内容:', combinedText.substring(0, 50) + '...')
+  console.log('[PostTestForm] WebRTC 连接状态:', dialog.isConnected.value)
+  
+  // 使用 WebRTC 播报（使用统一的 TTS 格式）
   try {
     if (dialog.isConnected.value) {
-      const ttsQuery = `[TTS-READ-ONLY] ${combinedText}`
+      const ttsQuery = buildTTSQuery(combinedText)
       await dialog.sendTextMessage(ttsQuery)
-      console.log('[PostTestForm] 播报问题:', currentQuestionIndex.value)
+      console.log('[PostTestForm] ✓ 问题已发送到 WebRTC')
+    } else {
+      console.warn('[PostTestForm] WebRTC 未连接，无法播报')
     }
   } catch (error) {
     console.warn('[PostTestForm] TTS 播报失败:', error)
@@ -171,8 +186,20 @@ function goToNextQuestion() {
 }
 
 // 完成问卷
-function finishQuestionnaire() {
+async function finishQuestionnaire() {
   console.log('[PostTestForm] 问卷完成，准备提交')
+  
+  // 播报结束语
+  const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约1-2天，请您耐心等待。'
+  try {
+    if (dialog.isConnected.value) {
+      const ttsQuery = buildTTSQuery(finishText)
+      await dialog.sendTextMessage(ttsQuery)
+      console.log('[PostTestForm] 播报结束语')
+    }
+  } catch (error) {
+    console.warn('[PostTestForm] 结束语播报失败:', error)
+  }
   
   // 转换答案格式以匹配 API 要求
   const formattedAnswers = {
