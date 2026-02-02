@@ -169,121 +169,186 @@ function extractWordsFromDialogue() {
   })
 }
 
-// 初始化词云画布动画
+// 初始化词云画布动画 - 数据汇聚吸入效果
 function initWordcloudAnimation() {
   const canvas = wordcloudCanvas.value
   if (!canvas) return
   
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
+  // 设置高清屏支持
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = window.innerWidth * dpr
+  canvas.height = window.innerHeight * dpr
+  canvas.style.width = `${window.innerWidth}px`
+  canvas.style.height = `${window.innerHeight}px`
+  
   const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
   
   const wordList = words.value.length > 0 ? words.value : extractWordsFromDialogue()
   words.value = wordList
   
-  // 词云粒子 - 更鲜艳的颜色和更高的不透明度
-  const particles = wordList.map((text, i) => ({
-    text,
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    vx: (Math.random() - 0.5) * 0.5,
-    vy: (Math.random() - 0.5) * 0.5,
-    size: 14 + Math.random() * 10,
-    opacity: 0.7 + Math.random() * 0.3,
-    color: ['#818cf8', '#a78bfa', '#f472b6', '#22d3ee', '#c084fc', '#fb7185', '#34d399'][i % 7]
-  }))
+  const centerX = window.innerWidth / 2
+  const centerY = window.innerHeight / 2
+  const maxRadius = Math.max(window.innerWidth, window.innerHeight) / 1.2
+  
+  // 颜色配置 - 保持高级蓝紫色系
+  const colors = [
+    { r: 167, g: 139, b: 250 },  // #a78bfa
+    { r: 192, g: 132, b: 252 },  // #c084fc
+    { r: 129, g: 140, b: 248 },  // #818cf8
+    { r: 56, g: 189, b: 248 },   // #38bdf8
+    { r: 232, g: 121, b: 249 }   // #e879f9
+  ]
+  
+  // 汇聚粒子类 - 四面八方向中心汇聚
+  class ConvergingParticle {
+    constructor(text, index) {
+      this.text = text
+      this.color = colors[index % colors.length]
+      this.baseScale = 0.8 + Math.random() * 0.5
+      this.reset(true)
+    }
+    
+    reset(initial = false) {
+      // 从屏幕四边随机位置生成
+      const side = Math.floor(Math.random() * 4)
+      const margin = 50
+      
+      switch(side) {
+        case 0: // 上边
+          this.x = Math.random() * window.innerWidth
+          this.y = -margin
+          break
+        case 1: // 右边
+          this.x = window.innerWidth + margin
+          this.y = Math.random() * window.innerHeight
+          break
+        case 2: // 下边
+          this.x = Math.random() * window.innerWidth
+          this.y = window.innerHeight + margin
+          break
+        case 3: // 左边
+          this.x = -margin
+          this.y = Math.random() * window.innerHeight
+          break
+      }
+      
+      // 如果是初始化，随机分布在屏幕各处
+      if (initial) {
+        this.x = Math.random() * window.innerWidth
+        this.y = Math.random() * window.innerHeight
+        // 避开中心区域
+        const dx = this.x - centerX
+        const dy = this.y - centerY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < 150) {
+          this.x = centerX + (dx / dist) * (150 + Math.random() * 200)
+          this.y = centerY + (dy / dist) * (150 + Math.random() * 200)
+        }
+      }
+      
+      // 计算到中心的方向
+      const dx = centerX - this.x
+      const dy = centerY - this.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      
+      // 归一化方向向量
+      this.vx = (dx / dist)
+      this.vy = (dy / dist)
+      
+      // 速度：适中
+      this.speed = 1.0 + Math.random() * 0.8
+      this.opacity = initial ? 0.8 : 0
+      this.distance = dist
+    }
+    
+    update() {
+      // 向中心移动
+      this.x += this.vx * this.speed
+      this.y += this.vy * this.speed
+      
+      // 计算当前到中心的距离
+      const dx = centerX - this.x
+      const dy = centerY - this.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      
+      // 越靠近中心速度稍快（轻微加速效果）
+      if (dist < 250) {
+        this.speed *= 1.005
+      }
+      
+      // 透明度控制
+      if (this.opacity < 0.9 && dist > 200) {
+        this.opacity = Math.min(0.9, this.opacity + 0.025)
+      } else if (dist < 120) {
+        // 接近中心时淡出
+        this.opacity = Math.max(0, dist / 120 * 0.9)
+      }
+      
+      // 到达中心附近则重置
+      if (dist < 60) {
+        this.reset()
+      }
+    }
+    
+    draw() {
+      if (this.opacity <= 0.01) return
+      
+      ctx.save()
+      
+      const fontSize = 15 * this.baseScale
+      ctx.font = `600 ${fontSize}px -apple-system, "Microsoft YaHei", sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      
+      const alpha = this.opacity
+      ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha})`
+      
+      // 发光效果
+      if (alpha > 0.4) {
+        ctx.shadowColor = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0.5)`
+        ctx.shadowBlur = 8 * alpha
+      }
+      
+      ctx.fillText(this.text, this.x, this.y)
+      ctx.restore()
+    }
+  }
+  
+  // 创建粒子：增加粒子数量以增强"大量数据"的感觉
+  // 如果词太少，就重复利用
+  let particleList = []
+  const baseList = wordList
+  const targetCount = 40 // 保持画面有约40个词在流动
+  
+  for (let i = 0; i < targetCount; i++) {
+    const text = baseList[i % baseList.length]
+    particleList.push(new ConvergingParticle(text, i))
+  }
   
   function animate() {
+    if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     
-    particles.forEach(p => {
-      p.x += p.vx
-      p.y += p.vy
-      
-      if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-      if (p.y < 0 || p.y > canvas.height) p.vy *= -1
-      
-      ctx.font = `${p.size}px "Microsoft YaHei", sans-serif`
-      ctx.fillStyle = p.color
-      ctx.globalAlpha = p.opacity
-      ctx.fillText(p.text, p.x, p.y)
+    particleList.forEach(p => {
+      p.update()
+      p.draw()
     })
     
-    ctx.globalAlpha = 1
     animationFrames.wordcloud = requestAnimationFrame(animate)
   }
   
   animate()
 }
 
-// 飞词动画
+// 飞词动画 - 已移除以减少视觉干扰
 function startFlyingWordsAnimation() {
-  const container = blackholeWords.value
-  if (!container) return
-  
-  const wordList = words.value.length > 0 ? words.value : extractWordsFromDialogue()
-  let index = 0
-  
-  intervals.flyingWords = setInterval(() => {
-    const word = wordList[index % wordList.length]
-    const el = document.createElement('span')
-    el.className = 'waiting-report-flying-word'
-    el.textContent = word
-    
-    // 随机起始位置（从外围向中心飞）
-    const angle = Math.random() * Math.PI * 2
-    const distance = 100 + Math.random() * 50
-    const startX = Math.cos(angle) * distance
-    const startY = Math.sin(angle) * distance
-    
-    el.style.cssText = `
-      --start-x: ${startX}px;
-      --start-y: ${startY}px;
-      --rotate: ${Math.random() * 360}deg;
-      color: ${['#818cf8', '#a78bfa', '#f472b6', '#22d3ee', '#c084fc'][index % 5]};
-      font-size: ${14 + Math.random() * 8}px;
-      left: 50%;
-      top: 50%;
-    `
-    
-    container.appendChild(el)
-    
-    // 动画结束后移除
-    setTimeout(() => {
-      el.remove()
-    }, 600)
-    
-    index++
-  }, 800)
+  // 保持空函数以防止报错，或彻底移除调用
 }
 
-// 火花动画
+// 火花动画 - 已移除以减少视觉干扰
 function startSparkAnimation() {
-  const container = sparkContainer.value
-  if (!container) return
-  
-  intervals.spark = setInterval(() => {
-    for (let i = 0; i < 3; i++) {
-      const spark = document.createElement('div')
-      spark.className = 'waiting-report-spark'
-      
-      const angle = Math.random() * Math.PI * 2
-      const tx = Math.cos(angle) * (80 + Math.random() * 40)
-      const ty = Math.sin(angle) * (80 + Math.random() * 40)
-      
-      spark.style.cssText = `
-        --tx: ${tx}px;
-        --ty: ${ty}px;
-        left: 50%;
-        top: 50%;
-        animation-delay: ${Math.random() * 0.3}s;
-      `
-      
-      container.appendChild(spark)
-      
-      setTimeout(() => spark.remove(), 1000)
-    }
-  }, 500)
+  // 保持空函数以防止报错，或彻底移除调用
 }
 
 // 数据计数器动画
@@ -850,15 +915,17 @@ onUnmounted(() => {
   z-index: 2;
 }
 
-/* 进度文字 */
+/* 进度文字 - 优化字体和间距 */
 .waiting-report-progress-text {
-  margin-top: 30px;
-  font-size: 16px;
+  margin-top: 40px;
+  font-size: 18px;
+  font-weight: 500;
   color: #e0e0e0;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+  letter-spacing: 4px;
+  text-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
   text-align: center;
   transition: opacity 0.3s ease;
+  font-family: -apple-system, "SF Pro Display", "Microsoft YaHei", sans-serif;
 }
 
 /* 扫描线 */

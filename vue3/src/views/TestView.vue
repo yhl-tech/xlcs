@@ -15,6 +15,9 @@
       <button class="dev-btn" @click="handleDevSkipToWaiting">
         等待报告
       </button>
+      <button class="dev-btn" @click="handleDevClearData" style="background: #ef4444;">
+        清除数据
+      </button>
     </div>
     
     <!-- 正式测试阶段 -->
@@ -739,6 +742,15 @@ function handleDevSkipToUploading() {
 // 开发测试 - 跳到等待报告页面
 function handleDevSkipToWaiting() {
   testStore.setPhase('waiting')
+}
+
+// 开发测试 - 清除所有测试数据
+function handleDevClearData() {
+  if (confirm('确定要清除所有测试数据吗？')) {
+    testStore.resetTest()
+    console.log('[Dev] 已清除所有测试数据')
+    alert('数据已清除，请重新进行测试')
+  }
 }
 </script>
 
