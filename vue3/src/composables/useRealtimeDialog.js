@@ -270,9 +270,9 @@ export function useRealtimeDialog() {
         },
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,
+          threshold: 0.6,          // 提高阈值，减少误触发
           prefix_padding_ms: 300,
-          silence_duration_ms: 800
+          silence_duration_ms: 1000 // 增加静音时长，让 AI 更不容易被打断
         }
       })
     })
