@@ -202,6 +202,18 @@ onMounted(async () => {
   // 停止所有之前的音频播放（来自准备页面或说明页面）
   stopAllAudios()
   
+  // 等待初始状态检查完成（防止刷新时的时序问题）
+  if (!testStore.initialCheckComplete) {
+    console.log('[TestView] 等待初始状态检查完成...')
+    // 最多等待 3 秒
+    let waitCount = 0
+    while (!testStore.initialCheckComplete && waitCount < 30) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      waitCount++
+    }
+    console.log('[TestView] 初始状态检查已完成，当前阶段:', testStore.phase)
+  }
+  
   // 如果不是测试阶段，重定向
   if (testStore.phase !== 'test' && testStore.phase !== 'postTest' && testStore.phase !== 'uploading' && testStore.phase !== 'waiting') {
     console.log('[TestView] 当前阶段不是测试阶段，重定向到准备页面')

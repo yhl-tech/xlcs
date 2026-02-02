@@ -76,7 +76,7 @@
 
     <!-- 底部提示 -->
     <div class="waiting-report-footer-hint">
-      <p>请耐心等待，AI 正在为您生成详细报告</p>
+      <p>请耐心等待，AI 正在为您生成报告</p>
       <div class="waiting-report-dots">
         <div class="waiting-report-dot"></div>
         <div class="waiting-report-dot"></div>
@@ -526,7 +526,7 @@ onUnmounted(() => {
   position: relative;
   z-index: 6;
   min-height: 100vh;
-  padding: 60px 20px 80px;
+  padding: 100px 20px 80px;
   display: flex;
   flex-direction: column;
   align-items: center;

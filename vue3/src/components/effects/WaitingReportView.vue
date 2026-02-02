@@ -429,7 +429,7 @@ async function checkReportStatus() {
     console.log('[WaitingReport] 报告状态:', response)
     
     // 解析报告状态: code === 0 表示请求成功，data === true 表示报告已生成
-    const isReady = true
+    const isReady = response.code === 0 && response.data === true
     
     if (isReady) {
       isCompleted.value = true

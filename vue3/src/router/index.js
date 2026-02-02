@@ -60,8 +60,9 @@ const routes = [
 ]
 
 // 创建路由实例
+// 使用 import.meta.env.BASE_URL 自动读取 vite.config.js 中的 base 配置
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

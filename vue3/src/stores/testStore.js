@@ -3,7 +3,41 @@
  * 管理测试阶段、图版状态、交互数据等
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+
+// localStorage key
+const STORAGE_KEY = 'xlcs_test_data'
+
+// 从 localStorage 加载数据
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.warn('[TestStore] 加载本地数据失败:', e)
+  }
+  return null
+}
+
+// 保存数据到 localStorage
+function saveToStorage(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch (e) {
+    console.warn('[TestStore] 保存本地数据失败:', e)
+  }
+}
+
+// 清除 localStorage 数据
+function clearStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (e) {
+    console.warn('[TestStore] 清除本地数据失败:', e)
+  }
+}
 
 export const useTestStore = defineStore('test', () => {
   // ==================== 常量 ====================
@@ -21,19 +55,22 @@ export const useTestStore = defineStore('test', () => {
     WAITING: 'waiting'      // 等待报告
   }
   
+  // 从 localStorage 加载已保存的数据
+  const savedData = loadFromStorage()
+  
   // ==================== 状态 ====================
   
-  // 当前测试阶段
+  // 当前测试阶段（不持久化）
   const phase = ref(PHASES.INFO)
   
-  // 当前图版索引（0-9）
+  // 当前图版索引（0-9）（不持久化）
   const currentPlate = ref(0)
   
   // 总图版数
   const totalPlates = ref(TOTAL_PLATES)
   
   // 基本信息
-  const basicInfo = ref({
+  const basicInfo = ref(savedData?.basicInfo || {
     sex: '',
     age: '',
     education: '',
@@ -42,7 +79,7 @@ export const useTestStore = defineStore('test', () => {
   })
   
   // 交互数据
-  const interactionData = ref({
+  const interactionData = ref(savedData?.interactionData || {
     zoom: {},           // { "0": [1, -1, 1], "1": [1] }
     rotate: {},         // { "0": [15, -15], "1": [30] }
     drawingTracks: {},  // { "0": {...}, "1": {...} }
@@ -50,7 +87,7 @@ export const useTestStore = defineStore('test', () => {
   })
   
   // 后测问卷答案
-  const postTestAnswers = ref({
+  const postTestAnswers = ref(savedData?.postTestAnswers || {
     representSelf: null,      // 代表自己的图版
     representFather: null,    // 代表父亲的图版
     representMother: null,    // 代表母亲的图版
@@ -59,23 +96,45 @@ export const useTestStore = defineStore('test', () => {
   })
   
   // 对话历史
-  const dialogHistory = ref([])
+  const dialogHistory = ref(savedData?.dialogHistory || [])
   
   // 会话 ID
-  const sessionId = ref(null)
+  const sessionId = ref(savedData?.sessionId || null)
   
   // 是否已使用过缩放（用于平移功能判断）
-  const hasUsedZoom = ref(false)
+  const hasUsedZoom = ref(savedData?.hasUsedZoom || false)
   
   // 每个图版的开始时间
-  const plateStartTimes = ref({})
+  const plateStartTimes = ref(savedData?.plateStartTimes || {})
   
   // 报告状态
-  const reportStatus = ref({
+  const reportStatus = ref(savedData?.reportStatus || {
     status: '',
     isReady: false,
     message: ''
   })
+  
+  // 初始状态检查是否完成（用于防止页面刷新时的时序问题）
+  const initialCheckComplete = ref(false)
+  
+  // ==================== 持久化 ====================
+  
+  // 监听状态变化并保存到 localStorage
+  function persistState() {
+    saveToStorage({
+      basicInfo: basicInfo.value,
+      interactionData: interactionData.value,
+      postTestAnswers: postTestAnswers.value,
+      dialogHistory: dialogHistory.value,
+      sessionId: sessionId.value,
+      hasUsedZoom: hasUsedZoom.value,
+      plateStartTimes: plateStartTimes.value,
+      reportStatus: reportStatus.value
+    })
+  }
+  
+  // 监听关键状态变化（不包含 phase 和 currentPlate）
+  watch([basicInfo, interactionData, postTestAnswers, dialogHistory, sessionId, reportStatus], persistState, { deep: true })
   
   // ==================== 计算属性 ====================
   
@@ -250,6 +309,11 @@ export const useTestStore = defineStore('test', () => {
     sessionId.value = null
     hasUsedZoom.value = false
     plateStartTimes.value = {}
+    reportStatus.value = { status: '', isReady: false, message: '' }
+    initialCheckComplete.value = false
+    
+    // 清除 localStorage 数据
+    clearStorage()
   }
   
   /**
@@ -257,6 +321,13 @@ export const useTestStore = defineStore('test', () => {
    */
   function markZoomUsed() {
     hasUsedZoom.value = true
+  }
+  
+  /**
+   * 标记初始状态检查已完成
+   */
+  function setInitialCheckComplete(value = true) {
+    initialCheckComplete.value = value
   }
   
   /**
@@ -292,6 +363,7 @@ export const useTestStore = defineStore('test', () => {
     hasUsedZoom,
     plateStartTimes,
     reportStatus,
+    initialCheckComplete,
     
     // 计算属性
     progress,
@@ -312,6 +384,7 @@ export const useTestStore = defineStore('test', () => {
     startTest,
     resetTest,
     markZoomUsed,
-    getSubmitData
+    getSubmitData,
+    setInitialCheckComplete
   }
 })

@@ -110,7 +110,8 @@ async function checkUserTestStatus() {
     }
 
     // 如果用户未提交数据，不跳转
-    if (uploadStatus.data !== true) {
+    // code !== 0 表示请求失败，data !== true 表示未提交过测试
+    if (uploadStatus.code !== 0 || uploadStatus.data !== true) {
       console.log('[App] 用户未提交过测试, code:', uploadStatus.code, 'data:', uploadStatus.data)
       return false
     }
@@ -133,6 +134,7 @@ async function checkUserTestStatus() {
     console.log('[App] 报告是否就绪:', isReportReady, '(code:', reportStatus.code, ', data:', reportStatus.data, ')')
 
     // 3. 设置状态并跳转到等待报告页面
+    console.log('[App] 设置 phase 为 waiting，跳转到报告等待页面')
     testStore.setPhase('waiting')
     testStore.setReportStatus({
       status: isReportReady ? 'ready' : 'pending',
@@ -140,9 +142,13 @@ async function checkUserTestStatus() {
       message: reportStatus.msg || (isReportReady ? '报告已生成' : '报告处理中...')
     })
     
-    // 如果不在 /test 页面，跳转过去
+    // 跳转到 /test 页面（用 replace 避免历史记录堆积）
+    // 即使当前在 /test，也强制跳转以确保组件重新渲染
     if (currentPath !== '/test') {
+      console.log('[App] 跳转到 /test')
       router.replace('/test')
+    } else {
+      console.log('[App] 已在 /test 页面，phase 已设置为 waiting')
     }
     return true
   } catch (error) {
@@ -150,6 +156,16 @@ async function checkUserTestStatus() {
     return false
   }
 }
+
+// 监听路由变化，登录后检查测试状态
+watch(() => route.path, async (newPath, oldPath) => {
+  // 从登录页跳转到其他页面时，检查用户测试状态
+  if (oldPath === '/login' && newPath !== '/login' && newPath !== '/') {
+    console.log('[App] 从登录页跳转，检查用户测试状态')
+    await checkUserTestStatus()
+    testStore.setInitialCheckComplete(true)
+  }
+})
 
 onMounted(async () => {
   console.log('知己心探 Vue 3 版本已启动')
@@ -168,6 +184,9 @@ onMounted(async () => {
   console.log('[App] 开始检查用户测试状态...')
   await checkUserTestStatus()
   console.log('[App] 检查用户测试状态完成')
+  
+  // 标记初始检查已完成
+  testStore.setInitialCheckComplete(true)
 })
 </script>
 
