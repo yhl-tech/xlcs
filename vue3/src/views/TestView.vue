@@ -103,7 +103,6 @@ import { useInteractionTracker } from '@/composables/useInteractionTracker'
 import { useImagePreloader } from '@/composables/useImagePreloader'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { useSubtitle } from '@/composables/useSubtitle'
-import { useGuide } from '@/composables/useGuide'
 import { useApi } from '@/composables/useApi'
 import { SYSTEM_PROMPT, POSTTEST_PROMPT } from '@/utils/constants'
 import { stopAllAudios } from '@/utils/audioManager'
@@ -122,7 +121,6 @@ const imagePreloader = useImagePreloader()
 const dialog = useRealtimeDialog()
 // audioRecorder 已被 dialog.startMixedRecording() 替代
 const subtitle = useSubtitle()
-const guide = useGuide()
 const api = useApi()
 
 const imageCanvasRef = ref(null)
@@ -256,13 +254,6 @@ onMounted(async () => {
       tracker.startTracking(testStore.currentPlate)
     }
     
-    // 显示新手引导
-    if (!guide.checkHasShown()) {
-      setTimeout(() => {
-        guide.showTestGuide()
-      }, 1000)
-    }
-    
     // 在测试阶段启动语音对话（带正确的系统提示词）
     console.log('[TestView] 测试阶段，启动 WebRTC 语音对话...')
     await startVoiceDialog()
@@ -317,13 +308,6 @@ function handleStartTest() {
   // 开始追踪第一张图版
   if (!tracker.isTracking.value) {
     tracker.startTracking(testStore.currentPlate)
-  }
-  
-  // 显示新手引导
-  if (!guide.checkHasShown()) {
-    setTimeout(() => {
-      guide.showTestGuide()
-    }, 500)
   }
 }
 
@@ -468,8 +452,8 @@ async function handlePostTestSubmit(answers) {
 
 // 上传完成后进入等待报告阶段
 function handleUploadComplete() {
-  session.markCompleted()
-  testStore.setPhase('waiting')
+  // session.markCompleted()
+  // testStore.setPhase('waiting')
 }
 
 // 恢复会话

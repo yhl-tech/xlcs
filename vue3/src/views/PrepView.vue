@@ -14,22 +14,42 @@
         >
           <!-- 性别 -->
           <div class="form-group">
-            <label for="sex">性别</label>
-            <select
-              id="sex"
-              v-model="form.sex"
-              required
+            <label>性别</label>
+            <div 
+              class="custom-select"
+              :class="{ 'is-open': sexDropdownOpen }"
             >
-              <option
-                value="男"
-                selected
+              <div 
+                class="custom-select-trigger"
+                @click="sexDropdownOpen = !sexDropdownOpen"
               >
-                男
-              </option>
-              <option value="女">
-                女
-              </option>
-            </select>
+                <span>{{ form.sex || '请选择' }}</span>
+                <svg
+                  class="select-arrow"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+              <div class="custom-select-options">
+                <div 
+                  v-for="opt in ['男', '女']" 
+                  :key="opt"
+                  class="custom-select-option"
+                  :class="{ 'is-selected': form.sex === opt }"
+                  @click="form.sex = opt; sexDropdownOpen = false"
+                >
+                  <span
+                    v-if="form.sex === opt"
+                    class="option-check"
+                  >✓</span>
+                  {{ opt }}
+                </div>
+              </div>
+            </div>
             <div
               v-if="errors.sex"
               class="error-message"
@@ -61,37 +81,42 @@
 
           <!-- 学历 -->
           <div class="form-group">
-            <label for="education">学历</label>
-            <select
-              id="education"
-              v-model="form.education"
-              required
+            <label>学历</label>
+            <div 
+              class="custom-select"
+              :class="{ 'is-open': eduDropdownOpen }"
             >
-              <option value="小学">
-                小学
-              </option>
-              <option value="初中">
-                初中
-              </option>
-              <option value="高中">
-                高中
-              </option>
-              <option value="中专">
-                中专
-              </option>
-              <option value="大专">
-                大专
-              </option>
-              <option value="本科">
-                本科
-              </option>
-              <option value="硕士">
-                硕士
-              </option>
-              <option value="博士">
-                博士
-              </option>
-            </select>
+              <div 
+                class="custom-select-trigger"
+                @click="eduDropdownOpen = !eduDropdownOpen"
+              >
+                <span :class="{ 'placeholder': !form.education }">{{ form.education || '请选择学历' }}</span>
+                <svg
+                  class="select-arrow"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+              <div class="custom-select-options">
+                <div 
+                  v-for="opt in educationOptions" 
+                  :key="opt"
+                  class="custom-select-option"
+                  :class="{ 'is-selected': form.education === opt }"
+                  @click="form.education = opt; eduDropdownOpen = false"
+                >
+                  <span
+                    v-if="form.education === opt"
+                    class="option-check"
+                  >✓</span>
+                  {{ opt }}
+                </div>
+              </div>
+            </div>
             <div
               v-if="errors.education"
               class="error-message"
@@ -273,6 +298,13 @@ const errors = reactive({
   mood: ''
 })
 
+// 下拉框状态
+const sexDropdownOpen = ref(false)
+const eduDropdownOpen = ref(false)
+
+// 学历选项
+const educationOptions = ['小学', '初中', '高中', '中专', '大专', '本科', '硕士', '博士']
+
 // 设备测试完成状态
 const isSpeakerTestPassed = ref(false)
 const isMicTestPassed = ref(false)
@@ -296,8 +328,20 @@ let testAudio = null
 // 欢迎语播报标志
 let welcomeMessagePlayed = false
 
+// 点击外部关闭下拉框
+function handleClickOutside(event) {
+  const target = event.target
+  if (!target.closest('.custom-select')) {
+    sexDropdownOpen.value = false
+    eduDropdownOpen.value = false
+  }
+}
+
 onMounted(async () => {
   console.log('[PrepView] 页面已加载')
+  
+  // 添加点击外部关闭下拉框的监听
+  document.addEventListener('click', handleClickOutside)
   
   // 播放欢迎语音（使用 MP3 文件，不需要 WebRTC）
   if (!welcomeMessagePlayed) {
@@ -330,6 +374,9 @@ async function playWelcomeMessage() {
 
 onUnmounted(() => {
   console.log('[PrepView] 组件卸载，清理所有资源')
+  
+  // 移除点击外部监听
+  document.removeEventListener('click', handleClickOutside)
   
   // 停止所有音频
   stopAllAudios()
@@ -450,45 +497,60 @@ async function handleMicTest() {
     const dataArray = new Uint8Array(bufferLength)
     
     // 检测音量
-    let maxVolume = 0
     let checkCount = 0
-    const maxChecks = 50 // 检测5秒
+    const maxChecks = 30 // 最多检测3秒
+    const volumeThreshold = 10 // 音量阈值
+    let consecutiveDetections = 0 // 连续检测到声音的次数
+    const requiredDetections = 3 // 需要连续检测到3次才算成功
     
     deviceCheckResult.value = '正在检测麦克风...请说话...'
     deviceCheckTip.value = '请对着麦克风说一句话。'
+    
+    const finishTest = (success) => {
+      clearInterval(checkInterval)
+      stream.getTracks().forEach(track => track.stop())
+      
+      if (success) {
+        deviceCheckResult.value = '✓ 麦克风测试完成'
+        isMicTestPassed.value = true
+        
+        // 如果音响也测试通过，则标记为 ready
+        if (isSpeakerTestPassed.value) {
+          deviceCheckStatus.value = 'ready'
+          deviceCheckTip.value = '设备检测完成，可以开始测试了。'
+        } else {
+          deviceCheckTip.value = '接下来请测试语音播放。'
+        }
+      } else {
+        deviceCheckResult.value = '✗ 未检测到声音，请检查麦克风'
+        deviceCheckTip.value = '请确保麦克风已连接并调高音量。'
+        deviceCheckStatus.value = 'error'
+      }
+      
+      isMicTesting.value = false
+    }
     
     const checkInterval = setInterval(() => {
       analyser.getByteFrequencyData(dataArray)
       const volume = dataArray.reduce((a, b) => a + b) / bufferLength
       
-      if (volume > maxVolume) {
-        maxVolume = volume
-      }
-      
       checkCount++
       
-      if (checkCount >= maxChecks) {
-        clearInterval(checkInterval)
-        stream.getTracks().forEach(track => track.stop())
-        
-        if (maxVolume > 10) {
-          deviceCheckResult.value = '✓ 麦克风测试完成'
-          isMicTestPassed.value = true
-          
-          // 如果音响也测试通过，则标记为 ready
-          if (isSpeakerTestPassed.value) {
-            deviceCheckStatus.value = 'ready'
-            deviceCheckTip.value = '设备检测完成，可以开始测试了。'
-          } else {
-            deviceCheckTip.value = '接下来请测试语音播放。'
-          }
-        } else {
-          deviceCheckResult.value = '✗ 未检测到声音，请检查麦克风'
-          deviceCheckTip.value = '请确保麦克风已连接并调高音量。'
-          deviceCheckStatus.value = 'error'
+      // 检测到足够的音量
+      if (volume > volumeThreshold) {
+        consecutiveDetections++
+        // 连续检测到声音3次，立即成功
+        if (consecutiveDetections >= requiredDetections) {
+          finishTest(true)
+          return
         }
-        
-        isMicTesting.value = false
+      } else {
+        consecutiveDetections = 0 // 重置连续计数
+      }
+      
+      // 超时未检测到
+      if (checkCount >= maxChecks) {
+        finishTest(false)
       }
     }, 100)
   } catch (error) {
@@ -684,7 +746,7 @@ async function handleStartTest() {
     width: 100%;
     height: 42px;
     padding: 0 14px;
-    background: rgba(15, 23, 42, 0.8) !important;
+    background-color: rgba(15, 23, 42, 0.8) !important;
     border: 1px solid rgba(100, 150, 200, 0.3);
     border-radius: 10px;
     color: #ffffff !important;
@@ -699,13 +761,13 @@ async function handleStartTest() {
     }
 
     &:hover {
-      background: rgba(15, 23, 42, 0.9) !important;
+      background-color: rgba(15, 23, 42, 0.9) !important;
       border-color: rgba(100, 150, 200, 0.5);
     }
 
     &:focus {
       outline: none;
-      background: rgba(15, 23, 42, 0.95) !important;
+      background-color: rgba(15, 23, 42, 0.95) !important;
       border-color: @brand-blue;
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }
@@ -744,6 +806,132 @@ async function handleStartTest() {
       color: #ffffff;
       padding: 10px;
     }
+  }
+}
+
+// 自定义下拉框
+.custom-select {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(100, 150, 200, 0.3);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+
+  &:hover {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: rgba(100, 150, 200, 0.5);
+  }
+
+  .placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+.select-arrow {
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.custom-select.is-open {
+  .custom-select-trigger {
+    border-color: @brand-blue;
+    background: rgba(15, 23, 42, 0.95);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+
+  .select-arrow {
+    transform: rotate(180deg);
+  }
+
+  .custom-select-options {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+}
+
+.custom-select-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(100, 150, 200, 0.3);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(59, 130, 246, 0.1);
+  max-height: 240px;
+  overflow-y: auto;
+
+  // 自定义滚动条
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 200, 0.3);
+    border-radius: 2px;
+  }
+}
+
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+
+  &:hover {
+    background: rgba(59, 130, 246, 0.15);
+    color: #ffffff;
+  }
+
+  &.is-selected {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    font-weight: 500;
+  }
+
+  .option-check {
+    margin-right: 8px;
+    color: #60a5fa;
+    font-size: 12px;
+    font-weight: bold;
   }
 }
 

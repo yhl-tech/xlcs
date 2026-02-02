@@ -1,494 +1,697 @@
-# 知己心探测试系统 - Vue 3 版本
+# 知己心探测试系统 - 技术文档
 
-基于 Vue 3 + Vite + Pinia 构建的心理测评系统前端应用。
+## 1. 项目概述
 
-## 技术栈
+**知己心探测试系统**是一个基于罗夏墨迹测试的在线心理测评系统。系统通过展示 10 张标准罗夏墨迹图版，结合 AI 语音对话和用户交互数据采集，对用户进行深度心理分析并生成专业报告。
 
-| 技术 | 版本 | 说明 |
+### 主要功能
+
+- **墨迹图版展示**：支持 10 张标准罗夏墨迹图版的展示、缩放、旋转
+- **实时语音对话**：基于 WebRTC 的 AI 语音对话，引导用户描述看到的内容
+- **画笔标注**：用户可在图版上进行画笔标注，标记看到的区域
+- **交互数据追踪**：记录用户的缩放、旋转、画笔轨迹等所有交互行为
+- **数据上传与分析**：将测试数据上传至服务器进行 AI 分析
+- **报告生成与下载**：生成专业心理测评报告（PDF）
+
+---
+
+## 2. 技术架构
+
+### 2.1 技术栈
+
+| 技术 | 版本 | 用途 |
 |------|------|------|
-| Vue | 3.4.x | 前端框架 |
+| Vue 3 | 3.x | 前端框架（Composition API） |
 | Vite | 5.x | 构建工具 |
-| Pinia | 2.1.x | 状态管理 |
-| Vue Router | 4.2.x | 路由管理 |
-| Axios | 1.13.x | HTTP 请求 |
-| Three.js | 0.182.x | 3D 背景效果 |
-| Driver.js | 1.4.x | 新手引导 |
-| lamejs | 1.2.x | MP3 编码 |
-| Less | 4.5.x | CSS 预处理器 |
+| Pinia | 2.x | 状态管理 |
+| Vue Router | 4.x | 路由管理 |
+| Axios | 1.x | HTTP 请求 |
+| Three.js | - | 3D 背景效果（黑洞动画） |
+| WebRTC | - | 实时语音通信 |
+| Driver.js | - | 新手引导 |
 
-## 项目结构（总计约 16,000+ 行代码）
+### 2.2 项目目录结构
 
 ```
 vue3/
-├── public/                    # 静态资源
-│   ├── audio/                 # 音频文件（欢迎语、操作提示音等）
-│   └── images/                # 图片资源（墨迹图版、logo等）
 ├── src/
-│   ├── assets/
-│   │   └── styles/
-│   │       ├── app.css                    # 2833 行 - 主样式
-│   │       ├── waiting-report.css         #  862 行 - 等待报告页样式
-│   │       ├── intro-preview-background.css #  800 行 - 介绍页背景样式
-│   │       └── question-progress.css      #  215 行 - 问题进度样式
-│   ├── components/
-│   │   ├── common/
-│   │   │   ├── AppHeader.vue              #  250 行 - 应用头部
-│   │   │   ├── BaseButton.vue             #  154 行 - 基础按钮
-│   │   │   ├── BaseModal.vue              #  213 行 - 基础弹窗
-│   │   │   ├── LoadingOverlay.vue         #   73 行 - 加载遮罩
-│   │   │   └── UserBar.vue                #  186 行 - 用户信息栏
-│   │   ├── effects/
-│   │   │   ├── BlackHoleBackground.vue    #  659 行 - 3D 黑洞背景动画
-│   │   │   ├── UploadingView.vue          # 1131 行 - 上传进度视图
-│   │   │   └── WaitingReportView.vue      #  903 行 - 等待报告视图
-│   │   ├── forms/
-│   │   │   ├── BasicInfoForm.vue          #  249 行 - 基本信息表单
-│   │   │   └── PostTestForm.vue           #  351 行 - 后测问卷（五个问题）
-│   │   ├── media/
-│   │   │   └── SubtitleDisplay.vue        #  127 行 - 字幕显示
-│   │   └── test/
-│   │       ├── ControlsBar.vue            #  311 行 - 测试控制栏
-│   │       ├── EnergyPillar.vue           #  114 行 - 能量柱进度
-│   │       ├── ImageCanvas.vue            #  466 行 - 墨迹图版画布
-│   │       └── IntroOverlay.vue           # 1046 行 - 测试介绍覆盖层
-│   ├── composables/
-│   │   ├── useApi.js                      #  643 行 - API 请求封装
-│   │   ├── useAudioRecorder.js            #  229 行 - 音频录制
-│   │   ├── useCanvas.js                   #  289 行 - 画布操作
-│   │   ├── useDeviceCheck.js              #  301 行 - 设备兼容性检测
-│   │   ├── useGuide.js                    #  250 行 - 新手引导
-│   │   ├── useImagePreloader.js           #  236 行 - 图片预加载
-│   │   ├── useInteractionTracker.js       #  544 行 - 用户交互追踪
-│   │   ├── useRealtimeDialog.js           #  834 行 - WebRTC 实时语音对话
-│   │   ├── useSession.js                  #  251 行 - 会话状态管理
-│   │   └── useSubtitle.js                 #  239 行 - 字幕管理
-│   ├── router/
-│   │   └── index.js                       #   99 行 - 路由配置
-│   ├── stores/
-│   │   ├── authStore.js                   #  151 行 - 认证状态
-│   │   ├── sessionStore.js                #  205 行 - 会话状态
-│   │   ├── testStore.js                   #  298 行 - 测试状态
-│   │   └── uiStore.js                     #  196 行 - UI 状态
-│   ├── utils/
-│   │   ├── audioManager.js                #   71 行 - 音频管理
-│   │   ├── constants.js                   #  247 行 - 常量配置
-│   │   └── helpers.js                     #  195 行 - 辅助函数
-│   ├── views/
-│   │   ├── HomeView.vue                   # 1171 行 - 首页
-│   │   ├── LoginView.vue                  #  889 行 - 登录页
-│   │   ├── PrepView.vue                   # 1051 行 - 测试准备页
-│   │   ├── ReportView.vue                 #  252 行 - 报告页
-│   │   └── TestView.vue                   #  928 行 - 测试主页面
-│   ├── App.vue                            #  111 行 - 根组件
-│   └── main.js                            #   55 行 - 入口文件
-├── index.html
-├── vite.config.js
-└── package.json
+│   ├── App.vue                 # 根组件
+│   ├── main.js                 # 入口文件
+│   │
+│   ├── assets/                 # 静态资源
+│   │   └── styles/             # CSS 样式文件
+│   │       ├── app.css
+│   │       ├── intro-preview-background.css
+│   │       ├── question-progress.css
+│   │       └── waiting-report.css
+│   │
+│   ├── components/             # 组件
+│   │   ├── common/             # 通用组件
+│   │   │   ├── AppHeader.vue       # 顶部导航栏
+│   │   │   ├── BaseButton.vue      # 基础按钮
+│   │   │   ├── BaseModal.vue       # 基础弹窗
+│   │   │   ├── LoadingOverlay.vue  # 加载遮罩
+│   │   │   └── UserBar.vue         # 用户信息栏
+│   │   │
+│   │   ├── effects/            # 特效组件
+│   │   │   ├── BlackHoleBackground.vue  # 黑洞背景动画
+│   │   │   ├── UploadingView.vue        # 上传进度视图
+│   │   │   └── WaitingReportView.vue    # 等待报告视图
+│   │   │
+│   │   ├── forms/              # 表单组件
+│   │   │   ├── BasicInfoForm.vue   # 基本信息表单
+│   │   │   └── PostTestForm.vue    # 后测问卷表单
+│   │   │
+│   │   ├── media/              # 媒体组件
+│   │   │   └── SubtitleDisplay.vue # 字幕显示
+│   │   │
+│   │   └── test/               # 测试相关组件
+│   │       ├── ControlsBar.vue     # 控制栏（缩放/旋转/画笔）
+│   │       ├── EnergyPillar.vue    # 能量柱进度
+│   │       ├── ImageCanvas.vue     # 墨迹图版画布
+│   │       └── IntroOverlay.vue    # 操作说明引导
+│   │
+│   ├── composables/            # 组合式函数
+│   │   ├── useApi.js               # API 请求封装
+│   │   ├── useAudioRecorder.js     # 音频录制
+│   │   ├── useCanvas.js            # 画布操作
+│   │   ├── useDeviceCheck.js       # 设备检测
+│   │   ├── useGuide.js             # 新手引导
+│   │   ├── useImagePreloader.js    # 图片预加载
+│   │   ├── useInteractionTracker.js # 交互追踪
+│   │   ├── useRealtimeDialog.js    # WebRTC 实时对话
+│   │   ├── useSession.js           # 会话管理
+│   │   └── useSubtitle.js          # 字幕管理
+│   │
+│   ├── router/                 # 路由配置
+│   │   └── index.js
+│   │
+│   ├── stores/                 # Pinia 状态管理
+│   │   ├── authStore.js        # 认证状态
+│   │   ├── sessionStore.js     # 会话状态
+│   │   ├── testStore.js        # 测试状态
+│   │   └── uiStore.js          # UI 状态
+│   │
+│   ├── utils/                  # 工具函数
+│   │   ├── audioManager.js     # 音频管理
+│   │   ├── constants.js        # 常量定义
+│   │   └── helpers.js          # 辅助函数
+│   │
+│   └── views/                  # 页面视图
+│       ├── HomeView.vue        # 首页
+│       ├── LoginView.vue       # 登录页
+│       ├── PrepView.vue        # 测试准备页
+│       ├── IntroView.vue       # 介绍说明页
+│       ├── TestView.vue        # 正式测试页
+│       └── ReportView.vue      # 报告页
+│
+├── public/                     # 静态资源（直接复制）
+│   ├── images/                 # 墨迹图版图片
+│   └── audio/                  # 音频文件
+│
+├── .env.development            # 开发环境配置
+├── .env.production             # 生产环境配置
+├── vite.config.js              # Vite 配置
+└── package.json                # 项目依赖
 ```
 
-## 快速开始
+---
 
-### 环境要求
+## 3. 核心功能模块
 
-- Node.js >= 18.x
-- pnpm >= 8.x（推荐）或 npm
+### 3.1 WebRTC 实时语音对话
 
-### 安装依赖
+**文件位置**：`src/composables/useRealtimeDialog.js`
 
-```bash
-cd vue3
-pnpm install
+基于 OpenAI Realtime API 实现的 WebRTC 语音对话功能：
+
+- **连接管理**：建立和维护 WebRTC 连接
+- **语音输入**：通过麦克风采集用户语音
+- **AI 响应**：接收并播放 AI 语音回复
+- **转写显示**：实时显示语音转文字内容
+
+```javascript
+// 使用示例
+const { connect, disconnect, sendText, isConnected } = useRealtimeDialog()
+
+// 连接对话服务
+await connect()
+
+// 发送文本消息
+sendText('用户输入的内容')
+
+// 断开连接
+disconnect()
 ```
 
-### 开发模式
+### 3.2 墨迹图版画布交互
 
-```bash
-pnpm dev
+**文件位置**：`src/components/test/ImageCanvas.vue`
+
+支持的交互操作：
+
+| 操作 | 描述 | 数据记录 |
+|------|------|----------|
+| 缩放 | 双指捏合或按钮控制 | `zoom: { "1": [1, -1, 1], ... }` |
+| 旋转 | 按钮控制顺/逆时针旋转 | `rotate: { "1": 2, ... }` |
+| 画笔 | 手指/鼠标绘制轨迹 | `drawingTracks: { "1": {...}, ... }` |
+| 平移 | 缩放后拖动查看 | 不记录 |
+
+### 3.3 用户交互数据追踪
+
+**文件位置**：`src/composables/useInteractionTracker.js`
+
+追踪并记录用户在测试过程中的所有交互行为：
+
+```javascript
+const tracker = useInteractionTracker()
+
+// 记录缩放操作（1=放大，-1=缩小）
+tracker.trackZoom(1)
+
+// 记录旋转操作
+tracker.trackRotate(15)  // 旋转角度
+
+// 记录画笔轨迹
+tracker.trackDrawingStart()
+tracker.trackDrawingMove(x, y)
+tracker.trackDrawingEnd()
+
+// 获取所有数据
+const data = tracker.getAllData()
 ```
 
-访问 http://localhost:8080
+### 3.4 数据上传流程
 
-### 生产构建
+测试完成后，系统会依次上传以下 6 个数据文件：
 
-```bash
-pnpm build
-# 或
-pnpm build:prod
+| 序号 | 文件名 | 内容 | 接口 |
+|------|--------|------|------|
+| 1 | scale.json | 缩放操作记录 | `/rorschach/user/upload_scale` |
+| 2 | rotate.json | 旋转次数统计 | `/rorschach/user/upload_rotate` |
+| 3 | trajectory.json | 画笔轨迹数据 | `/rorschach/user/upload_trajectory` |
+| 4 | video_clip.json | 时间戳切分 | `/rorschach/user/upload_seg_time` |
+| 5 | 5_questions.json | 后测问卷答案 | `/rorschach/user/upload_5_questions` |
+| 6 | audio.mp3 | 对话录音文件 | `/rorschach/user/upload_media` |
+
+---
+
+## 4. 页面流程
+
+```
+┌─────────────┐
+│   首页      │  HomeView.vue
+│  (/)        │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   登录      │  LoginView.vue
+│  (/login)   │  - 手机号+验证码登录
+└──────┬──────┘  - 用户名+密码登录（可选）
+       │
+       ▼
+┌─────────────┐
+│  测试准备   │  PrepView.vue
+│  (/prep)    │  - 设备检测（摄像头/麦克风）
+└──────┬──────┘  - 填写基本信息
+       │
+       ▼
+┌─────────────┐
+│  操作说明   │  IntroView.vue + IntroOverlay.vue
+│  (/intro)   │  - 观看操作演示
+└──────┬──────┘  - 练习基本操作
+       │
+       ▼
+┌─────────────┐
+│  正式测试   │  TestView.vue
+│  (/test)    │  - 10 张墨迹图版
+│             │  - AI 语音对话
+└──────┬──────┘  - 交互数据记录
+       │
+       ▼
+┌─────────────┐
+│  后测问卷   │  PostTestForm.vue
+│  (phase:    │  - 选择代表自己/父亲/母亲的图版
+│  postTest)  │  - 选择最喜欢/最讨厌的图版
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  数据上传   │  UploadingView.vue
+│  (phase:    │  - 上传 6 个数据文件
+│  uploading) │  - 显示上传进度
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  等待报告   │  WaitingReportView.vue
+│  (phase:    │  - 显示处理进度
+│  waiting)   │  - 报告生成后可下载
+└─────────────┘
 ```
 
-### 预览构建结果
+---
 
-```bash
-pnpm preview
+## 5. API 接口文档
+
+### 5.1 认证相关
+
+#### 手机号登录
+```
+POST /rorschach/user_login_phone
+
+请求体:
+{
+  "phone": "13800138000",
+  "verification_code": "123456"
+}
+
+响应:
+{
+  "code": 0,
+  "msg": "登录成功",
+  "data": {
+    "access_token": "eyJhbGc..."
+  }
+}
 ```
 
-## 页面流程
-
+#### 用户名密码登录
 ```
-首页 (/) 
-  ↓
-登录 (/login)
-  ↓
-测试准备 (/prep)
-  ├── 基本信息填写
-  ├── 测试说明介绍
-  └── 操作练习
-  ↓
-正式测试 (/test)
-  ├── 10张墨迹图版测试（可缩放、旋转、标注）
-  ├── WebRTC 语音对话
-  └── 综合测试问卷（五个问题）
-  ↓
-数据上传
-  ↓
-等待报告生成
-  ↓
-查看报告 (/report)
+POST /rorschach/user_login
+
+请求体:
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+响应:
+{
+  "code": 0,
+  "msg": "登录成功",
+  "data": {
+    "access_token": "eyJhbGc..."
+  }
+}
 ```
 
-## 核心功能
+#### 发送验证码
+```
+POST /rorschach/send_verification_code
 
-### 1. WebRTC 实时语音对话
+请求体:
+{
+  "phone": "13800138000"
+}
 
-通过 `useRealtimeDialog.js` 实现与 OpenAI Realtime API 的 WebRTC 连接：
+响应:
+{
+  "code": 0,
+  "msg": "验证码已发送"
+}
+```
 
-- 麦克风输入捕获
-- AI 语音回复播放
-- 混合音频录制（用户 + AI）
-- MP3 格式转换
+### 5.2 用户信息
 
-### 2. 交互数据追踪
+#### 设置基本信息
+```
+POST /rorschach/user/set_basic_info
 
-通过 `useInteractionTracker.js` 记录用户操作：
+请求体:
+{
+  "user_id": "username",
+  "basic_info": {
+    "sex": "男",
+    "age": "25",
+    "education": "本科",
+    "occupation": "程序员",
+    "mood": "平静"
+  }
+}
 
-- 缩放操作记录
-- 旋转操作记录
-- 画笔轨迹记录
-- 时间戳记录
+响应:
+{
+  "code": 0,
+  "msg": "设置成功"
+}
+```
 
-### 3. 图版画布
+### 5.3 数据上传
 
-`ImageCanvas.vue` 提供：
+#### 上传缩放数据
+```
+POST /rorschach/user/upload_scale
 
-- 图片缩放（0.5x - 3x）
-- 图片旋转（支持任意角度）
-- 画笔标注（多色）
-- 触摸/鼠标手势支持
+请求体: FormData
+  - file: scale.json
 
-### 4. 数据上传
-
-测试完成后，上传以下数据到后端。
-
-## API 接口详情
-
-### 1. 缩放数据 - `uploadZoom`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_scale` |
-| 文件名 | `scale.json` |
-| FormData | `file` |
-
-**数据格式：**
-
-```json
+文件格式:
 {
   "1": [1, 1, -1],
   "2": [],
-  "3": [1],
   ...
-  "10": [-1, -1]
+  "10": [1]
+}
+
+响应:
+{
+  "code": 0,
+  "msg": "上传成功"
 }
 ```
 
-- 键：图版编号 `"1"` - `"10"`
-- 值：操作数组，`1` = 放大，`-1` = 缩小
+#### 上传旋转数据
+```
+POST /rorschach/user/upload_rotate
 
----
+请求体: FormData
+  - file: rotate.json
 
-### 2. 旋转数据 - `uploadRotate`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_rotate` |
-| 文件名 | `rotate.json` |
-| FormData | `file` |
-
-**数据格式：**
-
-```json
+文件格式:
 {
   "1": 0,
   "2": 4,
-  "3": 22,
   ...
-  "10": 6
+  "10": 2
 }
 ```
 
-- 键：图版编号 `"1"` - `"10"`
-- 值：**旋转次数（整数）**，不是旋转角度
+#### 上传画笔轨迹
+```
+POST /rorschach/user/upload_trajectory
 
-> ⚠️ 注意：后端期望的是旋转次数，不是角度数组
+请求体: FormData
+  - file: trajectory.json
+  - user_id: string
 
----
-
-### 3. 画笔轨迹 - `uploadDrawingTracks`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_trajectory` |
-| 文件名 | `trajectory.json` |
-| FormData | `file` + `user_id` |
-| Headers | `User-Id: {userId}` |
-
-**数据格式：**
-
-```json
+文件格式:
 {
   "canvas_size": [800, 600],
   "data": {
     "1": {
       "0": [
         {
-          "coords": [100, 200, 150, 250],
-          "color": "red",
-          "time": "00:07"
+          "coords": [100, 200, 110, 210],
+          "color": "green",
+          "time": "00:15"
         }
       ]
     },
-    "2": {},
     ...
-    "10": {}
   }
 }
 ```
 
-- `canvas_size`: `[高度, 宽度]`
-- `data`: 按图版分组的轨迹数据
-  - 键：图版编号 `"1"` - `"10"`
-  - 值：轨迹组对象，键为轨迹组索引 `"0"`, `"1"`, ...
-    - `coords`: `[y1, x1, y2, x2, ...]` 坐标点数组
-    - `color`: 颜色名称 `"red"` / `"green"` / `"blue"` / `"white"`
-    - `time`: 相对时间 `"MM:SS"` 格式
+#### 上传时间戳
+```
+POST /rorschach/user/upload_seg_time
 
----
+请求体: FormData
+  - file: video_clip.json
 
-### 4. 时间戳数据 - `uploadSegTime`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_seg_time` |
-| 文件名 | `video_clip.json` |
-| FormData | `file` |
-
-**数据格式：**
-
-```json
+文件格式:
 {
   "start": "00:00",
   "1": "01:53",
   "2": "03:45",
-  "3": "05:12",
   ...
-  "10": "23:08",
+  "10": "25:00",
   "select": "25:15",
   "stop": "30:29"
 }
 ```
 
-- `start`: 测试开始时间
-- `"1"` - `"10"`: 各图版开始时间
-- `select`: 进入综合测试时间
-- `stop`: 测试结束时间
-- 时间格式：`"MM:SS"`（分钟和秒数均为两位数）
+#### 上传后测问卷
+```
+POST /rorschach/user/upload_5_questions
 
----
+请求体: FormData
+  - file: 5_questions.json
 
-### 5. 五个问题 - `upload5Questions`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_5_questions` |
-| 文件名 | `5_questions.json` |
-| FormData | `file` |
-
-**数据格式：**
-
-```json
+文件格式:
 {
   "self": [3],
-  "father": [5],
-  "mother": [7],
-  "favorite": [1, 8],
-  "dislike": [4, 6]
+  "father": [7],
+  "mother": [2],
+  "favorite": [8],
+  "dislike": [4]
 }
 ```
 
-- `self`: 代表自己的图版（可多选）
-- `father`: 代表父亲的图版（可多选）
-- `mother`: 代表母亲的图版（可多选）
-- `favorite`: 最喜欢的图版（可多选）⚠️ 前端使用 `like`，上传时转换为 `favorite`
-- `dislike`: 最不喜欢的图版（可多选）
-- 值为图版编号数组 `[1-10]`
+#### 上传音频文件
+```
+POST /rorschach/user/upload_media
 
-> ⚠️ 注意：不包含 `mood` 字段；键名必须与后端一致
+请求体: FormData
+  - file: audio.mp3
 
----
-
-### 6. 音频文件 - `uploadMedia`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/upload_media` |
-| 文件名 | `audio_{userId}_{timestamp}.mp3` |
-| FormData | `file` |
-| 超时时间 | 300000ms (5分钟) |
-
-**支持格式：**
-- MP3
-- MP4
-
----
-
-### 7. 检查报告状态 - `checkReportStatus`
-
-| 项目 | 值 |
-|------|-----|
-| 接口路径 | `POST /rorschach/user/get_report_status` |
-| 请求体 | `{ "user_id": "{userId}" }` |
-
-**返回格式：**
-
-```json
+响应:
 {
-  "ready": true,
-  "report_url": "..."
+  "code": 0,
+  "msg": "上传成功"
 }
+```
+
+### 5.4 报告相关
+
+#### 检查上传状态
+```
+POST /rorschach/user/get_upload_files_status
+
+请求体:
+{
+  "user_id": "username"
+}
+
+响应:
+{
+  "code": 0,
+  "msg": "查验成功",
+  "data": true  // true=已上传, false=未上传
+}
+```
+
+#### 检查报告状态
+```
+POST /rorschach/user/get_report_status
+
+请求体:
+{
+  "user_id": "username"
+}
+
+响应:
+{
+  "code": 0,
+  "msg": "报告已生成",
+  "data": true  // true=已生成, false=未生成
+}
+```
+
+#### 下载报告 PDF
+```
+POST /rorschach/user/get_report_new
+
+请求体:
+{
+  "user_id": "username"
+}
+
+响应: application/pdf (Blob)
+```
+
+#### 获取报告解读版
+```
+POST /rorschach/user/get_report_publicity
+
+请求体:
+{
+  "user_id": "username"
+}
+
+响应: text/html
 ```
 
 ---
 
-## 接口汇总表
+## 6. 状态管理
 
-| 功能 | 接口路径 | 方法 | 文件名 | FormData 字段 |
-|------|----------|------|--------|--------------|
-| 缩放数据 | `/rorschach/user/upload_scale` | POST | `scale.json` | `file` |
-| 旋转数据 | `/rorschach/user/upload_rotate` | POST | `rotate.json` | `file` |
-| 画笔轨迹 | `/rorschach/user/upload_trajectory` | POST | `trajectory.json` | `file`, `user_id` |
-| 时间戳 | `/rorschach/user/upload_seg_time` | POST | `video_clip.json` | `file` |
-| 五个问题 | `/rorschach/user/upload_5_questions` | POST | `5_questions.json` | `file` |
-| 音频文件 | `/rorschach/user/upload_media` | POST | `*.mp3` | `file` |
-| 报告状态 | `/rorschach/user/get_report_status` | POST | - | `user_id` (JSON) |
+### 6.1 authStore（认证状态）
 
----
+**文件**：`src/stores/authStore.js`
 
-## 空数据处理策略
+| 状态 | 类型 | 描述 |
+|------|------|------|
+| `token` | string | 用户认证令牌 |
+| `userInfo` | object | 用户信息 |
+| `isLoggingIn` | boolean | 登录中状态 |
+| `isLoggedIn` | computed | 是否已登录 |
 
-| 数据类型 | 空数据处理 | 说明 |
-|---------|-----------|------|
-| 缩放数据 | **上传** | 补齐所有10个图版为空数组 `[]` |
-| 旋转数据 | **上传** | 补齐所有10个图版为 `0` |
-| 画笔轨迹 | **上传** | 补齐所有10个图版为空对象 `{}` |
-| 时间戳 | **上传** | 补齐所有键为 `"00:00"` |
-| 五个问题 | **上传** | 补齐所有5个字段为空数组 `[]` |
-| 音频文件 | **跳过** | 无录音数据时跳过 |
+**主要方法**：
+- `login(phone, code)` - 手机号登录
+- `loginWithUsername(username, password)` - 用户名登录
+- `logout()` - 登出
+- `setToken(token)` - 设置令牌
 
-## 状态管理
+### 6.2 testStore（测试状态）
 
-### authStore
+**文件**：`src/stores/testStore.js`
 
-管理用户认证状态：
+| 状态 | 类型 | 描述 | 持久化 |
+|------|------|------|--------|
+| `phase` | string | 当前测试阶段 | 否 |
+| `currentPlate` | number | 当前图版索引 (0-9) | 否 |
+| `basicInfo` | object | 用户基本信息 | 是 |
+| `interactionData` | object | 交互数据 | 是 |
+| `postTestAnswers` | object | 后测问卷答案 | 是 |
+| `dialogHistory` | array | 对话历史 | 是 |
+| `reportStatus` | object | 报告状态 | 是 |
 
+**测试阶段枚举**：
 ```javascript
-{
-  isLoggedIn: boolean,
-  token: string,
-  userInfo: { username, phone, ... }
+PHASES = {
+  INFO: 'info',           // 基本信息填写
+  INTRO: 'intro',         // 介绍预览
+  OPERATION_TEST: 'operationTest',  // 操作测试
+  TEST: 'test',           // 正式测试
+  POST_TEST: 'postTest',  // 后测问卷
+  UPLOADING: 'uploading', // 数据上传
+  WAITING: 'waiting'      // 等待报告
 }
 ```
 
-### testStore
+### 6.3 sessionStore（会话状态）
 
-管理测试流程状态：
+**文件**：`src/stores/sessionStore.js`
 
-```javascript
-{
-  phase: 'info' | 'intro' | 'operationTest' | 'test' | 'postTest' | 'uploading' | 'waiting',
-  currentPlate: 0-9,
-  postTestAnswers: { ... }
-}
+用于会话持久化和断点续测：
+
+| 方法 | 描述 |
+|------|------|
+| `saveSnapshot()` | 保存当前会话快照 |
+| `loadSnapshot()` | 加载会话快照 |
+| `restoreSession()` | 恢复会话 |
+| `clearSnapshot()` | 清除快照 |
+
+### 6.4 uiStore（UI 状态）
+
+**文件**：`src/stores/uiStore.js`
+
+| 状态 | 描述 |
+|------|------|
+| `isLoading` | 全局加载状态 |
+| `loadingMessage` | 加载提示文本 |
+| `backgroundTheme` | 背景主题 (0-9) |
+| `modalState` | 弹窗状态 |
+| `toastState` | Toast 提示状态 |
+
+**主要方法**：
+- `showLoading(message)` / `hideLoading()`
+- `showConfirm({ title, message })`
+- `showToast(message, type)`
+- `showSuccess(message)` / `showError(message)`
+
+---
+
+## 7. 开发指南
+
+### 7.1 环境要求
+
+- **Node.js**：18.x 或更高版本
+- **包管理器**：pnpm（推荐）或 npm
+- **浏览器**：Chrome/Edge/Safari 最新版本
+
+### 7.2 安装步骤
+
+```bash
+# 克隆项目
+git clone <repository-url>
+
+# 进入 Vue 3 目录
+cd vue3
+
+# 安装依赖
+pnpm install
 ```
 
-### uiStore
+### 7.3 开发/构建命令
 
-管理 UI 状态：
+```bash
+# 开发模式（本地开发服务器）
+pnpm dev
 
-```javascript
-{
-  isLoading: boolean,
-  loadingMessage: string,
-  backgroundTheme: number
-}
+# 生产构建
+pnpm build
+
+# 预览构建结果
+pnpm preview
 ```
 
-## 环境配置
+### 7.4 环境变量配置
 
-在项目根目录创建 `.env` 文件：
+#### 开发环境 `.env.development`
 
-```env
+```bash
+# API 代理地址
+VITE_API_BASE_URL=/api
+
+# 是否显示用户名登录
+VITE_SHOW_USERNAME_LOGIN=true
+
+# 路由基础路径
+VITE_BASE_URL=/
+```
+
+#### 生产环境 `.env.production`
+
+```bash
 # API 地址
-VITE_API_BASE_URL=http://your-api-server.com
+VITE_API_BASE_URL=/xlcp/api
 
-# OpenAI API Key
-VITE_OPENAI_API_KEY=your-openai-api-key
+# 是否显示用户名登录
+VITE_SHOW_USERNAME_LOGIN=true
+
+# 路由基础路径（部署在子目录时配置）
+VITE_BASE_URL=/xlcp
 ```
 
-## API 代理配置
+### 7.5 代理配置
 
-开发环境的 API 代理在 `vite.config.js` 中配置：
+开发环境下，API 请求通过 Vite 代理转发：
 
 ```javascript
-proxy: {
-  '/api': {
-    target: 'http://14.103.237.160:29876',
-    changeOrigin: true,
-    rewrite: (path) => path.replace(/^\/api/, '')
+// vite.config.js
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://14.103.237.160:29876',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, '')
+    }
   }
 }
 ```
 
-## 代码规范
+---
 
-- ESLint + Prettier 格式化
-- Vue 3 Composition API + `<script setup>` 语法
-- 组件命名使用 PascalCase
-- Composables 使用 `use` 前缀
+## 8. 部署注意事项
 
-```bash
-# 代码检查
-pnpm lint
+1. **静态资源**：确保 `public/` 目录下的图片和音频资源正确部署
+2. **路由配置**：使用 history 模式路由，需配置服务器将所有路由指向 `index.html`
+3. **HTTPS**：WebRTC 功能在生产环境必须使用 HTTPS
+4. **CORS**：确保后端 API 正确配置跨域策略
+5. **子路径部署**：如部署在 `/xlcp` 子路径，需配置 `VITE_BASE_URL=/xlcp`
 
-# 代码格式化
-pnpm format
-```
+---
 
-## 浏览器支持
+## 9. 更新日志
 
-- Chrome >= 90
-- Firefox >= 90
-- Safari >= 14
-- Edge >= 90
+| 版本 | 日期 | 更新内容 |
+|------|------|----------|
+| 1.0.0 | 2024-01 | Vue 3 版本初始发布 |
 
-> 需要支持 WebRTC、MediaRecorder API
+---
 
-## 开发注意事项
-
-1. **WebRTC 连接**：需要 HTTPS 或 localhost 环境
-2. **麦克风权限**：首次使用需要用户授权
-3. **lamejs**：在 `main.js` 中通过 `lamejs/lame.min.js?url` 注入 script，挂载到 `window.lamejs`
-4. **图片预加载**：进入测试前会预加载所有墨迹图版
-
-## License
-
-MIT
+*文档最后更新：2026-01-30*

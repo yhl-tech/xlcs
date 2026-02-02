@@ -149,15 +149,23 @@ let intervals = {}
 // 从对话历史提取词汇
 function extractWordsFromDialogue() {
   const dialogHistory = testStore.dialogHistory || []
-  const userDialogues = dialogHistory.filter(item => item.speaker === 'user' && item.text)
+  
+  // 兼容两种数据格式（旧数据可能是嵌套格式）：
+  // 新格式: { speaker: 'user', text: '...' }
+  // 旧格式: { role: { speaker: 'user', text: '...' } }
+  const userDialogues = dialogHistory.filter(item => {
+    const speaker = item.role?.speaker || item.speaker
+    const text = item.role?.text || item.text
+    return speaker === 'user' && text
+  })
   
   if (userDialogues.length === 0) {
     return ['心理测试', '墨迹图', '联想', '情感', '分析', '报告', '压力', '焦虑']
   }
   
-  return userDialogues.slice(0, 12).map(item => {
-    const text = item.text
-    return text.length > 15 ? text.substring(0, 15) + '...' : text
+  return userDialogues.slice(0, 30).map(item => {
+    const text = item.role?.text || item.text || ''
+    return text.length > 20 ? text.substring(0, 20) + '...' : text
   })
 }
 
@@ -173,16 +181,16 @@ function initWordcloudAnimation() {
   const wordList = words.value.length > 0 ? words.value : extractWordsFromDialogue()
   words.value = wordList
   
-  // 词云粒子
+  // 词云粒子 - 更鲜艳的颜色和更高的不透明度
   const particles = wordList.map((text, i) => ({
     text,
     x: Math.random() * canvas.width,
     y: Math.random() * canvas.height,
     vx: (Math.random() - 0.5) * 0.5,
     vy: (Math.random() - 0.5) * 0.5,
-    size: 12 + Math.random() * 8,
-    opacity: 0.3 + Math.random() * 0.4,
-    color: ['#667eea', '#764ba2', '#f093fb', '#06b6d4', '#8b5cf6'][i % 5]
+    size: 14 + Math.random() * 10,
+    opacity: 0.7 + Math.random() * 0.3,
+    color: ['#818cf8', '#a78bfa', '#f472b6', '#22d3ee', '#c084fc', '#fb7185', '#34d399'][i % 7]
   }))
   
   function animate() {
@@ -232,8 +240,8 @@ function startFlyingWordsAnimation() {
       --start-x: ${startX}px;
       --start-y: ${startY}px;
       --rotate: ${Math.random() * 360}deg;
-      color: ${['#667eea', '#764ba2', '#f093fb'][index % 3]};
-      font-size: ${12 + Math.random() * 6}px;
+      color: ${['#818cf8', '#a78bfa', '#f472b6', '#22d3ee', '#c084fc'][index % 5]};
+      font-size: ${14 + Math.random() * 8}px;
       left: 50%;
       top: 50%;
     `

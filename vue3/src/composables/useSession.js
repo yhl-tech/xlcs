@@ -188,10 +188,14 @@ export function useSession() {
   
   /**
    * 标记会话完成
+   * 只重置 phase 和 currentPlate，保留其他数据用于词云展示等
+   * 其他数据会在用户登出时清空
    */
   function markCompleted() {
     clearSnapshot()
-    testStore.resetTest()
+    // 只重置测试阶段和当前图版，保留对话历史等数据
+    testStore.phase = 'info'
+    testStore.currentPlate = 0
   }
   
   /**

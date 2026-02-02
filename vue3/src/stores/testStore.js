@@ -251,11 +251,12 @@ export const useTestStore = defineStore('test', () => {
   
   /**
    * 添加对话记录
+   * @param {object} entry - 对话条目对象 { speaker: 'user'|'assistant', text: '...' }
    */
-  function addDialogEntry(role, content) {
+  function addDialogEntry(entry) {
     dialogHistory.value.push({
-      role,
-      content,
+      speaker: entry.speaker || 'user',
+      text: entry.text || '',
       timestamp: Date.now(),
       plateIndex: currentPlate.value
     })
