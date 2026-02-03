@@ -54,6 +54,11 @@ let dc = null
 let audioElement = null
 let audioContext = null
 let mediaStream = null
+let delayedStream = null // 延迟后的音频流
+let delayNode = null // 延迟节点
+
+// 音频延迟配置（秒）
+const AUDIO_DELAY_SECONDS = 1.0
 
 // 混合录音相关
 const isMixedRecording = ref(false)
@@ -144,12 +149,28 @@ export function useRealtimeDialog() {
       }
       console.log('[Dialog] ✓ 步骤 5/10: 音频播放元素已创建')
       
-      // 6. 添加本地音频轨道
-      console.log('[Dialog] 步骤 6/10: 添加本地音频轨道...')
-      mediaStream.getTracks().forEach(track => {
-        pc.addTrack(track, mediaStream)
+      // 6. 添加本地音频轨道（带延迟）
+      console.log('[Dialog] 步骤 6/10: 添加本地音频轨道（延迟 ' + AUDIO_DELAY_SECONDS + ' 秒）...')
+      
+      // 创建延迟音频管道：麦克风 -> 延迟节点 -> 目标流 -> WebRTC
+      const micSourceNode = audioContext.createMediaStreamSource(mediaStream)
+      delayNode = audioContext.createDelay(AUDIO_DELAY_SECONDS + 0.1) // 最大延迟时间
+      delayNode.delayTime.value = AUDIO_DELAY_SECONDS // 设置实际延迟
+      
+      const delayedDestination = audioContext.createMediaStreamDestination()
+      
+      // 连接音频管道：麦克风 -> 延迟 -> 输出
+      micSourceNode.connect(delayNode)
+      delayNode.connect(delayedDestination)
+      
+      delayedStream = delayedDestination.stream
+      console.log('[Dialog] ✓ 音频延迟管道已创建，延迟时间:', AUDIO_DELAY_SECONDS, '秒')
+      
+      // 使用延迟后的音频流添加到 WebRTC
+      delayedStream.getTracks().forEach(track => {
+        pc.addTrack(track, delayedStream)
       })
-      console.log('[Dialog] ✓ 步骤 6/10: 本地音频轨道已添加')
+      console.log('[Dialog] ✓ 步骤 6/10: 本地音频轨道已添加（带延迟）')
       
       // 7. 创建数据通道
       console.log('[Dialog] 步骤 7/10: 创建数据通道...')
@@ -459,6 +480,17 @@ export function useRealtimeDialog() {
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop())
       mediaStream = null
+    }
+    
+    // 清理延迟音频流
+    if (delayedStream) {
+      delayedStream.getTracks().forEach(track => track.stop())
+      delayedStream = null
+    }
+    
+    if (delayNode) {
+      delayNode.disconnect()
+      delayNode = null
     }
     
     if (audioContext) {
