@@ -33,86 +33,87 @@
 ### 2.2 项目目录结构
 
 ```
-vue3/
+vue3/                                                    总计: 21,805 行
 ├── src/
-│   ├── App.vue                 # 根组件
-│   ├── main.js                 # 入口文件
+│   ├── App.vue                 # 根组件                      212 行
+│   ├── main.js                 # 入口文件                     55 行
 │   │
 │   ├── assets/                 # 静态资源
 │   │   └── styles/             # CSS 样式文件
-│   │       ├── app.css
-│   │       ├── intro-preview-background.css
-│   │       ├── question-progress.css
-│   │       └── waiting-report.css
+│   │       ├── app.css                                     2,832 行
+│   │       ├── intro-preview-background.css                  800 行
+│   │       ├── question-progress.css                         215 行
+│   │       └── waiting-report.css                            862 行
 │   │
 │   ├── components/             # 组件
 │   │   ├── common/             # 通用组件
-│   │   │   ├── AppHeader.vue       # 顶部导航栏
-│   │   │   ├── BaseButton.vue      # 基础按钮
-│   │   │   ├── BaseModal.vue       # 基础弹窗
-│   │   │   ├── LoadingOverlay.vue  # 加载遮罩
-│   │   │   └── UserBar.vue         # 用户信息栏
+│   │   │   ├── AppHeader.vue       # 顶部导航栏              253 行
+│   │   │   ├── BaseButton.vue      # 基础按钮                154 行
+│   │   │   ├── BaseModal.vue       # 基础弹窗                213 行
+│   │   │   ├── LoadingOverlay.vue  # 加载遮罩                 73 行
+│   │   │   └── UserBar.vue         # 用户信息栏              186 行
 │   │   │
 │   │   ├── effects/            # 特效组件
-│   │   │   ├── BlackHoleBackground.vue  # 黑洞背景动画
-│   │   │   ├── UploadingView.vue        # 上传进度视图
-│   │   │   └── WaitingReportView.vue    # 等待报告视图
+│   │   │   ├── BlackHoleBackground.vue  # 黑洞背景动画       659 行
+│   │   │   ├── UploadingView.vue        # 上传进度视图     1,202 行
+│   │   │   └── WaitingReportView.vue    # 等待报告视图     1,138 行
 │   │   │
 │   │   ├── forms/              # 表单组件
-│   │   │   ├── BasicInfoForm.vue   # 基本信息表单
-│   │   │   └── PostTestForm.vue    # 后测问卷表单
+│   │   │   ├── BasicInfoForm.vue   # 基本信息表单            249 行
+│   │   │   └── PostTestForm.vue    # 后测问卷表单            374 行
 │   │   │
 │   │   ├── media/              # 媒体组件
-│   │   │   └── SubtitleDisplay.vue # 字幕显示
+│   │   │   └── SubtitleDisplay.vue # 字幕显示                127 行
 │   │   │
 │   │   └── test/               # 测试相关组件
-│   │       ├── ControlsBar.vue     # 控制栏（缩放/旋转/画笔）
-│   │       ├── EnergyPillar.vue    # 能量柱进度
-│   │       ├── ImageCanvas.vue     # 墨迹图版画布
-│   │       └── IntroOverlay.vue    # 操作说明引导
+│   │       ├── ControlsBar.vue     # 控制栏（缩放/旋转/画笔） 311 行
+│   │       ├── EnergyPillar.vue    # 能量柱进度              114 行
+│   │       ├── ImageCanvas.vue     # 墨迹图版画布            459 行
+│   │       └── IntroOverlay.vue    # 操作说明引导          1,110 行
 │   │
 │   ├── composables/            # 组合式函数
-│   │   ├── useApi.js               # API 请求封装
-│   │   ├── useAudioRecorder.js     # 音频录制
-│   │   ├── useCanvas.js            # 画布操作
-│   │   ├── useDeviceCheck.js       # 设备检测
-│   │   ├── useGuide.js             # 新手引导
-│   │   ├── useImagePreloader.js    # 图片预加载
-│   │   ├── useInteractionTracker.js # 交互追踪
-│   │   ├── useRealtimeDialog.js    # WebRTC 实时对话
-│   │   ├── useSession.js           # 会话管理
-│   │   └── useSubtitle.js          # 字幕管理
+│   │   ├── data.js                 # 数据处理                111 行
+│   │   ├── useApi.js               # API 请求封装            639 行
+│   │   ├── useAudioRecorder.js     # 音频录制                229 行
+│   │   ├── useCanvas.js            # 画布操作                289 行
+│   │   ├── useDeviceCheck.js       # 设备检测                301 行
+│   │   ├── useGuide.js             # 新手引导                250 行
+│   │   ├── useImagePreloader.js    # 图片预加载              239 行
+│   │   ├── useInteractionTracker.js # 交互追踪               544 行
+│   │   ├── useRealtimeDialog.js    # WebRTC 实时对话         834 行
+│   │   ├── useSession.js           # 会话管理                255 行
+│   │   └── useSubtitle.js          # 字幕管理                239 行
 │   │
 │   ├── router/                 # 路由配置
-│   │   └── index.js
+│   │   └── index.js                                          100 行
 │   │
 │   ├── stores/                 # Pinia 状态管理
-│   │   ├── authStore.js        # 认证状态
-│   │   ├── sessionStore.js     # 会话状态
-│   │   ├── testStore.js        # 测试状态
-│   │   └── uiStore.js          # UI 状态
+│   │   ├── authStore.js        # 认证状态                    151 行
+│   │   ├── sessionStore.js     # 会话状态                    205 行
+│   │   ├── testStore.js        # 测试状态                    391 行
+│   │   └── uiStore.js          # UI 状态                     196 行
 │   │
 │   ├── utils/                  # 工具函数
-│   │   ├── audioManager.js     # 音频管理
-│   │   ├── constants.js        # 常量定义
-│   │   └── helpers.js          # 辅助函数
+│   │   ├── audioManager.js     # 音频管理                    100 行
+│   │   ├── constants.js        # 常量定义                    238 行
+│   │   └── helpers.js          # 辅助函数                    195 行
 │   │
 │   └── views/                  # 页面视图
-│       ├── HomeView.vue        # 首页
-│       ├── LoginView.vue       # 登录页
-│       ├── PrepView.vue        # 测试准备页
-│       ├── IntroView.vue       # 介绍说明页
-│       ├── TestView.vue        # 正式测试页
-│       └── ReportView.vue      # 报告页
+│       ├── HomeView.vue        # 首页                      1,174 行
+│       ├── LoginView.vue       # 登录页                      889 行
+│       ├── PrepView.vue        # 测试准备页                1,238 行
+│       ├── IntroView.vue       # 介绍说明页                   51 行
+│       ├── TestView.vue        # 正式测试页                  954 行
+│       └── ReportView.vue      # 报告页                      252 行
 │
 ├── public/                     # 静态资源（直接复制）
 │   ├── images/                 # 墨迹图版图片
 │   └── audio/                  # 音频文件
 │
-├── .env.development            # 开发环境配置
-├── .env.production             # 生产环境配置
-├── vite.config.js              # Vite 配置
-└── package.json                # 项目依赖
+├── .env.development            # 开发环境配置                   4 行
+├── .env.production             # 生产环境配置                   4 行
+├── vite.config.js              # Vite 配置                   102 行
+└── package.json                # 项目依赖                      33 行
 ```
 
 ---

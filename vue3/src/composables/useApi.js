@@ -490,10 +490,10 @@ export function useApi() {
     // 确保文件有正确的文件名和类型
     let fileToUpload = file
     
-    // 如果是 Blob，转换为 File
+    // 如果是 Blob，转换为 File，文件名使用用户 ID
     if (file instanceof Blob && !(file instanceof File)) {
       const extension = file.type.includes('mp4') ? 'mp4' : 'mp3'
-      const fileName = `audio_${userId || 'unknown'}_${Date.now()}.${extension}`
+      const fileName = `${userId || 'unknown'}.${extension}`
       fileToUpload = new File([file], fileName, { type: file.type || 'audio/mp3' })
     }
     

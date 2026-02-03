@@ -2,7 +2,7 @@
   <div class="test-view">
     
     <!-- 开发测试按钮 -->
-    <!-- <div class="dev-test-buttons">
+    <div class="dev-test-buttons">
       <button class="dev-btn" @click="handleDevSubmitAll">
         测试提交文件
       </button>
@@ -18,7 +18,7 @@
       <button class="dev-btn" @click="handleDevClearData" style="background: #ef4444;">
         清除数据
       </button>
-    </div> -->
+    </div>
     
     <!-- 正式测试阶段 -->
     <div v-if="testStore.phase === 'test'" class="test-screen">
@@ -294,6 +294,33 @@ onUnmounted(() => {
   session.destroy()
   // 注意：不断开 WebRTC 连接，因为它是全局单例，由 App.vue 管理
   tracker.resetInteractionData()
+})
+
+// 监听 phase 变化，处理已经在 /test 页面时点击"直接进入"的情况
+watch(() => testStore.phase, async (newPhase, oldPhase) => {
+  console.log('[TestView] phase 变化:', oldPhase, '→', newPhase)
+  
+  // 当 phase 变为 'test' 时，启动 WebRTC（如果还没连接）
+  if (newPhase === 'test' && oldPhase !== 'test') {
+    console.log('[TestView] phase 切换到 test，检查 WebRTC 连接状态...')
+    
+    // 设置背景主题
+    uiStore.setBackgroundTheme(testStore.currentPlate)
+    
+    // 确保追踪已启动
+    if (!tracker.isTracking.value) {
+      console.log('[TestView] 开始追踪图版:', testStore.currentPlate)
+      tracker.startTracking(testStore.currentPlate)
+    }
+    
+    // 启动语音对话
+    if (!dialog.isConnected.value && !dialog.isConnecting.value) {
+      console.log('[TestView] WebRTC 未连接，启动语音对话...')
+      await startVoiceDialog()
+    } else {
+      console.log('[TestView] WebRTC 已连接，跳过重新连接')
+    }
+  }
 })
 
 // 开始测试
