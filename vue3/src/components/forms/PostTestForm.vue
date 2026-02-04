@@ -190,7 +190,7 @@ async function finishQuestionnaire() {
   console.log('[PostTestForm] 问卷完成，准备提交')
   
   // 播报结束语
-  const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约1-2天，请您耐心等待。'
+  const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约6 -8小时，请您耐心等待。'
   try {
     if (dialog.isConnected.value) {
       const ttsQuery = buildTTSQuery(finishText)

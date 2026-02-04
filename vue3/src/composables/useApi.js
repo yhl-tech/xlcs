@@ -276,8 +276,8 @@ export function useApi() {
     
     // console.log('[API] 上传缩放数据:', { originalData: zoomData, completeData, userId })
     
-    const response = await client.post('/rorschach/user/upload_scale', formData)
-    return response
+    // const response = await client.post('/rorschach/user/upload_scale', formData)
+    // return response
   }
 
   /**
@@ -516,7 +516,7 @@ export function useApi() {
     
     // 保存文件到本地
     const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
-    // saveFileToLocal(fileToUpload, mediaFileName)
+    saveFileToLocal(fileToUpload, mediaFileName)
     
     const response = await client.post('/rorschach/user/upload_media', formData, {
       timeout: 300000, // 5分钟超时

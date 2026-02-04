@@ -291,9 +291,9 @@ export function useRealtimeDialog() {
         },
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.6,          // 提高阈值，减少误触发
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000 // 增加静音时长，让 AI 更不容易被打断
+          threshold: 0.6,          // 提高阈值，减少噪音误触发（0.0-1.0，越高越不敏感）
+          prefix_padding_ms: 500,  // 语音开始前的缓冲时间
+          silence_duration_ms: 1500, // 需要 1.5 秒静音才认为用户说完
         }
       })
     })

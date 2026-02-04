@@ -224,14 +224,12 @@ onMounted(async () => {
 
   console.log('[TestView] 当前阶段:', testStore.phase)
 
-  // 预加载图片
+  // 懒加载图片：只预加载当前图片和后续 2 张
   uiStore.showLoading('正在加载测试资源...')
   try {
-    await imagePreloader.preloadRorschachImages({
-      onProgress: (loaded, total, percent) => {
-        uiStore.loadingMessage = `加载图片 ${loaded}/${total} (${percent}%)`
-      }
-    })
+    // 预加载当前图片和后续 2 张（懒加载模式）
+    imagePreloader.preloadAhead(testStore.currentPlate, 2)
+    console.log('[TestView] 懒加载模式：预加载图片', testStore.currentPlate, '及后续 2 张')
   } catch (error) {
     console.error('图片预加载失败:', error)
   } finally {
@@ -443,6 +441,9 @@ async function handleNextPlate() {
     testStore.nextPlate()
     uiStore.setBackgroundTheme(testStore.currentPlate)
     imageCanvasRef.value?.resetTransform()
+    
+    // 懒加载：预加载当前图片和后续 2 张
+    imagePreloader.preloadAhead(testStore.currentPlate, 2)
     
     // 开始追踪新图版
     tracker.startTracking(testStore.currentPlate)
@@ -856,22 +857,22 @@ function handleDevClearData() {
   background: transparent;
 }
 
-// 字幕样式 - 使用绝对定位避免影响图片大小
+// 字幕样式 - 单行显示，宽度更大
 .subtitle-container {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: 80px; // 控制栏高度上方
   width: auto;
-  max-width: 80%;
+  max-width: 95%; // 加宽
   z-index: 100;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px 24px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
+  padding: 12px 32px; // 左右内边距加大
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  border-radius: 24px; // 更圆润
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -879,19 +880,21 @@ function handleDevClearData() {
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 100%;
 }
 
 .subtitle-text {
-  display: flex;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
-  font-size: 14px;
+  font-size: 16px; // 字体稍大
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.95);
   text-align: center;
-  word-wrap: break-word;
-  word-break: break-all;
+  white-space: nowrap; // 单行显示
+  overflow: hidden;
+  text-overflow: ellipsis; // 超长时显示省略号
   transition: all 0.25s ease;
 }
 
@@ -970,12 +973,12 @@ function handleDevClearData() {
 
   .subtitle-container {
     bottom: 70px;
-    max-width: 90%;
-    padding: 10px 16px;
+    max-width: 98%;
+    padding: 10px 20px;
   }
 
   .subtitle-text {
-    font-size: 12px;
+    font-size: 14px;
   }
 }
 </style>

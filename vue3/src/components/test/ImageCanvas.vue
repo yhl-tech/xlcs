@@ -1,15 +1,18 @@
 <template>
-  <div class="image-canvas-container" ref="containerRef">
+  <div
+    ref="containerRef"
+    class="image-canvas-container"
+  >
     <!-- 图片层 - 与原始 #rorschach-image 一致 -->
     <img
       ref="imageRef"
       :src="currentImageSrc"
       :style="imageTransformStyle"
       class="rorschach-image"
+      draggable="false"
       @load="handleImageLoad"
       @error="handleImageLoadError"
-      draggable="false"
-    />
+    >
 
     <!-- 画布层 - 与原始 #drawing-canvas 一致 -->
     <canvas
@@ -20,12 +23,15 @@
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointerleave="handlePointerUp"
-    ></canvas>
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useImagePreloader } from '@/composables/useImagePreloader'
+
+const imagePreloader = useImagePreloader()
 
 const props = defineProps({
   plateIndex: {
@@ -54,6 +60,14 @@ const canvasRef = ref(null)
 // 图片变换状态
 const scale = ref(1)
 const rotation = ref(0)
+const panOffset = ref({ x: 0, y: 0 }) // 平移偏移
+
+// 拖拽状态
+const isPanning = ref(false)
+let panStartX = 0
+let panStartY = 0
+let panStartOffsetX = 0
+let panStartOffsetY = 0
 
 // 绘图状态
 const isDrawing = ref(false)
@@ -74,20 +88,27 @@ const isTransitioning = ref(false) // 是否正在切换
 
 // 计算属性 - 使用 displayedPlateIndex 而不是 props.plateIndex
 const currentImageSrc = computed(() => {
-  // 使用 BASE_URL 确保路径正确
-  return `${import.meta.env.BASE_URL}images/rorschach-blot-${displayedPlateIndex.value + 1}.webp`
+  // 使用懒加载器获取图片 URL（优先返回缓存的 Blob URL）
+  return imagePreloader.getImageUrl(displayedPlateIndex.value)
 })
 
-// 图片变换样式 - 与原始 #rorschach-image 保持一致
+// 图片变换样式 - 包含平移、缩放、旋转
 const imageTransformStyle = computed(() => ({
-  transform: `scale(${scale.value}) rotate(${rotation.value}deg)`,
-  opacity: imageOpacity.value
+  transform: `translate(${panOffset.value.x}px, ${panOffset.value.y}px) scale(${scale.value}) rotate(${rotation.value}deg)`,
+  opacity: imageOpacity.value,
+  cursor: canPan() ? (isPanning.value ? 'grabbing' : 'grab') : 'default'
 }))
 
-// 画布变换样式 - 与原始 #drawing-canvas 保持一致
+// 画布变换样式 - 与图片保持同步
 const canvasTransformStyle = computed(() => ({
-  transform: `translate(-50%, -50%) scale(${scale.value}) rotate(${rotation.value}deg)`
+  transform: `translate(calc(-50% + ${panOffset.value.x}px), calc(-50% + ${panOffset.value.y}px)) scale(${scale.value}) rotate(${rotation.value}deg)`
 }))
+
+// 判断是否可以拖拽
+function canPan() {
+  // 只有在非绘图工具且放大时才能拖拽
+  return currentTool.value === 'none' && scale.value > 1
+}
 
 // 监听外部 brushColor 变化
 watch(() => props.brushColor, (newColor) => {
@@ -99,19 +120,55 @@ onMounted(() => {
   resizeCanvas()
   window.addEventListener('resize', resizeCanvas)
   internalBrushColor.value = props.brushColor
+  
+  // 添加拖拽事件监听（在容器上）
+  const container = containerRef.value
+  if (container) {
+    container.addEventListener('mousedown', handleContainerMouseDown)
+    container.addEventListener('mousemove', handleContainerMouseMove)
+    container.addEventListener('mouseup', handleContainerMouseUp)
+    container.addEventListener('mouseleave', handleContainerMouseUp)
+    container.addEventListener('touchstart', handleContainerTouchStart, { passive: false })
+    container.addEventListener('touchmove', handleContainerTouchMove, { passive: false })
+    container.addEventListener('touchend', handleContainerTouchEnd)
+    container.addEventListener('touchcancel', handleContainerTouchEnd)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCanvas)
+  
+  // 移除拖拽事件监听
+  const container = containerRef.value
+  if (container) {
+    container.removeEventListener('mousedown', handleContainerMouseDown)
+    container.removeEventListener('mousemove', handleContainerMouseMove)
+    container.removeEventListener('mouseup', handleContainerMouseUp)
+    container.removeEventListener('mouseleave', handleContainerMouseUp)
+    container.removeEventListener('touchstart', handleContainerTouchStart)
+    container.removeEventListener('touchmove', handleContainerTouchMove)
+    container.removeEventListener('touchend', handleContainerTouchEnd)
+    container.removeEventListener('touchcancel', handleContainerTouchEnd)
+  }
 })
 
-// 预加载图片
+// 预加载图片（使用懒加载器）
 function preloadImage(index) {
   return new Promise((resolve) => {
+    // 如果已经缓存，直接返回
+    if (imagePreloader.isImageLoaded(index)) {
+      resolve(true)
+      return
+    }
+    
+    // 触发预加载
+    imagePreloader.preloadImage(index)
+    
+    // 等待加载完成
     const img = new Image()
     img.onload = () => resolve(true)
     img.onerror = () => resolve(false)
-    img.src = `${import.meta.env.BASE_URL}images/rorschach-blot-${index + 1}.webp`
+    img.src = imagePreloader.getImageUrl(index)
   })
 }
 
@@ -288,13 +345,31 @@ function getCanvasPoint(e) {
   const canvas = canvasRef.value
   const rect = canvas.getBoundingClientRect()
   
-  // 考虑缩放因素
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
+  // 获取画布中心点（屏幕坐标）
+  const centerX = rect.left + rect.width / 2
+  const centerY = rect.top + rect.height / 2
+  
+  // 鼠标相对于画布中心的位置（屏幕坐标）
+  // 需要先减去平移偏移（因为平移是在缩放和旋转之前应用的）
+  let dx = e.clientX - centerX - panOffset.value.x
+  let dy = e.clientY - centerY - panOffset.value.y
+  
+  // 反向旋转鼠标坐标（抵消 CSS 旋转）
+  const angleRad = -rotation.value * Math.PI / 180
+  const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad)
+  const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad)
+  
+  // 反向缩放（抵消 CSS 缩放）
+  const unscaledX = rotatedX / scale.value
+  const unscaledY = rotatedY / scale.value
+  
+  // 转换到画布坐标（画布中心 -> 画布左上角）
+  const canvasX = unscaledX + canvas.width / 2
+  const canvasY = unscaledY + canvas.height / 2
   
   return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
+    x: canvasX,
+    y: canvasY
   }
 }
 
@@ -330,14 +405,136 @@ function redrawHistory() {
   })
 }
 
+// ==================== 拖拽平移功能 ====================
+
+// 计算平移边界（防止拖出可视区域）
+function getClampedOffset(rawX, rawY) {
+  const container = containerRef.value
+  const image = imageRef.value
+  if (!container || !image) return { x: 0, y: 0 }
+  
+  const containerRect = container.getBoundingClientRect()
+  const cw = containerRect.width
+  const ch = containerRect.height
+  
+  // 图片实际显示尺寸
+  const displayWidth = image.offsetWidth * scale.value
+  const displayHeight = image.offsetHeight * scale.value
+  
+  // 计算最大偏移量
+  let maxOffsetX = 0
+  let maxOffsetY = 0
+  
+  if (displayWidth > cw) {
+    maxOffsetX = (displayWidth - cw) / 2
+  }
+  if (displayHeight > ch) {
+    maxOffsetY = (displayHeight - ch) / 2
+  }
+  
+  // 限制偏移范围
+  let x = rawX
+  let y = rawY
+  
+  if (maxOffsetX === 0) {
+    x = 0
+  } else {
+    x = Math.max(-maxOffsetX, Math.min(maxOffsetX, x))
+  }
+  
+  if (maxOffsetY === 0) {
+    y = 0
+  } else {
+    y = Math.max(-maxOffsetY, Math.min(maxOffsetY, y))
+  }
+  
+  return { x, y }
+}
+
+// 开始拖拽
+function startPan(clientX, clientY) {
+  if (!canPan()) return
+  
+  isPanning.value = true
+  panStartX = clientX
+  panStartY = clientY
+  panStartOffsetX = panOffset.value.x
+  panStartOffsetY = panOffset.value.y
+}
+
+// 拖拽移动
+function movePan(clientX, clientY) {
+  if (!isPanning.value) return
+  
+  const deltaX = clientX - panStartX
+  const deltaY = clientY - panStartY
+  
+  const rawX = panStartOffsetX + deltaX
+  const rawY = panStartOffsetY + deltaY
+  
+  const clamped = getClampedOffset(rawX, rawY)
+  panOffset.value = { x: clamped.x, y: clamped.y }
+}
+
+// 结束拖拽
+function endPan() {
+  isPanning.value = false
+}
+
+// 容器鼠标事件
+function handleContainerMouseDown(e) {
+  if (e.button !== 0) return
+  if (!canPan()) return
+  e.preventDefault()
+  startPan(e.clientX, e.clientY)
+}
+
+function handleContainerMouseMove(e) {
+  if (!isPanning.value) return
+  e.preventDefault()
+  movePan(e.clientX, e.clientY)
+}
+
+function handleContainerMouseUp() {
+  endPan()
+}
+
+// 容器触摸事件
+function handleContainerTouchStart(e) {
+  if (!e.touches || e.touches.length === 0) return
+  if (!canPan()) return
+  const touch = e.touches[0]
+  e.preventDefault()
+  startPan(touch.clientX, touch.clientY)
+}
+
+function handleContainerTouchMove(e) {
+  if (!isPanning.value || !e.touches || e.touches.length === 0) return
+  const touch = e.touches[0]
+  e.preventDefault()
+  movePan(touch.clientX, touch.clientY)
+}
+
+function handleContainerTouchEnd() {
+  endPan()
+}
+
+// 缩放或重置时更新平移边界
+function updatePanBounds() {
+  const clamped = getClampedOffset(panOffset.value.x, panOffset.value.y)
+  panOffset.value = { x: clamped.x, y: clamped.y }
+}
+
 // 公开方法
 function zoomIn() {
   scale.value = Math.min(scale.value + 0.1, 3)
+  nextTick(() => updatePanBounds())
   emitTransformChange()
 }
 
 function zoomOut() {
   scale.value = Math.max(scale.value - 0.1, 0.5)
+  nextTick(() => updatePanBounds())
   emitTransformChange()
 }
 
@@ -354,6 +551,7 @@ function rotateRight() {
 function resetTransform() {
   scale.value = 1
   rotation.value = 0
+  panOffset.value = { x: 0, y: 0 }
 }
 
 function clearCanvas() {
