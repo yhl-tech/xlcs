@@ -11,8 +11,13 @@
 
     <!-- 主容器 -->
     <div class="waiting-report-main-container">
-      <!-- 标题区域 -->
+      <!-- 标题区域 - 更醒目的警示 -->
       <div class="waiting-report-header">
+        <div class="warning-icon-container">
+          <svg class="warning-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 9V13M12 17H12.01M5.07 19H18.93C20.07 19 20.8 17.77 20.23 16.8L13.3 4.8C12.73 3.83 11.27 3.83 10.7 4.8L3.77 16.8C3.2 17.77 3.93 19 5.07 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <h1>数据上传中，不要关闭页面</h1>
         <p class="waiting-report-status-text">{{ statusText }}</p>
       </div>
@@ -118,17 +123,18 @@ const showRetryBtn = ref(false)
 const showRetestBtn = ref(false)
 const dataCounter = ref(0)
 
-// 状态文本
+// 状态文本 - 使用更专业的数据处理术语
 const statusTexts = [
-  '正在解析您的心理特征数据',
-  '正在整合多维度数据',
-  '正在分析行为模式',
-  '正在上传测试结果',
-  'AI 模型深度学习中'
+  '多维心理特征数据解析中',
+  '认知行为模式深度分析',
+  '语义特征向量提取中',
+  '神经网络模型推理中',
+  'AI 智能融合处理中',
+  '心理画像特征构建中'
 ]
 const statusTextIndex = ref(0)
 const statusText = ref(statusTexts[0])
-const progressText = ref('正在整合多维度数据...')
+const progressText = ref('初始化数据处理引擎...')
 
 // 词云数据
 const words = ref([])
@@ -397,39 +403,39 @@ async function startUpload() {
     const interactionData = tracker.formatForUpload()
     
     // 1. 上传缩放数据
-    progressText.value = '正在上传缩放数据...'
+    progressText.value = '解析视觉交互数据...'
     await api.uploadZoom(interactionData.zoom, userId)
-    uploadProgress.value = 15
+    uploadProgress.value = 10
     console.log('[Uploading] 缩放数据已上传')
     
     // 2. 上传旋转数据
-    progressText.value = '正在上传旋转数据...'
+    progressText.value = '解析空间认知数据...'
     await api.uploadRotate(interactionData.rotate, userId)
-    uploadProgress.value = 30
+    uploadProgress.value = 20
     console.log('[Uploading] 旋转数据已上传')
     
     // 3. 上传画笔轨迹
-    progressText.value = '正在上传画笔轨迹...'
+    progressText.value = '解析笔迹轨迹特征...'
     await api.uploadDrawingTracks(interactionData.drawingTracks, userId, [600, 800])
-    uploadProgress.value = 45
+    uploadProgress.value = 30
     console.log('[Uploading] 画笔轨迹已上传')
     
     // 4. 上传时间戳数据
-    progressText.value = '正在上传时间戳数据...'
+    progressText.value = '多维时序数据融合...'
     const audioTimestamps = tracker.getAudioTimestamps()
     await api.uploadSegTime(audioTimestamps, userId)
-    uploadProgress.value = 60
+    uploadProgress.value = 40
     console.log('[Uploading] 时间戳数据已上传')
     
     // 5. 上传问卷答案
-    progressText.value = '正在上传问卷答案...'
+    progressText.value = '整合心理问卷数据...'
     const postTestAnswers = testStore.postTestAnswers || {}
     await api.upload5Questions(postTestAnswers, userId)
-    uploadProgress.value = 75
+    uploadProgress.value = 50
     console.log('[Uploading] 问卷答案已上传')
     
-    // 6. 上传音频
-    progressText.value = '正在处理音频...'
+    // 6. 上传音频（占 50% 进度，从 50% 到 100%）
+    progressText.value = '处理语音交互数据...'
     try {
       console.log('[Uploading] ========== 开始音频处理 ==========')
       console.log('[Uploading] WebRTC 连接状态:', dialog.isConnected.value)
@@ -443,15 +449,34 @@ async function startUpload() {
         console.log('[Uploading] WebM blob:', webmBlob ? `${(webmBlob.size / 1024).toFixed(2)} KB` : '无数据')
         
         if (webmBlob && webmBlob.size > 0) {
-          progressText.value = '正在转换音频格式...'
+          progressText.value = '语音数据编码转换中...'
+          uploadProgress.value = 55
           console.log('[Uploading] 开始转换为 MP3...')
           
           const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
+          uploadProgress.value = 65
           
           if (mp3Blob && mp3Blob.size > 0) {
-            progressText.value = '正在上传音频...'
+            progressText.value = '语音数据上传中...'
             console.log('[Uploading] MP3 大小:', (mp3Blob.size / 1024).toFixed(2), 'KB')
-            await api.uploadMedia(mp3Blob, userId)
+            
+            // 使用真实上传进度回调
+            await api.uploadMedia(mp3Blob, userId, (percent) => {
+              // 音频上传占 65% 到 98% 的进度
+              const audioProgress = 65 + Math.round(percent * 0.33)
+              uploadProgress.value = audioProgress
+              
+              // 每隔一段进度更新提示文字
+              if (percent < 30) {
+                progressText.value = '语音数据传输中...'
+              } else if (percent < 60) {
+                progressText.value = '语音特征同步中...'
+              } else if (percent < 90) {
+                progressText.value = '语音数据校验中...'
+              } else {
+                progressText.value = '语音数据写入中...'
+              }
+            })
             console.log('[Uploading] ✓ 音频已上传成功')
           } else {
             console.warn('[Uploading] ✗ MP3 转换结果为空')
@@ -474,7 +499,7 @@ async function startUpload() {
     uploadProgress.value = 100
     
     uploadStatus.value = 'success'
-    progressText.value = '上传完成！正在跳转...'
+    progressText.value = '数据同步完成！正在初始化分析引擎...'
     console.log('[Uploading] 所有数据上传完成')
     
     // 延迟后触发完成事件
@@ -601,28 +626,75 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* 标题区域 */
+/* 警示图标容器 */
+.warning-icon-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.warning-icon {
+  width: 48px;
+  height: 48px;
+  color: #feca57;
+  animation: warningPulse 1.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(254, 202, 87, 0.6));
+}
+
+@keyframes warningPulse {
+  0%, 100% { 
+    transform: scale(1); 
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.1); 
+    opacity: 0.8;
+  }
+}
+
+/* 标题区域 - 更醒目 */
 .waiting-report-header {
   text-align: center;
   margin-bottom: 50px;
   animation: fadeInDown 1s ease-out;
   
   h1 {
-    font-size: 36px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    font-size: 42px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ff6b6b 0%, #feca57 25%, #48dbfb 50%, #ff9ff3 75%, #ff6b6b 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-bottom: 15px;
-    text-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+    margin-bottom: 20px;
+    animation: gradientShift 4s ease infinite;
+    filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.5)) drop-shadow(0 0 40px rgba(72, 219, 251, 0.3));
+    letter-spacing: 4px;
   }
 }
 
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
 .waiting-report-status-text {
-  font-size: 18px;
-  color: #a0aec0;
-  letter-spacing: 2px;
+  font-size: 20px;
+  color: #e2e8f0;
+  letter-spacing: 3px;
+  font-weight: 500;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  animation: textPulse 2s ease-in-out infinite;
+}
+
+@keyframes textPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
 }
 
 /* 黑洞进度条容器 */

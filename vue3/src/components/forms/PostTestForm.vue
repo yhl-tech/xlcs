@@ -8,13 +8,19 @@
       <button 
         class="ptf-next-btn"
         @click="goToNextQuestion"
+        :disabled="timeLeft > 0"
       >
-        {{ isLastQuestion ? '确认提交' : '下一页' }}
+        <span>{{ isLastQuestion ? '确认提交' : '下一页' }}</span>
+        <span class="ptf-next-timer">({{ timeLeft }}s)</span>
       </button>
     </div>
 
+
     <!-- 问题文本框 -->
-    <div class="ptf-instruction-box">
+    <div
+      class="ptf-instruction-box"
+      :style="{ '--ptf-question-bg': currentQuestionBg }"
+    >
       <p class="ptf-question-text">
         {{ currentQuestionText }}
       </p>
@@ -43,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { 
   POST_TEST_QUESTIONS, 
@@ -54,6 +60,8 @@ import {
 
 const emit = defineEmits(['submit'])
 
+const QUESTION_DURATION = 20
+
 // 获取可显示的问题列表
 const displayableQuestions = computed(() => {
   return POST_TEST_QUESTIONS.filter(shouldDisplayQuestion)
@@ -62,6 +70,8 @@ const displayableQuestions = computed(() => {
 // 状态
 const currentQuestionIndex = ref(0)
 const answers = reactive({})
+const timeLeft = ref(QUESTION_DURATION)
+let timerId = null
 
 // WebRTC 对话
 const dialog = useRealtimeDialog()
@@ -82,11 +92,30 @@ onMounted(async () => {
   // 播报第一个问题（包含开场语）
   console.log('[PostTestForm] 准备播报第一个问题')
   await askCurrentQuestion()
+  startQuestionTimer()
+})
+
+onUnmounted(() => {
+  clearQuestionTimer()
 })
 
 // 当前问题
 const currentQuestion = computed(() => {
   return displayableQuestions.value[currentQuestionIndex.value] || null
+})
+
+// 当前问题背景色（每题一个淡色）
+const QUESTION_COLORS = [
+  'rgba(56, 189, 248, 0.45)', // 青色
+  'rgba(129, 140, 248, 0.50)', // 靛蓝
+  'rgba(52, 211, 153, 0.48)', // 绿色
+  'rgba(251, 191, 36, 0.48)', // 黄色
+  'rgba(244, 114, 182, 0.50)' // 粉色
+]
+
+const currentQuestionBg = computed(() => {
+  const idx = currentQuestionIndex.value % QUESTION_COLORS.length
+  return QUESTION_COLORS[idx]
 })
 
 // 当前问题文本
@@ -173,8 +202,33 @@ async function askCurrentQuestion() {
   }
 }
 
+function clearQuestionTimer() {
+  if (timerId) {
+    clearInterval(timerId)
+    timerId = null
+  }
+}
+
+function startQuestionTimer() {
+  clearQuestionTimer()
+  timeLeft.value = QUESTION_DURATION
+  
+  timerId = window.setInterval(() => {
+    if (timeLeft.value > 0) {
+      timeLeft.value--
+    }
+    if (timeLeft.value <= 0) {
+      // 仅停止计时，不自动切换问题
+      clearQuestionTimer()
+    }
+  }, 1000)
+}
+
 // 下一个问题
-function goToNextQuestion() {
+function goToNextQuestion(isAuto = false) {
+  // 无论是自动还是手动，都先清理当前计时器
+  clearQuestionTimer()
+  
   if (isLastQuestion.value) {
     // 完成所有问题
     finishQuestionnaire()
@@ -182,6 +236,7 @@ function goToNextQuestion() {
     currentQuestionIndex.value++
     // 播报下一个问题
     askCurrentQuestion()
+    startQuestionTimer()
   }
 }
 
@@ -190,16 +245,16 @@ async function finishQuestionnaire() {
   console.log('[PostTestForm] 问卷完成，准备提交')
   
   // 播报结束语
-  const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约6 -8小时，请您耐心等待。'
-  try {
-    if (dialog.isConnected.value) {
-      const ttsQuery = buildTTSQuery(finishText)
-      await dialog.sendTextMessage(ttsQuery)
-      console.log('[PostTestForm] 播报结束语')
-    }
-  } catch (error) {
-    console.warn('[PostTestForm] 结束语播报失败:', error)
-  }
+  // const finishText = '再次感谢您的时间，测试报告将会交给模型进行分析，为时大约6 -8小时，请您耐心等待。'
+  // try {
+  //   if (dialog.isConnected.value) {
+  //     const ttsQuery = buildTTSQuery(finishText)
+  //     await dialog.sendTextMessage(ttsQuery)
+  //     console.log('[PostTestForm] 播报结束语')
+  //   }
+  // } catch (error) {
+  //   console.warn('[PostTestForm] 结束语播报失败:', error)
+  // }
   
   // 转换答案格式以匹配 API 要求
   const formattedAnswers = {
@@ -249,17 +304,46 @@ async function finishQuestionnaire() {
   letter-spacing: 2px;
 }
 
+.ptf-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 16px;
+}
+
+.ptf-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.ptf-timer {
+  font-size: 14px;
+  color: #bfdbfe;
+}
+
+.ptf-timer-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin: 0 4px;
+}
+
 .ptf-next-btn {
   position: absolute;
   right: 0;
   background: rgba(16, 23, 42, 0.6);
   border: 1px solid rgba(64, 224, 255, 0.5);
   color: #fff;
-  padding: 8px 24px;
+  padding: 8px 18px;
   border-radius: 20px;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   
   &:hover {
     background: rgba(64, 224, 255, 0.2);
@@ -269,18 +353,33 @@ async function finishQuestionnaire() {
   &:active {
     transform: translateY(1px);
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: rgba(148, 163, 184, 0.7);
+  }
+}
+
+.ptf-next-timer {
+  font-size: 12px;
+  color: #fbbf24;
 }
 
 /* Instruction Box */
 .ptf-instruction-box {
-  background: transparent;
-  padding: 16px 0;
-  margin-bottom: 16px;
+  background: var(--ptf-question-bg, rgba(15, 23, 42, 0.95));
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  box-shadow: 0 0 24px rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(248, 250, 252, 0.25);
+  transition: background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 
 .ptf-question-text {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.6;
   margin: 0;
   font-weight: 500;

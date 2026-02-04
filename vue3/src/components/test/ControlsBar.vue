@@ -12,10 +12,18 @@
 
     <!-- 缩放旋转按钮组 -->
     <div class="control-group">
-      <button @click="emit('zoom-in')">🔍+ 放大</button>
-      <button @click="emit('zoom-out')">🔍- 缩小</button>
-      <button @click="emit('rotate-left')">↶ 左转</button>
-      <button @click="emit('rotate-right')">↷ 右转</button>
+      <button @click="emit('zoom-in')">
+        🔍+ 放大
+      </button>
+      <button @click="emit('zoom-out')">
+        🔍- 缩小
+      </button>
+      <button @click="emit('rotate-left')">
+        ↶ 左转
+      </button>
+      <button @click="emit('rotate-right')">
+        ↷ 右转
+      </button>
     </div>
 
     <!-- 画笔工具组 -->
@@ -33,28 +41,28 @@
           data-color="red"
           style="background-color: #ef4444"
           @click="selectColor('red')"
-        ></div>
+        />
         <div 
           class="color-option"
           :class="{ selected: currentColor === 'green' }"
           data-color="green"
           style="background-color: #10b981"
           @click="selectColor('green')"
-        ></div>
+        />
         <div 
           class="color-option"
           :class="{ selected: currentColor === 'blue' }"
           data-color="blue"
           style="background-color: #3b82f6"
           @click="selectColor('blue')"
-        ></div>
+        />
         <div 
           class="color-option"
           :class="{ selected: currentColor === 'white' }"
           data-color="white"
           style="background-color: #ffffff"
           @click="selectColor('white')"
-        ></div>
+        />
       </div>
       <button 
         :class="{ selected: currentTool === 'eraser' }"
@@ -62,7 +70,9 @@
       >
         🗑️ 擦除
       </button>
-      <button @click="emit('clear-all')">🧹 一键擦除</button>
+      <button @click="emit('clear-all')">
+        🧹 一键擦除
+      </button>
     </div>
 
     <!-- 下一张按钮组 -->

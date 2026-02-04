@@ -109,7 +109,22 @@
                   <span
                     v-if="index < currentStepIndex || (isCompleted && index === currentStepIndex)"
                     class="rf-step-badge rf-step-badge-completed"
-                  >已核准</span>
+                  >
+                    <svg
+                      class="rf-check-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M20 6L9 17L4 12"
+                        stroke="currentColor"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
                   <span
                     v-else-if="index === currentStepIndex && !isCompleted"
                     class="rf-step-badge rf-step-badge-active"
@@ -849,9 +864,19 @@ onUnmounted(() => {
 }
 
 .rf-step-badge-completed {
-  color: #2563eb;
-  background-color: #eff6ff;
-  border: 1px solid #dbeafe;
+  color: #22c55e;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rf-check-icon {
+  width: 24px;
+  height: 24px;
+  color: #22c55e;
 }
 
 .rf-step-badge-active {
