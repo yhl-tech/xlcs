@@ -117,6 +117,25 @@ export const useTestStore = defineStore('test', () => {
   // 初始状态检查是否完成（用于防止页面刷新时的时序问题）
   const initialCheckComplete = ref(false)
   
+  // ==================== 能量系统 ====================
+  
+  const MAX_ENERGY = 1000 // 最大能量值
+  const ENERGY_PER_STROKE = 2 // 每次绘画增加的能量
+  const ENERGY_PER_PARTICLE = 5 // 批量粒子每个增加的能量
+  
+  // 当前能量值
+  const energy = ref(savedData?.energy || 0)
+  
+  // 当前页面的能量上限（第N页 = N * 100）
+  const maxEnergyForCurrentPage = computed(() => {
+    return (currentPlate.value + 1) * 100
+  })
+  
+  // 能量百分比（用于显示）
+  const energyProgress = computed(() => {
+    return Math.round((energy.value / MAX_ENERGY) * 100)
+  })
+  
   // ==================== 持久化 ====================
   
   // 监听状态变化并保存到 localStorage
@@ -129,12 +148,13 @@ export const useTestStore = defineStore('test', () => {
       sessionId: sessionId.value,
       hasUsedZoom: hasUsedZoom.value,
       plateStartTimes: plateStartTimes.value,
-      reportStatus: reportStatus.value
+      reportStatus: reportStatus.value,
+      energy: energy.value
     })
   }
   
   // 监听关键状态变化（不包含 phase 和 currentPlate）
-  watch([basicInfo, interactionData, postTestAnswers, dialogHistory, sessionId, reportStatus], persistState, { deep: true })
+  watch([basicInfo, interactionData, postTestAnswers, dialogHistory, sessionId, reportStatus, energy], persistState, { deep: true })
   
   // ==================== 计算属性 ====================
   
@@ -292,6 +312,42 @@ export const useTestStore = defineStore('test', () => {
   }
   
   /**
+   * 增加能量
+   * @param {number} amount - 增加的能量值，默认为 ENERGY_PER_STROKE
+   */
+  function addEnergy(amount = ENERGY_PER_STROKE) {
+    // 限制能量不超过当前页面的上限和总上限
+    energy.value = Math.min(
+      energy.value + amount, 
+      maxEnergyForCurrentPage.value, 
+      MAX_ENERGY
+    )
+  }
+  
+  /**
+   * 减少能量
+   * @param {number} amount - 减少的能量值
+   */
+  function removeEnergy(amount = ENERGY_PER_STROKE) {
+    energy.value = Math.max(energy.value - amount, 0)
+  }
+  
+  /**
+   * 重置能量
+   */
+  function resetEnergy() {
+    energy.value = 0
+  }
+  
+  /**
+   * 设置能量值（用于恢复状态）
+   * @param {number} value - 能量值
+   */
+  function setEnergy(value) {
+    energy.value = Math.min(Math.max(0, value), MAX_ENERGY)
+  }
+  
+  /**
    * 重置测试状态
    */
   function resetTest() {
@@ -312,6 +368,7 @@ export const useTestStore = defineStore('test', () => {
     plateStartTimes.value = {}
     reportStatus.value = { status: '', isReady: false, message: '' }
     initialCheckComplete.value = false
+    energy.value = 0
     
     // 清除 localStorage 数据
     clearStorage()
@@ -351,6 +408,9 @@ export const useTestStore = defineStore('test', () => {
     // 常量
     PHASES,
     TOTAL_PLATES,
+    MAX_ENERGY,
+    ENERGY_PER_STROKE,
+    ENERGY_PER_PARTICLE,
     
     // 状态
     phase,
@@ -365,12 +425,15 @@ export const useTestStore = defineStore('test', () => {
     plateStartTimes,
     reportStatus,
     initialCheckComplete,
+    energy,
     
     // 计算属性
     progress,
     isTestComplete,
     currentPlateNumber,
     currentImageSrc,
+    maxEnergyForCurrentPage,
+    energyProgress,
     
     // 方法
     setPhase,
@@ -386,6 +449,10 @@ export const useTestStore = defineStore('test', () => {
     resetTest,
     markZoomUsed,
     getSubmitData,
-    setInitialCheckComplete
+    setInitialCheckComplete,
+    addEnergy,
+    removeEnergy,
+    resetEnergy,
+    setEnergy
   }
 })

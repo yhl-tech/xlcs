@@ -180,24 +180,40 @@ watch(() => props.plateIndex, async (newIndex, oldIndex) => {
     // 1. 预加载新图片
     await preloadImage(newIndex)
     
-    // 2. 淡出当前图片
+    // 2. 先快速淡出（让图片不可见）
     imageOpacity.value = 0
     
-    // 3. 等待淡出动画完成后切换图片
+    // 3. 等淡出完成后，再重置变换（此时图片已不可见，用户看不到旋转）
     setTimeout(() => {
-      // 重置变换和画布
-      resetTransform()
+      // 禁用过渡，瞬间重置变换
+      const image = imageRef.value
+      const canvas = canvasRef.value
+      if (image) image.style.transition = 'none'
+      if (canvas) canvas.style.transition = 'none'
+      
+      // 重置变换
+      scale.value = 1
+      rotation.value = 0
+      panOffset.value = { x: 0, y: 0 }
+      
+      // 清空画布
       clearCanvas()
       
       // 切换到新图片
       displayedPlateIndex.value = newIndex
       
-      // 4. 淡入新图片
-      nextTick(() => {
-        imageOpacity.value = 1
-        isTransitioning.value = false
+      // 强制重绘后恢复过渡动画并淡入
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (image) image.style.transition = ''
+          if (canvas) canvas.style.transition = ''
+          
+          // 淡入新图片
+          imageOpacity.value = 1
+          isTransitioning.value = false
+        })
       })
-    }, 300) // 淡出时间
+    }, 350) // 等待淡出动画完成
   } else if (oldIndex === undefined) {
     // 首次加载
     displayedPlateIndex.value = newIndex
@@ -298,8 +314,13 @@ function handlePointerMove(e) {
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     
-    // 触发追踪事件
-    emit('drawing-move', { x: point.x, y: point.y })
+    // 触发追踪事件，同时传递屏幕坐标用于粒子效果
+    emit('drawing-move', { 
+      x: point.x, 
+      y: point.y,
+      clientX: e.clientX,
+      clientY: e.clientY
+    })
   } else if (currentTool.value === 'eraser') {
     ctx.strokeStyle = 'rgba(0,0,0,1)'
     ctx.lineWidth = brushSize.value * 3
@@ -345,14 +366,15 @@ function getCanvasPoint(e) {
   const canvas = canvasRef.value
   const rect = canvas.getBoundingClientRect()
   
-  // 获取画布中心点（屏幕坐标）
+  // 获取画布视觉中心点（屏幕坐标）
+  // 注意：getBoundingClientRect() 已经包含了所有 CSS 变换（包括 translate/scale/rotate）
   const centerX = rect.left + rect.width / 2
   const centerY = rect.top + rect.height / 2
   
-  // 鼠标相对于画布中心的位置（屏幕坐标）
-  // 需要先减去平移偏移（因为平移是在缩放和旋转之前应用的）
-  let dx = e.clientX - centerX - panOffset.value.x
-  let dy = e.clientY - centerY - panOffset.value.y
+  // 鼠标相对于画布视觉中心的位置（屏幕坐标）
+  // 不需要减去 panOffset，因为 rect 已经反映了平移后的位置
+  let dx = e.clientX - centerX
+  let dy = e.clientY - centerY
   
   // 反向旋转鼠标坐标（抵消 CSS 旋转）
   const angleRad = -rotation.value * Math.PI / 180
@@ -614,6 +636,7 @@ defineExpose({
   padding: 24px 24px 0 24px;
   min-height: min(70vh, 640px);
   box-sizing: border-box;
+  margin-top: -30px; // 图片整体上移 30px
 }
 
 // 图片样式 - 与原始 #rorschach-image 一致

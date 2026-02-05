@@ -36,7 +36,7 @@
       </div>
 
       <!-- 能量柱 -->
-      <EnergyPillar :progress="testStore.progress" />
+      <EnergyPillar ref="energyPillarRef" :progress="testStore.energyProgress" />
 
       <!-- 字幕区域 -->
       <div v-if="showSubtitles" class="subtitle-container">
@@ -52,7 +52,7 @@
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
         :total-plates="10"
-        :min-view-time="1"
+        :min-view-time="30"
         @tool-change="handleToolChange"
         @color-change="handleColorChange"
         @zoom-in="handleZoomIn"
@@ -127,6 +127,7 @@ const subtitle = useSubtitle()
 const api = useApi()
 
 const imageCanvasRef = ref(null)
+const energyPillarRef = ref(null)
 const showSubtitles = ref(false)
 const currentSubtitle = ref('')
 const isSubtitleTyping = ref(false)
@@ -347,16 +348,24 @@ function handleDrawingComplete(data) {
 // 画笔追踪 - 开始绘制
 function handleDrawingStart({ x, y, color }) {
   tracker.trackDrawingStart(x, y, color)
+  // 激活能量柱波纹效果
+  energyPillarRef.value?.startDrawing()
 }
 
 // 画笔追踪 - 绘制移动
-function handleDrawingMove({ x, y }) {
+function handleDrawingMove({ x, y, clientX, clientY }) {
   tracker.trackDrawingPoint(x, y)
+  // 生成粒子飞向能量柱
+  if (clientX !== undefined && clientY !== undefined) {
+    energyPillarRef.value?.onDrawMove(clientX, clientY)
+  }
 }
 
 // 画笔追踪 - 结束绘制
 function handleDrawingEnd() {
   tracker.trackDrawingEnd()
+  // 停止能量柱波纹效果
+  energyPillarRef.value?.stopDrawing()
 }
 
 // 工具切换
