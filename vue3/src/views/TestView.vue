@@ -448,14 +448,15 @@ async function handleNextPlate() {
     }
   } else {
     testStore.nextPlate()
+
+    // 立即记录新图版的时间戳（确保与图片切换严格同步）
+    tracker.startTracking(testStore.currentPlate)
+
     uiStore.setBackgroundTheme(testStore.currentPlate)
     imageCanvasRef.value?.resetTransform()
-    
+
     // 懒加载：预加载当前图片和后续 2 张
     imagePreloader.preloadAhead(testStore.currentPlate, 2)
-    
-    // 开始追踪新图版
-    tracker.startTracking(testStore.currentPlate)
     
     // 播报当前图片的提示语音
     try {

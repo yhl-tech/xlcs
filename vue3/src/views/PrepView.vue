@@ -273,12 +273,14 @@ import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import useApi from '@/composables/useApi'
 import { playAudio, stopAllAudios } from '@/utils/audioManager'
+import { useImagePreloader } from '@/composables/useImagePreloader'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const testStore = useTestStore()
 const sessionStore = useSessionStore()
 const api = useApi()
+const { preloadAll } = useImagePreloader()
 
 // 表单数据
 const form = reactive({
@@ -339,20 +341,32 @@ function handleClickOutside(event) {
 
 onMounted(async () => {
   console.log('[PrepView] 页面已加载')
-  
+
   // 添加点击外部关闭下拉框的监听
   document.addEventListener('click', handleClickOutside)
-  
+
   // 播放欢迎语音（使用 MP3 文件，不需要 WebRTC）
   if (!welcomeMessagePlayed) {
     welcomeMessagePlayed = true
     await playWelcomeMessage()
   }
-  
+
   // 设备检测提示
   deviceCheckStatus.value = 'pending'
   deviceCheckTip.value = '请先测试语音播放和麦克风，确保设备正常。'
   deviceCheckResult.value = '等待检测'
+
+  // 预加载测试墨迹图
+  console.log('[PrepView] 开始预加载墨迹图...')
+  preloadAll({
+    onProgress: (loaded, total, percent) => {
+      console.log(`[PrepView] 墨迹图预加载进度: ${loaded}/${total} (${percent}%)`)
+    }
+  }).then(result => {
+    console.log('[PrepView] 墨迹图预加载完成:', result)
+  }).catch(error => {
+    console.error('[PrepView] 墨迹图预加载失败:', error)
+  })
 })
 
 // 播报欢迎语（使用 mp3 文件和全局音频管理器）
