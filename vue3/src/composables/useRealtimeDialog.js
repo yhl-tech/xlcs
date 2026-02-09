@@ -507,7 +507,24 @@ export function useRealtimeDialog() {
       audioElement = null
     }
     
-    console.log('[Dialog] 已断开连接')
+    // 清理混合录音相关状态（确保下次进入时可以正常启动录音）
+    if (mixedMediaRecorder) {
+      try {
+        if (mixedMediaRecorder.state !== 'inactive') {
+          mixedMediaRecorder.stop()
+        }
+      } catch (err) {
+        console.warn('[Dialog] 停止 MediaRecorder 失败:', err)
+      }
+      mixedMediaRecorder = null
+    }
+    mixedStreamDestination = null
+    mixedAudioChunks = []
+    micSource = null
+    remoteAudioSource = null
+    isMixedRecording.value = false
+    
+    console.log('[Dialog] 已断开连接，录音状态已重置')
     
     if (callbacks.onDisconnect) {
       callbacks.onDisconnect()

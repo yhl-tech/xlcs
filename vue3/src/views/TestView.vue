@@ -52,7 +52,7 @@
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
         :total-plates="10"
-        :min-view-time="30"
+        :min-view-time="1"
         @tool-change="handleToolChange"
         @color-change="handleColorChange"
         @zoom-in="handleZoomIn"
@@ -250,15 +250,17 @@ onMounted(async () => {
     // 设置背景主题
     uiStore.setBackgroundTheme(testStore.currentPlate)
     
-    // 如果还没有追踪，开始追踪当前图版
-    if (!tracker.isTracking.value) {
-      console.log('[TestView] 开始追踪图版:', testStore.currentPlate)
-      tracker.startTracking(testStore.currentPlate)
-    }
-    
-    // 在测试阶段启动语音对话（带正确的系统提示词）
+    // 先启动语音对话和录音（WebRTC 连接可能需要几秒）
     console.log('[TestView] 测试阶段，启动 WebRTC 语音对话...')
-    await startVoiceDialog()
+    const recordingStartTime = await startVoiceDialog()
+
+    // 录音启动后再开始追踪，使用录音开始时间作为基准时间
+    if (!tracker.isTracking.value) {
+      console.log('[TestView] 录音已启动，开始追踪图版:', testStore.currentPlate)
+      console.log('[TestView] - 使用录音开始时间戳:', recordingStartTime)
+      tracker.startTracking(testStore.currentPlate, recordingStartTime)
+      console.log('[TestView] - testStartTime 已记录')
+    }
     
     // 播放开场白（仅第一次进入时）
     if (!hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
@@ -306,18 +308,19 @@ watch(() => testStore.phase, async (newPhase, oldPhase) => {
     // 设置背景主题
     uiStore.setBackgroundTheme(testStore.currentPlate)
     
-    // 确保追踪已启动
-    if (!tracker.isTracking.value) {
-      console.log('[TestView] 开始追踪图版:', testStore.currentPlate)
-      tracker.startTracking(testStore.currentPlate)
-    }
-    
-    // 启动语音对话
+    // 先启动语音对话和录音
+    let recordingStartTime = null
     if (!dialog.isConnected.value && !dialog.isConnecting.value) {
       console.log('[TestView] WebRTC 未连接，启动语音对话...')
-      await startVoiceDialog()
+      recordingStartTime = await startVoiceDialog()
     } else {
       console.log('[TestView] WebRTC 已连接，跳过重新连接')
+    }
+
+    // 录音启动后再开始追踪，使用录音开始时间作为基准时间
+    if (!tracker.isTracking.value) {
+      console.log('[TestView] 录音已启动，开始追踪图版:', testStore.currentPlate)
+      tracker.startTracking(testStore.currentPlate, recordingStartTime)
     }
   }
 })
@@ -334,10 +337,9 @@ function handleStartTest() {
   
   uiStore.setBackgroundTheme(testStore.currentPlate)
   
-  // 开始追踪第一张图版
-  if (!tracker.isTracking.value) {
-    tracker.startTracking(testStore.currentPlate)
-  }
+  // 注意：不在这里调用 startTracking
+  // 时间戳追踪会在 watch 中的 startVoiceDialog 完成后启动
+  // 确保时间戳与音频录制开始时间同步
 }
 
 // 绘图完成
@@ -447,9 +449,10 @@ async function handleNextPlate() {
       })
     }
   } else {
+    // 先切换图版索引（快速操作）
     testStore.nextPlate()
 
-    // 立即记录新图版的时间戳（确保与图片切换严格同步）
+    // 立即记录新图版的时间戳（在用户点击按钮的瞬间，确保与音频时间严格同步）
     tracker.startTracking(testStore.currentPlate)
 
     uiStore.setBackgroundTheme(testStore.currentPlate)
@@ -534,7 +537,7 @@ async function startVoiceDialog() {
   try {
     const currentPrompt = getPromptForCurrentPhase()
     console.log('[TestView] 当前阶段:', testStore.phase, '使用提示词:', currentPrompt.substring(0, 50) + '...')
-    
+
     // 如果尚未连接，先建立连接
     if (!dialog.isConnected.value && !dialog.isConnecting.value) {
       console.log('[TestView] WebRTC 未连接，正在建立连接...')
@@ -546,27 +549,36 @@ async function startVoiceDialog() {
         systemPrompt: currentPrompt
       })
     }
-    
+
     // 开始混合录音（麦克风 + AI 回复）
+    let recordingStartTime = null
     try {
       console.log('[TestView] 正在启动混合录音...')
       console.log('[TestView] - WebRTC 连接状态:', dialog.isConnected.value)
+      // 在录音开始的瞬间记录时间戳
+      recordingStartTime = Date.now()
+      console.log('[TestView] - 录音开始时间戳:', recordingStartTime)
       await dialog.startMixedRecording()
       const status = dialog.getMixedRecordingStatus()
       console.log('[TestView] ✓ 混合录音已启动:', status)
+      console.log('[TestView] - startMixedRecording 耗时:', Date.now() - recordingStartTime, 'ms')
     } catch (error) {
       console.error('[TestView] ✗ 启动混合录音失败:', error)
       console.error('[TestView] - 错误详情:', error.message)
     }
-    
+
     dialog.setCallbacks({
       onTranscript: (transcript) => {
         subtitle.show(transcript.text, transcript.speaker)
       }
     })
+
+    // 返回录音开始时间戳
+    return recordingStartTime
   } catch (error) {
     console.error('语音对话启动失败:', error)
-    uiStore.showError('语音对话启动失败，请检查麦克风权限')
+    uiStore.showError('语音对话启动失败，请检查麦克风���限')
+    return null
   }
 }
 

@@ -73,7 +73,7 @@ export function useInteractionTracker() {
    */
   function formatTimestamp(timestamp) {
     if (!testStartTime.value || !timestamp) return '00:00'
-    const elapsed = Math.floor((timestamp - testStartTime.value) / 1000)
+    const elapsed = Math.ceil((timestamp - testStartTime.value) / 1000)
     const minutes = Math.floor(elapsed / 60)
     const seconds = elapsed % 60
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
@@ -85,7 +85,7 @@ export function useInteractionTracker() {
   function getDrawingTimestamp() {
     if (!testStartTime.value) return '00:00'
     const now = Date.now()
-    const elapsed = Math.floor((now - testStartTime.value) / 1000)
+    const elapsed = Math.ceil((now - testStartTime.value) / 1000)
     const minutes = Math.floor(elapsed / 60)
     const seconds = elapsed % 60
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
@@ -110,30 +110,41 @@ export function useInteractionTracker() {
   
   /**
    * 开始追踪某个图版（进入测试页面时调用）
+   * @param {number} plateIndex - 图版索引（0-9）
+   * @param {number} startTime - 可选的开始时间戳，用于与录音时间同步
    */
-  function startTracking(plateIndex) {
+  function startTracking(plateIndex, startTime = null) {
     // 如果有未完成的轨迹，先结束它
     if (currentTrack.value) {
       trackDrawingEnd()
     }
-    
+
     isTracking.value = true
     currentPlateIndex.value = plateIndex
-    
+
     // 如果是第一次开始，记录测试开始时间
     if (!testStartTime.value) {
-      testStartTime.value = Date.now()
+      // 使用传入的时间戳，如果没有则使用当前时间
+      testStartTime.value = startTime || Date.now()
       timestamps.start = testStartTime.value
+      console.log('[InteractionTracker] ⏰ 首次记录 testStartTime:', testStartTime.value, startTime ? '(使用传入时间戳)' : '(使用当前时间)')
     }
-    
+
     const plateKey = String(plateIndex + 1)
-    
+
     // 记录图版切换时间戳（首次访问）
     if (!timestamps.plates[plateKey]) {
-      timestamps.plates[plateKey] = Date.now()
+      // 如果是第一个图版且传入了开始时间，使用该时间
+      if (plateIndex === 0 && startTime) {
+        timestamps.plates[plateKey] = startTime
+      } else {
+        timestamps.plates[plateKey] = Date.now()
+      }
+      const relativeTime = formatTimestamp(timestamps.plates[plateKey])
+      console.log('[InteractionTracker] 开始追踪图版:', plateKey, '绝对时间戳:', timestamps.plates[plateKey], '相对时间:', relativeTime)
+    } else {
+      console.log('[InteractionTracker] 图版', plateKey, '已有时间戳，跳过记录')
     }
-    
-    console.log('[InteractionTracker] 开始追踪图版:', plateKey)
   }
   
   /**
