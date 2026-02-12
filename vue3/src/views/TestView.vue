@@ -47,7 +47,6 @@
           </div>
         </div>
       </div>
-
       <!-- 控制栏 -->
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
@@ -643,12 +642,13 @@ async function handleSubmit() {
     
     // 4. 上传笔迹轨迹数据（drawing_tracks.json）
     uiStore.loadingMessage = '正在上传绘画轨迹...'
-    // 获取画布尺寸
-    const canvasSize = imageCanvasRef.value ? 
-      [imageCanvasRef.value.$el?.clientHeight || 0, imageCanvasRef.value.$el?.clientWidth || 0] : 
+    // 获取 canvas 实际尺寸（不是容器尺寸）
+    const drawingData = imageCanvasRef.value?.getDrawingData()
+    const canvasSize = drawingData ? 
+      [drawingData.canvasHeight, drawingData.canvasWidth] : 
       [0, 0]
     await api.uploadDrawingTracks(interactionData.drawingTracks, userId, canvasSize)
-    console.log('[TestView] 绘画轨迹已上传')
+    console.log('[TestView] 绘画轨迹已上传，canvas 尺寸:', canvasSize)
     
     // 5. 上传时间戳数据（video_clip.json）
     uiStore.loadingMessage = '正在上传时间数据...'
@@ -732,11 +732,12 @@ async function handleDevSubmitAll() {
     
     // 3. 上传画笔轨迹数据（真实数据）
     uiStore.loadingMessage = '正在上传画笔轨迹...'
-    const canvasSize = imageCanvasRef.value ? 
-      [imageCanvasRef.value.$el?.clientHeight || 600, imageCanvasRef.value.$el?.clientWidth || 800] : 
+    const drawingData = imageCanvasRef.value?.getDrawingData()
+    const canvasSize = drawingData ? 
+      [drawingData.canvasHeight, drawingData.canvasWidth] : 
       [600, 800]
     await api.uploadDrawingTracks(interactionData.drawingTracks, userId, canvasSize)
-    console.log('[DevTest] 画笔轨迹已上传:', interactionData.drawingTracks)
+    console.log('[DevTest] 画笔轨迹已上传，canvas 尺寸:', canvasSize, interactionData.drawingTracks)
     
     // 4. 上传时间戳数据（真实数据）
     uiStore.loadingMessage = '正在上传时间戳数据...'

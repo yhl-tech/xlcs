@@ -93,8 +93,9 @@ const currentImageSrc = computed(() => {
 })
 
 // 图片变换样式 - 包含平移、缩放、旋转
+// 先居中 translate(-50%, -50%)，再应用用户的平移、缩放、旋转
 const imageTransformStyle = computed(() => ({
-  transform: `translate(${panOffset.value.x}px, ${panOffset.value.y}px) scale(${scale.value}) rotate(${rotation.value}deg)`,
+  transform: `translate(calc(-50% + ${panOffset.value.x}px), calc(-50% + ${panOffset.value.y}px)) scale(${scale.value}) rotate(${rotation.value}deg)`,
   opacity: imageOpacity.value,
   cursor: canPan() ? (isPanning.value ? 'grabbing' : 'grab') : 'default'
 }))
@@ -229,27 +230,21 @@ function resizeCanvas() {
     const image = imageRef.value
     if (!container || !canvas) return
 
-    // 使画布大小与图片显示尺寸一致
+    // 使画布大小与图片**实际渲染尺寸**完全一致
     if (image && image.complete && image.naturalWidth) {
-      const containerWidth = container.clientWidth * 0.9
-      const containerHeight = container.clientHeight * 0.9
-      const aspectRatio = image.naturalWidth / image.naturalHeight
+      // 使用 clientWidth/clientHeight 获取图片实际渲染尺寸（不含 border）
+      // 比 getBoundingClientRect() 更精确，不受 transform 和亚像素影响
+      const canvasWidth = image.clientWidth
+      const canvasHeight = image.clientHeight
       
-      let canvasWidth, canvasHeight
-      if (containerWidth / containerHeight > aspectRatio) {
-        canvasHeight = containerHeight
-        canvasWidth = canvasHeight * aspectRatio
-      } else {
-        canvasWidth = containerWidth
-        canvasHeight = canvasWidth / aspectRatio
-      }
-      
+      // 设置 canvas 的逻辑像素和 CSS 像素都为图片实际尺寸
       canvas.width = canvasWidth
       canvas.height = canvasHeight
       
-      // 设置画布 CSS 尺寸
       canvas.style.width = `${canvasWidth}px`
       canvas.style.height = `${canvasHeight}px`
+      
+      console.log('[ImageCanvas] Canvas 已调整为图片实际尺寸:', { width: canvasWidth, height: canvasHeight })
     }
 
     // 重绘历史
@@ -641,6 +636,10 @@ defineExpose({
 
 // 图片样式 - 与原始 #rorschach-image 一致
 .rorschach-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  // transform 由 :style 绑定的 imageTransformStyle 提供，包含居中、平移、缩放、旋转
   max-width: 90%;
   max-height: 90%;
   object-fit: contain;
