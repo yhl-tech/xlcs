@@ -108,13 +108,13 @@
                     @click="handleSelectColor('blue')"
                   />
                 </div>
-                <button 
+                <!-- <button 
                   :disabled="!operationEnabled"
                   data-action="erase"
                   @click="handleSelectEraser"
                 >
                   🗑️ 擦除
-                </button>
+                </button> -->
                 <button 
                   ref="clearBtn"
                   :disabled="!operationEnabled"

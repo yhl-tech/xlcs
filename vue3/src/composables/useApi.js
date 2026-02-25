@@ -199,9 +199,9 @@ export function useApi() {
   // ==================== 认证相关 ====================
 
   const phoneLogin = async (phone, verificationCode) => {
-    const response = await client.post('/rorschach/user_login_phone', {
+    const response = await client.post('/rorschach/user_register_sms', {
       phone,
-      verification_code: verificationCode
+      sms_code: verificationCode
     })
     return response
   }
@@ -215,7 +215,7 @@ export function useApi() {
   }
 
   const sendVerificationCode = async (phone) => {
-    const response = await client.post('/rorschach/send_verification_code', { phone })
+    const response = await client.post('/rorschach/send_sms_code', { phone })
     return response
   }
 
