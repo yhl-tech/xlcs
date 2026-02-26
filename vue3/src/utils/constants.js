@@ -174,7 +174,7 @@ export const POST_TEST_QUESTIONS = [
   },
   {
     key: 'mother',
-    text: '下一个问题是，十张图片里，选择一张最能代表你母亲的，是哪一张？'
+    text: '下一个问题是，在下面的十张图片里，选择一张最能代表你的母亲的，是哪一张？'
   },
   {
     key: 'mother_why',

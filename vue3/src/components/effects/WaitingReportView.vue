@@ -320,7 +320,7 @@ const testStore = useTestStore()
 const steps = [
   { id: 'submit', label: '提交数据', icon: 'upload', desc: '数据已通过 256-bit 高强度加密通道上传至云端分析中心' },
   { id: 'validate', label: '数据校验', icon: 'shieldCheck', desc: '正在对比历史常模基准，排除极端值与无效作答干扰' },
-  { id: 'ai', label: 'AI 模型计算', icon: 'brain', desc: '深度神经网络正在提取 128 个心理特征维度，匹配 10万+ 样本数据' },
+  { id: 'ai', label: 'AI 模型计算', icon: 'brain', desc: '深度神经网络正在提取 128 个心理特征维度，匹配 10万+ 样本数据。报告将会在6-8小时内生成，请您耐心等待，现在您可以点击右上角的”退出“按钮，退出当前页面了。' },
   { id: 'review', label: '心理师人工复核', icon: 'userCheck', desc: '资深心理专家（执业 5 年以上）将结合 AI 报告进行逻辑校对与深度专业建议' },
   { id: 'generate', label: '报告生成', icon: 'fileText', desc: '多端适配排版，生成包含 20+ 页的深度心理洞察 PDF 报告' }
 ]

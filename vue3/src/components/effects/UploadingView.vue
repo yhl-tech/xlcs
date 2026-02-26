@@ -496,6 +496,7 @@ async function startUpload() {
       console.error('[Uploading] - 错误信息:', audioError.message)
       // 不抛出错误，继续后续流程
     }
+
     uploadProgress.value = 100
     
     uploadStatus.value = 'success'

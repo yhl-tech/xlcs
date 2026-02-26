@@ -71,7 +71,7 @@ let panStartOffsetY = 0
 
 // 绘图状态
 const isDrawing = ref(false)
-const currentTool = ref('none') // none, pen, eraser
+const currentTool = ref('pen') // none, pen, eraser - 默认开启画笔
 const brushSize = ref(3)
 
 // 绘图数据

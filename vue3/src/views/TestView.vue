@@ -581,10 +581,18 @@ async function startVoiceDialog() {
   }
 }
 
-// 结束语音对话
+// 结束语音对话（断开连接但保留录音数据供上传使用）
 async function stopVoiceDialog() {
-  // 停止混合录音（保持连接）
-  console.log('[TestView] 停止语音对话（保持连接）')
+  console.log('[TestView] 停止语音对话，断开 WebRTC 连接但保留录音数据')
+  try {
+    if (dialog.isConnected.value) {
+      // 断开连接但不清空录音数据（clearRecordingData = false）
+      await dialog.disconnect(false)
+      console.log('[TestView] WebRTC 连接已断开，录音数据已保留')
+    }
+  } catch (error) {
+    console.warn('[TestView] 断开 WebRTC 连接失败:', error)
+  }
 }
 
 // 提交测试

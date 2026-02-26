@@ -460,39 +460,42 @@ export function useRealtimeDialog() {
   
   /**
    * 断开连接
+   * @param {boolean} clearRecordingData - 是否清空录音数据（默认 true）
    */
-  async function disconnect() {
+  async function disconnect(clearRecordingData = true) {
+    console.log('[Dialog] 断开连接，clearRecordingData:', clearRecordingData)
+
     isConnected.value = false
     isConnecting.value = false
     isSpeaking.value = false
     isListening.value = false
-    
+
     if (dc) {
       dc.close()
       dc = null
     }
-    
+
     if (pc) {
       pc.close()
       pc = null
     }
-    
+
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop())
       mediaStream = null
     }
-    
+
     // 清理延迟音频流
     if (delayedStream) {
       delayedStream.getTracks().forEach(track => track.stop())
       delayedStream = null
     }
-    
+
     if (delayNode) {
       delayNode.disconnect()
       delayNode = null
     }
-    
+
     if (audioContext) {
       try {
         await audioContext.close()
@@ -501,13 +504,13 @@ export function useRealtimeDialog() {
       }
       audioContext = null
     }
-    
+
     if (audioElement) {
       audioElement.srcObject = null
       audioElement = null
     }
-    
-    // 清理混合录音相关状态（确保下次进入时可以正常启动录音）
+
+    // 清理混合录音相关状态
     if (mixedMediaRecorder) {
       try {
         if (mixedMediaRecorder.state !== 'inactive') {
@@ -519,13 +522,20 @@ export function useRealtimeDialog() {
       mixedMediaRecorder = null
     }
     mixedStreamDestination = null
-    mixedAudioChunks = []
     micSource = null
     remoteAudioSource = null
     isMixedRecording.value = false
-    
-    console.log('[Dialog] 已断开连接，录音状态已重置')
-    
+
+    // 根据参数决定是否清空录音数据
+    if (clearRecordingData) {
+      console.log('[Dialog] 清空录音数据，原数据块数:', mixedAudioChunks.length)
+      mixedAudioChunks = []
+    } else {
+      console.log('[Dialog] 保留录音数据，数据块数:', mixedAudioChunks.length)
+    }
+
+    console.log('[Dialog] 已断开连接')
+
     if (callbacks.onDisconnect) {
       callbacks.onDisconnect()
     }
@@ -753,6 +763,14 @@ export function useRealtimeDialog() {
     console.log('[Dialog] 混合录音状态:', status)
     return status
   }
+
+  /**
+   * 清空录音数据
+   */
+  function clearRecordingData() {
+    console.log('[Dialog] 清空录音数据，原数据块数:', mixedAudioChunks.length)
+    mixedAudioChunks = []
+  }
   
   /**
    * 将 WebM Blob 转换为 MP3 Blob
@@ -876,6 +894,7 @@ export function useRealtimeDialog() {
     startMixedRecording,
     stopMixedRecording,
     getMixedRecordingStatus,
+    clearRecordingData,
     convertWebMToMP3
   }
 }

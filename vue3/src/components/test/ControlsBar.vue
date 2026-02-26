@@ -175,10 +175,10 @@ function startCountdown() {
   }, 1000)
 }
 
-// 切换图版时重置工具和倒计时
+// 切换图版时重置工具和倒计时（画笔默认开启）
 watch(() => props.currentPlate, () => {
-  currentTool.value = 'none'
-  emit('tool-change', 'none')
+  currentTool.value = 'pen'
+  emit('tool-change', 'pen')
   startCountdown()
 }, { immediate: true })
 
