@@ -667,7 +667,7 @@ export function useRealtimeDialog() {
     mixedMediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         mixedAudioChunks.push(event.data)
-        console.log('[Dialog] 收到音频数据块，大小:', event.data.size, '总块数:', mixedAudioChunks.length)
+        // console.log('[Dialog] 收到音频数据块，大小:', event.data.size, '总块数:', mixedAudioChunks.length)
       }
     }
     
@@ -773,27 +773,27 @@ export function useRealtimeDialog() {
   }
   
   /**
-   * 将 WebM Blob 转换为 MP3 Blob
+   * 将 WebM Blob 转换为 MP3 Blob（使用 Web Worker 避免阻塞主线程）
    */
   async function convertWebMToMP3(webmBlob) {
     try {
       console.log('[Dialog] 开始转换 WebM 到 MP3')
       console.log('[Dialog] - WebM 大小:', (webmBlob.size / 1024 / 1024).toFixed(2), 'MB')
-      
+
       if (!webmBlob || webmBlob.size === 0) {
         console.warn('[Dialog] WebM blob 为空，跳过转换')
         return null
       }
-      
+
       // 1. 读取并解码 WebM
       console.log('[Dialog] 步骤 1: 读取 WebM 数据...')
       const arrayBuffer = await webmBlob.arrayBuffer()
       console.log('[Dialog] - ArrayBuffer 大小:', arrayBuffer.byteLength)
-      
+
       // 创建新的 AudioContext（避免使用可能已关闭的）
       console.log('[Dialog] 步骤 2: 创建 AudioContext 并解码...')
       const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 })
-      
+
       let audioBuffer
       try {
         audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0))
@@ -805,64 +805,146 @@ export function useRealtimeDialog() {
         ctx.close()
         throw new Error(`解码音频失败: ${decodeError.message}`)
       }
-      
+
       // 2. 提取并转换 PCM 数据
       console.log('[Dialog] 步骤 3: 提取 PCM 数据...')
       const float32Data = audioBuffer.getChannelData(0)
       const sampleRate = audioBuffer.sampleRate
       const int16Data = new Int16Array(float32Data.length)
-      
+
       for (let i = 0; i < float32Data.length; i++) {
         const s = Math.max(-1, Math.min(1, float32Data[i]))
         int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
       }
       console.log('[Dialog] - PCM 样本数:', int16Data.length)
-      
-      // 3. 使用 lamejs 编码为 MP3
-      console.log('[Dialog] 步骤 4: 初始化 lamejs...')
-      
-      // 获取 lamejs
-      const Lame = getLamejs()
-      console.log('[Dialog] - lamejs 状态: 已加载')
-      
-      const mp3encoder = new Lame.Mp3Encoder(1, sampleRate, 128)
-      const sampleBlockSize = 1152
-      const mp3Data = []
-      
-      let processedSamples = 0
-      for (let i = 0; i < int16Data.length; i += sampleBlockSize) {
-        const sampleChunk = int16Data.subarray(
-          i,
-          Math.min(i + sampleBlockSize, int16Data.length)
-        )
-        const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
-        if (mp3buf.length > 0) {
-          mp3Data.push(new Int8Array(mp3buf))
-        }
-        processedSamples += sampleChunk.length
-      }
-      
-      const mp3buf = mp3encoder.flush()
-      if (mp3buf.length > 0) {
-        mp3Data.push(new Int8Array(mp3buf))
-      }
-      
-      console.log('[Dialog] - 处理了', processedSamples, '个样本')
-      console.log('[Dialog] - 生成了', mp3Data.length, '个 MP3 数据块')
-      
-      // 4. 创建 MP3 Blob
-      const mp3Blob = new Blob(mp3Data, { type: 'audio/mpeg' })
-      console.log('[Dialog] ✓ MP3 转换完成，大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
-      
-      // 关闭临时创建的 AudioContext
+
+      // 关闭 AudioContext
       ctx.close()
-      
+
+      // 3. 使用 Web Worker 编码为 MP3（避免阻塞主线程��
+      console.log('[Dialog] 步骤 4: 使用 Worker 编码 MP3...')
+      const mp3Blob = await encodeMP3InWorker(int16Data, sampleRate)
+
+      console.log('[Dialog] ✓ MP3 转换完成，大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
       return mp3Blob
-      
+
     } catch (error) {
       console.error('[Dialog] WebM 转 MP3 失败:', error)
       throw new Error(`WebM 转 MP3 失败: ${error.message}`)
     }
+  }
+
+  /**
+   * 在 Worker 中编码 MP3
+   */
+  function encodeMP3InWorker(int16Data, sampleRate) {
+    return new Promise((resolve, reject) => {
+      try {
+        const worker = new Worker(
+          new URL('../workers/mp3Encoder.worker.js', import.meta.url),
+          { type: 'classic' }
+        )
+
+        let initialized = false
+
+        worker.onmessage = (e) => {
+          const { type, blob, error } = e.data
+
+          if (type === 'ready') {
+            initialized = true
+            worker.postMessage(
+              { type: 'encode', pcmData: int16Data.buffer, sampleRate },
+              [int16Data.buffer.slice(0)]
+            )
+            return
+          }
+
+          if (type === 'complete') {
+            worker.terminate()
+            resolve(blob)
+          } else if (type === 'error') {
+            worker.terminate()
+            if (!initialized) {
+              // Worker 初始化失败，回退到主线程
+              console.warn('[Dialog] Worker 初始化失败，回退到主线程编码')
+              resolve(encodeMP3Sync(int16Data, sampleRate))
+            } else {
+              reject(new Error(error))
+            }
+          }
+        }
+
+        worker.onerror = (err) => {
+          console.warn('[Dialog] Worker 出错，回退到主线程:', err)
+          worker.terminate()
+          resolve(encodeMP3Sync(int16Data, sampleRate))
+        }
+
+        // 初始化 Worker
+        import('lamejs/lame.min.js?url').then(module => {
+          worker.postMessage({ type: 'init', lamejsUrl: module.default })
+        })
+      } catch (error) {
+        console.warn('[Dialog] Worker 创建失败，回退到主线程:', error)
+        resolve(encodeMP3Sync(int16Data, sampleRate))
+      }
+    })
+  }
+
+  /**
+   * 同步编码 MP3（回退方案，使用 requestIdleCallback 分片）
+   */
+  function encodeMP3Sync(int16Data, sampleRate) {
+    return new Promise((resolve, reject) => {
+      const Lame = getLamejs()
+      const mp3encoder = new Lame.Mp3Encoder(1, sampleRate, 128)
+      const sampleBlockSize = 1152
+      const mp3Data = []
+      let offset = 0
+
+      function processChunk(deadline) {
+        // 每次处理尽可能多的块，但不超过空闲时间
+        while (offset < int16Data.length && deadline.timeRemaining() > 0) {
+          const sampleChunk = int16Data.subarray(
+            offset,
+            Math.min(offset + sampleBlockSize, int16Data.length)
+          )
+          const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
+          if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf))
+          }
+          offset += sampleBlockSize
+        }
+
+        if (offset < int16Data.length) {
+          requestIdleCallback(processChunk)
+        } else {
+          const mp3buf = mp3encoder.flush()
+          if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf))
+          }
+          resolve(new Blob(mp3Data, { type: 'audio/mpeg' }))
+        }
+      }
+
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(processChunk)
+      } else {
+        // 不支持 requestIdleCallback 时直接同步处理
+        for (let i = 0; i < int16Data.length; i += sampleBlockSize) {
+          const sampleChunk = int16Data.subarray(i, Math.min(i + sampleBlockSize, int16Data.length))
+          const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
+          if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf))
+          }
+        }
+        const mp3buf = mp3encoder.flush()
+        if (mp3buf.length > 0) {
+          mp3Data.push(new Int8Array(mp3buf))
+        }
+        resolve(new Blob(mp3Data, { type: 'audio/mpeg' }))
+      }
+    })
   }
   
   // 注意：不在 onUnmounted 中断开连接，因为这是全局单例

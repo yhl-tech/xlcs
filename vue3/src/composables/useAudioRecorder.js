@@ -106,49 +106,116 @@ export function useAudioRecorder() {
     return merged
   }
   
+  // 转换进度
+  const convertProgress = ref(0)
+
   /**
-   * 将 PCM 转换为 MP3
+   * 将 PCM 转换为 MP3（使用 Web Worker 避免阻塞主线程）
    * @param {Int16Array} pcmData - PCM 数据
    * @param {number} rate - 采样率
+   * @param {Function} onProgress - 进度回调
    * @returns {Promise<Blob>}
    */
-  async function convertPCMToMP3(pcmData, rate = 24000) {
+  async function convertPCMToMP3(pcmData, rate = 24000, onProgress) {
     return new Promise((resolve, reject) => {
       try {
-        // 使用通过 CDN 加载的 window.lamejs
-        if (!window.lamejs || !window.lamejs.Mp3Encoder) {
-          throw new Error('lamejs 库未正确加载')
+        const worker = new Worker(
+          new URL('../workers/mp3Encoder.worker.js', import.meta.url),
+          { type: 'classic' }
+        )
+
+        let initialized = false
+
+        worker.onmessage = (e) => {
+          const { type, progress, blob, error } = e.data
+
+          if (type === 'ready') {
+            initialized = true
+            // 发送编码任务
+            worker.postMessage(
+              { type: 'encode', pcmData: pcmData.buffer, sampleRate: rate },
+              [pcmData.buffer.slice(0)]
+            )
+            return
+          }
+
+          if (type === 'progress') {
+            convertProgress.value = progress
+            onProgress?.(progress)
+          } else if (type === 'complete') {
+            console.log('[AudioRecorder] MP3 转换完成，大小:', blob.size, 'bytes')
+            convertProgress.value = 100
+            worker.terminate()
+            resolve(blob)
+          } else if (type === 'error') {
+            worker.terminate()
+            if (!initialized) {
+              // Worker 初始化失败，回退到主线程
+              convertPCMToMP3Sync(pcmData, rate).then(resolve).catch(reject)
+            } else {
+              reject(new Error(error))
+            }
+          }
         }
-        const mp3encoder = new window.lamejs.Mp3Encoder(1, rate, 128) // 单声道，128kbps
-        const sampleBlockSize = 1152 // MP3 编码块大小
-        const mp3Data = []
-        
-        // 分块编码
-        for (let i = 0; i < pcmData.length; i += sampleBlockSize) {
+
+        worker.onerror = (err) => {
+          console.warn('[AudioRecorder] Worker 出错，回退到主线程:', err)
+          worker.terminate()
+          convertPCMToMP3Sync(pcmData, rate).then(resolve).catch(reject)
+        }
+
+        // 先初始化 Worker，传入 lamejs URL（与 main.js 中相同的方式）
+        import('lamejs/lame.min.js?url').then(module => {
+          worker.postMessage({ type: 'init', lamejsUrl: module.default })
+        })
+      } catch (error) {
+        console.warn('[AudioRecorder] Worker 创建失败，回退到主线程:', error)
+        convertPCMToMP3Sync(pcmData, rate).then(resolve).catch(reject)
+      }
+    })
+  }
+
+  /**
+   * 同步方式转换（回退方案）
+   */
+  function convertPCMToMP3Sync(pcmData, rate) {
+    return new Promise((resolve, reject) => {
+      // 使用 requestIdleCallback 分片处理，减少卡顿
+      if (!window.lamejs?.Mp3Encoder) {
+        reject(new Error('lamejs 库未正确加载'))
+        return
+      }
+
+      const mp3encoder = new window.lamejs.Mp3Encoder(1, rate, 128)
+      const sampleBlockSize = 1152
+      const mp3Data = []
+      let offset = 0
+
+      function processChunk(deadline) {
+        while (offset < pcmData.length && deadline.timeRemaining() > 0) {
           const sampleChunk = pcmData.subarray(
-            i,
-            Math.min(i + sampleBlockSize, pcmData.length)
+            offset,
+            Math.min(offset + sampleBlockSize, pcmData.length)
           )
           const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
           if (mp3buf.length > 0) {
             mp3Data.push(new Int8Array(mp3buf))
           }
+          offset += sampleBlockSize
         }
-        
-        // 刷新编码器
-        const mp3buf = mp3encoder.flush()
-        if (mp3buf.length > 0) {
-          mp3Data.push(new Int8Array(mp3buf))
+
+        if (offset < pcmData.length) {
+          requestIdleCallback(processChunk)
+        } else {
+          const mp3buf = mp3encoder.flush()
+          if (mp3buf.length > 0) {
+            mp3Data.push(new Int8Array(mp3buf))
+          }
+          resolve(new Blob(mp3Data, { type: 'audio/mpeg' }))
         }
-        
-        // 合并所有 MP3 数据块
-        const mp3Blob = new Blob(mp3Data, { type: 'audio/mpeg' })
-        console.log('[AudioRecorder] MP3 转换完成，大小:', mp3Blob.size, 'bytes')
-        resolve(mp3Blob)
-      } catch (error) {
-        console.error('[AudioRecorder] MP3 转换失败:', error)
-        reject(error)
       }
+
+      requestIdleCallback(processChunk)
     })
   }
   
@@ -213,7 +280,8 @@ export function useAudioRecorder() {
     sampleRate,
     duration,
     status,
-    
+    convertProgress,
+
     // 方法
     start,
     stop,
