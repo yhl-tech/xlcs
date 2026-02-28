@@ -77,13 +77,19 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
     const authStore = useAuthStore()
     if (!authStore.isLoggedIn) {
-      // 保存目标路由，登录后跳转
+      // 重定向到首页，带上 showLogin 参数触发登录弹窗
       next({
-        path: '/login',
-        query: { redirect: to.fullPath }
+        path: '/',
+        query: { showLogin: 'true', redirect: to.fullPath }
       })
       return
     }
+  }
+
+  // /login 路由重定向到首页并打开弹窗
+  if (to.path === '/login') {
+    next({ path: '/', query: { showLogin: 'true' } })
+    return
   }
   
   next()

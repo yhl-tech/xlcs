@@ -244,7 +244,7 @@ function resizeCanvas() {
       canvas.style.width = `${canvasWidth}px`
       canvas.style.height = `${canvasHeight}px`
       
-      console.log('[ImageCanvas] Canvas 已调整为图片实际尺寸:', { width: canvasWidth, height: canvasHeight })
+      // console.log('[ImageCanvas] Canvas 已调整为图片实际尺寸:', { width: canvasWidth, height: canvasHeight })
     }
 
     // 重绘历史

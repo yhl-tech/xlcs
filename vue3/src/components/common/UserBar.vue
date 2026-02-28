@@ -57,26 +57,26 @@ function handleEnterTest() {
 function handleLogout() {
   if (confirm('确定要退出登录吗？')) {
     console.log('[UserBar] 开始退出登录流程')
-    
+
     // 1. 停止所有音频播放
     stopAllAudios()
-    
+
     // 2. 断开 WebRTC 连接
     if (window.$realtimeDialog && window.$realtimeDialog.isConnected.value) {
       console.log('[UserBar] 断开 WebRTC 连接')
       window.$realtimeDialog.disconnect()
     }
-    
+
     // 3. 清空用户状态
     authStore.logout()
-    
+
     // 4. 清空测试数据
     testStore.resetTest()
     sessionStore.clearSnapshot()
-    
-    // 5. 跳转到登录页
-    router.push('/login')
-    
+
+    // 5. 跳转到首页（不带 showLogin 参数）
+    router.push('/')
+
     console.log('[UserBar] 退出登录完成')
   }
 }

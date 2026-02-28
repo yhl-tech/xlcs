@@ -47,9 +47,9 @@
                 我们将模糊的直觉转化为可视化的<strong class="highlight-text">"心理基因组"</strong>，助你精准洞察核心人格、情绪模式与潜在天赋。
               </p>
 
-              <router-link to="/login" class="cta-btn">
+              <button class="cta-btn" @click="openLoginModal">
                 启动心灵扫描
-              </router-link>
+              </button>
             </div>
           </div>
         </div>
@@ -152,20 +152,64 @@
                 InnerScan 帮你在这个复杂的系统中，找到属于你的引力中心。
               </p>
 
-              <router-link to="/login" class="cta-btn small">
+              <button class="cta-btn small" @click="openLoginModal">
                 启动心灵扫描
-              </router-link>
+              </button>
             </div>
           </div>
         </div>
       </section>
 
     </div>
+
+    <!-- 登录弹窗 -->
+    <LoginModal v-model="showLoginModal" @success="showLoginModal = false" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, shallowRef, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted, shallowRef, markRaw, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import LoginModal from '@/components/common/LoginModal.vue'
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+// 登录弹窗状态
+const showLoginModal = ref(false)
+
+function openLoginModal() {
+  if (authStore.isLoggedIn) {
+    router.push('/prep')
+  } else {
+    showLoginModal.value = true
+  }
+}
+
+// 监听 URL 参数，自动打开登录弹窗
+watch(() => route.query.showLogin, (val) => {
+  if (val === 'true') {
+    // 清除 URL 参数
+    router.replace({ query: { ...route.query, showLogin: undefined } })
+
+    // 只在未登录时打开弹窗
+    if (!authStore.isLoggedIn) {
+      showLoginModal.value = true
+    }
+  }
+}, { immediate: true })
+
+// 监听登录状态，已登录时关闭弹窗
+watch(() => authStore.token, (token) => {
+  if (token) {
+    showLoginModal.value = false
+  } else {
+    // 退出登录时，如果在首页则不自动打开弹窗
+    showLoginModal.value = false
+  }
+})
 
 // 获取 BASE_URL 用于资源路径
 const baseUrl = import.meta.env.BASE_URL
