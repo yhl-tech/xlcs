@@ -153,7 +153,7 @@
           <p>
             <strong>3</strong>.接下来，请随我的指示，点击各个按钮。
           </p>
-          <p v-if="showEnterTip">
+          <p>
             <strong>4</strong>.如果您确认清楚了测试的流程，那就可以点击"进入"按钮，开始本次正式的心理测试。
           </p>
         </div>

@@ -2,7 +2,7 @@
   <div class="test-view">
     
     <!-- 开发测试按钮 -->
-    <div class="dev-test-buttons">
+    <!-- <div class="dev-test-buttons">
       <button class="dev-btn" @click="handleDevSubmitAll">
         测试提交文件
       </button>
@@ -18,7 +18,7 @@
       <button class="dev-btn" @click="handleDevClearData" style="background: #ef4444;">
         清除数据
       </button>
-    </div>
+    </div> -->
     
     <!-- 正式测试阶段 -->
     <div v-if="testStore.phase === 'test'" class="test-screen">
@@ -51,7 +51,7 @@
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
         :total-plates="10"
-        :min-view-time="1"
+        :min-view-time="30"
         @tool-change="handleToolChange"
         @color-change="handleColorChange"
         @zoom-in="handleZoomIn"
@@ -482,31 +482,32 @@ function handlePreviousPlate() {
 async function handlePostTestSubmit(answers) {
   // 停止语音对话
   await stopVoiceDialog()
-  
+
   // 保存问卷答案
   Object.entries(answers).forEach(([key, value]) => {
     testStore.setPostTestAnswer(key, value)
   })
   session.saveSnapshot('posttest_complete')
-  
+
+  // 关闭 WebRTC 连接（保留音频数据）
+  console.log('[TestView] 进入上传阶段，关闭 WebRTC 连接')
+  try {
+    if (dialog.isConnected.value) {
+      await dialog.disconnect(false)
+      console.log('[TestView] WebRTC 连接已关闭，音频数据已保留')
+    }
+  } catch (error) {
+    console.warn('[TestView] 关闭 WebRTC 连接失败:', error)
+  }
+
   // 直接进入上传阶段
   testStore.setPhase('uploading')
 }
 
 // 上传完成后进入等待报告阶段
 async function handleUploadComplete() {
-  console.log('[TestView] 上传完成，关闭 WebRTC 连接')
-  
-  // 关闭 WebRTC 连接
-  try {
-    if (dialog.isConnected.value) {
-      await dialog.disconnect()
-      console.log('[TestView] WebRTC 连接已关闭')
-    }
-  } catch (error) {
-    console.warn('[TestView] 关闭 WebRTC 连接失败:', error)
-  }
-  
+  console.log('[TestView] 上传完成')
+
   // 进入等待报告阶段
   testStore.setPhase('waiting')
 }
