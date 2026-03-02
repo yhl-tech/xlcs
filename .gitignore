@@ -1,4 +1,4 @@
-.gitignore# Logs
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -6,24 +6,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.pnpm-store
 
 node_modules
 dist
 dist-ssr
 *.local
 
-# public 目录（如果使用符号链接，不需要忽略）
-# public
-
-# pnpm
-.pnpm-store
-# 注意：pnpm-lock.yaml 应该提交到版本控制
-
-# 环境变量文件
-# .env
-.env.local
-.env.*.local
-
+.env.development
+.env.production
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -34,4 +25,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.claude/*
+
+# Environment files with secrets
+.env.local
+.env.*.local
