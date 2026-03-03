@@ -40,7 +40,7 @@
                 Decoding <span class="text-gradient">Your Soul</span>
               </h1>
               
-              <p class="hero-subtitle">抵达你不曾了解的自我</p>
+              <p class="hero-subtitle">抵达你不曾了解的 自我</p>
               
               <p class="hero-description">
                 InnerScan 融合多模态 AI 与投射性心理测试，深度解析你的潜意识结构。<br>
