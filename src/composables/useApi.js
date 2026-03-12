@@ -515,8 +515,8 @@ export function useApi() {
     })
     
     // 保存文件到本地
-    // const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
-    // saveFileToLocal(fileToUpload, mediaFileName)
+    const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
+    saveFileToLocal(fileToUpload, mediaFileName)
     
     const response = await client.post('/rorschach/user/upload_media', formData, {
       timeout: 300000, // 5分钟超时

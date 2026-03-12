@@ -2,7 +2,7 @@
   <div class="test-view">
     
     <!-- 开发测试按钮 -->
-    <!-- <div class="dev-test-buttons">
+    <div class="dev-test-buttons">
       <button class="dev-btn" @click="handleDevSubmitAll">
         测试提交文件
       </button>
@@ -18,7 +18,7 @@
       <button class="dev-btn" @click="handleDevClearData" style="background: #ef4444;">
         清除数据
       </button>
-    </div> -->
+    </div>
     
     <!-- 正式测试阶段 -->
     <div v-if="testStore.phase === 'test'" class="test-screen">

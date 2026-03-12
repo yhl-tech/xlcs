@@ -24,6 +24,10 @@ export default defineConfig(({ mode }) => {
         target: 'http://14.103.237.160:29876',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/realtime': {
+        target: 'http://129.226.147.53:8765',
+        changeOrigin: true
       }
     }
   },

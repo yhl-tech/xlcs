@@ -121,9 +121,28 @@ export function useRealtimeDialog() {
       
       // 4. 创建 RTCPeerConnection
       console.log('[Dialog] 步骤 4/10: 创建 RTCPeerConnection...')
+      // pc = new RTCPeerConnection({
+      //   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      // })
+
       pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      })
+  iceServers: [
+    {
+      urls: 'stun:129.226.147.53:3478'
+    },
+    {
+      urls: 'turn:129.226.147.53:3478',
+      username: 'rtcuser',
+      credential: 'Pass2024WebRTC'
+    },
+    {
+      urls: 'turn:129.226.147.53:5349',
+      username: 'rtcuser',
+      credential: 'Pass2024WebRTC'
+    }
+  ],
+  iceTransportPolicy: 'relay'  // 强制使用TURN中继
+})
       console.log('[Dialog] ✓ 步骤 4/10: RTCPeerConnection 已创建')
       
       // 5. 设置音频播放
@@ -204,14 +223,13 @@ export function useRealtimeDialog() {
       await pc.setLocalDescription(offer)
       console.log('[Dialog] ✓ 步骤 8/10: SDP offer 已创建')
       
-      // 9. 发送 SDP 到 OpenAI
+      // 9. 发送 SDP 到 OpenAI（经后端代理）
       console.log('[Dialog] 步骤 9/10: 发送 SDP 到 OpenAI...')
       const model = DIALOG_CONFIG.openai.model || 'gpt-4o-realtime-preview-2024-12-17'
-      const baseUrl = 'https://api.openai.com/v1/realtime'
-      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+      const sdpResponse = await fetch(`/realtime/sdp?model=${model}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${ephemeralKey}`,
+          'X-Ephemeral-Key': ephemeralKey,
           'Content-Type': 'application/sdp'
         },
         body: offer.sdp
@@ -242,7 +260,22 @@ export function useRealtimeDialog() {
       isConnected.value = true
       isConnecting.value = false
       console.log('[Dialog] ========== WebRTC 连接成功 ==========')
-      
+
+      // 连接成功后通过数据通道发送提示词和配置
+      if (systemPrompt || speaker) {
+        console.log('[Dialog] 发送 session.update 配置提示词和语音...')
+        updateSession({
+          systemPrompt: systemPrompt,
+          speaker: speaker,
+          turnDetection: {
+            type: 'server_vad',
+            threshold: 0.6,
+            prefix_padding_ms: 500,
+            silence_duration_ms: 1500,
+          }
+        })
+      }
+
       if (callbacks.onConnect) {
         callbacks.onConnect()
       }
@@ -263,39 +296,11 @@ export function useRealtimeDialog() {
   /**
    * 获取临时令牌
    */
-  async function getEphemeralToken(systemPrompt, speaker) {
-    const apiKey = DIALOG_CONFIG.openai.apiKey
-    console.log('[Dialog] getEphemeralToken - API Key:', apiKey ? `存在 (前10位: ${apiKey.substring(0, 10)}...)` : '不存在')
-    
-    if (!apiKey) {
-      throw new Error('未配置 OpenAI API Key')
-    }
-    
-    const model = DIALOG_CONFIG.openai.model || 'gpt-4o-realtime-preview-2024-12-17'
-    const instructions = systemPrompt || DIALOG_CONFIG.openai.systemPrompt || '你是一个友好的AI助手。'
-    
-    console.log('[Dialog] 请求令牌参数:', { model, voice: speaker, instructions: instructions.substring(0, 50) + '...' })
-    
-    const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        voice: speaker || 'alloy',
-        instructions: instructions,
-        input_audio_transcription: {
-          model: 'whisper-1'
-        },
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.6,          // 提高阈值，减少噪音误触发（0.0-1.0，越高越不敏感）
-          prefix_padding_ms: 500,  // 语音开始前的缓冲时间
-          silence_duration_ms: 1500, // 需要 1.5 秒静音才认为用户说完
-        }
-      })
+  async function getEphemeralToken() {
+    console.log('[Dialog] getEphemeralToken - 通过后端代理获取临时令牌')
+
+    const response = await fetch('/realtime/token', {
+      method: 'POST'
     })
     
     console.log('[Dialog] 令牌响应状态:', response.status, response.statusText)
