@@ -239,3 +239,7 @@ location /xlcp/api/ {
 - [ ] 确定部署方式（根路径或子路径），构建时传入对应 `VITE_BASE_URL`、`VITE_API_BASE_URL`
 - [ ] 在**仓库根目录**执行 `docker build`，上下文为 `.`
 - [ ] 服务器已安装 Docker，并选好镜像上传方式（仓库 / tar / 服务器构建）
+
+
+docker build --platform linux/amd64 -t xlcs-vue3:latest .
+docker save -o xlcs-vue3.tar xlcs-vue3:latest

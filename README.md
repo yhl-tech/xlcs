@@ -832,3 +832,19 @@ server: {
 ---
 
 *文档最后更新：2026-02-03*
+
+docker build \
+  --platform linux/amd64 \
+  --build-arg VITE_BASE_URL=/xlcp/ \
+  --build-arg VITE_API_BASE_URL=/xlcp/api \
+  --build-arg VITE_SHOW_USERNAME_LOGIN=true \
+  -t xlcs-vue3:latest \
+  .
+
+docker build --platform linux/amd64 -t xlcs-vue3:latest .
+docker save -o xlcs-vue3.tar xlcs-vue3:latest
+
+docker stop xlcs-vue3
+  docker rm xlcs-vue3
+docker load -i xlcs-vue3.tar
+  docker run -d -p 8081:80 --name xlcs-vue3 xlcs-vue3:latest
