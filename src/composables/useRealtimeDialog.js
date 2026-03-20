@@ -441,26 +441,36 @@ export function useRealtimeDialog() {
       session: sessionConfig
     })
   }
-  
+
   /**
    * 发送文本消息
    */
-  function sendTextMessage(text) {
+  function sendTextMessage(text, options = {}) {
     if (!isConnected.value) {
       console.warn('[Dialog] 未连接')
       return false
     }
-    
-    return sendEvent({
+
+    const { createResponse = true } = options || {}
+
+    const ok = sendEvent({
       type: 'conversation.item.create',
       item: {
         type: 'message',
         role: 'user',
         content: [{ type: 'input_text', text }]
       }
-    }) && sendEvent({
-      type: 'response.create'
     })
+
+    if (!ok) return false
+
+    if (createResponse) {
+      return sendEvent({
+        type: 'response.create'
+      })
+    }
+
+    return true
   }
   
   /**

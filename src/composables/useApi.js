@@ -485,15 +485,23 @@ export function useApi() {
   /**
    * 上传音/视频文件
    * POST /rorschach/user/upload_media
+   * @param {Blob|File} file - 音频文件
+   * @param {string|null} userId - 用户ID
+   * @param {Function|null} onProgress - 上传进度回调
+   * @param {number|null} plateIndex - 图版索引（0-9），传入时文件名为 media1.mp3 ~ media10.mp3
    */
-  const uploadMedia = async (file, userId = null, onProgress = null) => {
+  const uploadMedia = async (file, userId = null, onProgress = null, plateIndex = null) => {
     // 确保文件有正确的文件名和类型
     let fileToUpload = file
     
-    // 如果是 Blob，转换为 File，文件名使用用户 ID
+    // 如果是 Blob，转换为 File
     if (file instanceof Blob && !(file instanceof File)) {
       const extension = file.type.includes('mp4') ? 'mp4' : 'mp3'
-      const fileName = `${userId || 'unknown'}.${extension}`
+      // 有图版编号时使用 userId_1 ~ userId_10，否则使用用户 ID
+      const baseName = plateIndex !== null
+        ? `${userId || 'unknown'}_${plateIndex + 1}`
+        : (userId || 'unknown')
+      const fileName = `${baseName}.${extension}`
       fileToUpload = new File([file], fileName, { type: file.type || 'audio/mp3' })
     }
     

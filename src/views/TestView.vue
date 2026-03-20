@@ -51,7 +51,7 @@
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
         :total-plates="10"
-        :min-view-time="30"
+        :min-view-time="1"
         @tool-change="handleToolChange"
         @color-change="handleColorChange"
         @zoom-in="handleZoomIn"
@@ -138,9 +138,104 @@ const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 // TTS 播报提示词（让 AI 只朗读不添加额外解释）
 const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
 
+// 记录已刷新过 system prompt 的图版，避免重复刷新
+const lastSystemPromptRefreshedPlate = ref(-1)
+
+// ==================== 按图版分段录音上传 ====================
+
+/**
+ * 停止当前图版的录音，异步转 MP3 并上传（不阻塞主流程）
+ * @param {number} plateIndex - 图版索引（0-9），用于命名 media1.mp3 ~ media10.mp3
+ */
+async function stopAndUploadCurrentPlateAudio(plateIndex) {
+  const userId = authStore.userInfo?.username || authStore.userInfo?.phone || authStore.userId
+  try {
+    const recordingStatus = dialog.getMixedRecordingStatus()
+    if (!recordingStatus.isRecording && recordingStatus.chunksCount === 0) {
+      console.log(`[TestView] 图版 ${plateIndex + 1} 无录音数据，跳过上传`)
+      return
+    }
+
+    console.log(`[TestView] 停止图版 ${plateIndex + 1} 录音...`)
+    const webmBlob = await dialog.stopMixedRecording()
+    if (!webmBlob || webmBlob.size === 0) {
+      console.warn(`[TestView] 图版 ${plateIndex + 1} 录音数据为空，跳过上传`)
+      return
+    }
+
+    // 异步转码 + 上传，不 await，避免阻塞用户切图
+    const uploadAsync = async () => {
+      try {
+        console.log(`[TestView] 图版 ${plateIndex + 1} 开始转码 MP3...`)
+        const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
+        if (!mp3Blob || mp3Blob.size === 0) {
+          console.warn(`[TestView] 图版 ${plateIndex + 1} MP3 转码结果为空，跳过上传`)
+          return
+        }
+        console.log(`[TestView] 图版 ${plateIndex + 1} MP3 大小: ${(mp3Blob.size / 1024 / 1024).toFixed(2)}MB，开始上传...`)
+        await api.uploadMedia(mp3Blob, userId, null, plateIndex)
+        console.log(`[TestView] ✓ 图版 ${plateIndex + 1} 音频上传完成（media${plateIndex + 1}.mp3）`)
+      } catch (err) {
+        console.error(`[TestView] ✗ 图版 ${plateIndex + 1} 音频转码/上传失败:`, err)
+      }
+    }
+    uploadAsync()
+  } catch (err) {
+    console.error(`[TestView] ✗ 停止图版 ${plateIndex + 1} 录音失败:`, err)
+  }
+}
+
+/**
+ * 断开 WebRTC 并重新连接（每张图独立会话），然后开始新录音
+ * @returns {number|null} 新录音开始时间戳
+ */
+async function reconnectAndStartRecording() {
+  try {
+    // 断开旧连接（录音已在 stopAndUploadCurrentPlateAudio 里停了，这里清空数据）
+    if (dialog.isConnected.value) {
+      console.log('[TestView] 断开旧 WebRTC 连接...')
+      await dialog.disconnect(true)
+    }
+
+    // 重新连接
+    console.log('[TestView] 重新建立 WebRTC 连接（新会话）...')
+    await dialog.connect(SYSTEM_PROMPT, 'alloy')
+
+    dialog.setCallbacks({
+      onTranscript: (transcript) => {
+        subtitle.show(transcript.text, transcript.speaker)
+      }
+    })
+
+    // 开始新录音
+    const recordingStartTime = Date.now()
+    await dialog.startMixedRecording()
+    console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
+    return recordingStartTime
+  } catch (err) {
+    console.error('[TestView] 重新连接 WebRTC 失败:', err)
+    return null
+  }
+}
+
 // 构建 TTS 播报查询文本
 function buildTTSQuery(text) {
   return `${TTS_READ_ONLY_PROMPT}\n${text}`
+}
+
+function refreshSystemPromptForPlate(plateIndex) {
+  if (!dialog.isConnected.value) return false
+  // 只在主测试阶段刷新，避免覆盖后测提示词
+  if (testStore.phase !== 'test') return false
+  if (plateIndex === lastSystemPromptRefreshedPlate.value) return true
+
+  // 直接重新下发系统提示词（当前 Realtime 版本不支持真正的 conversation.clear）
+  const updated = dialog.updateSession({ systemPrompt: SYSTEM_PROMPT })
+
+  if (updated) {
+    lastSystemPromptRefreshedPlate.value = plateIndex
+  }
+  return updated
 }
 
 // 发送 TTS 播报
@@ -259,6 +354,13 @@ onMounted(async () => {
       console.log('[TestView] - 使用录音开始时间戳:', recordingStartTime)
       tracker.startTracking(testStore.currentPlate, recordingStartTime)
       console.log('[TestView] - testStartTime 已记录')
+    }
+
+    // 每张图刷新一次系统提示词（不断开连接）
+    try {
+      refreshSystemPromptForPlate(testStore.currentPlate)
+    } catch (err) {
+      console.warn('[TestView] 刷新系统提示词失败:', err)
     }
     
     // 播放开场白（仅第一次进入时）
@@ -419,47 +521,55 @@ async function handleNextPlate() {
   console.log('[TestView] handleNextPlate - currentPlate:', testStore.currentPlate, 'isLastPlate:', isLastPlate)
   
   if (isLastPlate) {
-    // 最后一张图完成后，进入后测问卷
-    console.log('[TestView] 最后一张图完成，进入后测问卷')
-    
-    // 检查当前录音状态
-    const recordingStatus = dialog.getMixedRecordingStatus()
-    console.log('[TestView] 切换前录音状态:', JSON.stringify(recordingStatus))
-    
-    // 如果录音未启动，尝试启动
-    if (!recordingStatus.isRecording && recordingStatus.chunksCount === 0) {
-      console.warn('[TestView] ⚠️ 录音未启动或无数据，尝试重新启动录音')
-      try {
-        await dialog.startMixedRecording()
-        console.log('[TestView] ✓ 录音已重新启动')
-      } catch (err) {
-        console.error('[TestView] ✗ 重新启动录音失败:', err)
-      }
-    }
-    
+    // 最后一张图完成后，先停录音上传，再进入后测问卷
+    console.log('[TestView] 最后一张图完成，停止录音并进入后测问卷')
+
+    // 停止第 10 张录音并异步上传
+    await stopAndUploadCurrentPlateAudio(testStore.currentPlate)
+
     tracker.recordSelectPhase()
     testStore.setPhase('postTest')
-    // 注意：不要在这里再次调用 startVoiceDialog，避免清空录音数据
-    // 只更新会话的系统提示词
-    if (dialog.isConnected.value) {
-      console.log('[TestView] WebRTC 已连接，更新提示词为后测提示词')
-      dialog.updateSession({
-        systemPrompt: POSTTEST_PROMPT
+
+    // 重新连接 WebRTC（后测阶段使用后测提示词）
+    try {
+      if (dialog.isConnected.value) {
+        await dialog.disconnect(true)
+      }
+      await dialog.connect(POSTTEST_PROMPT, 'alloy')
+      dialog.setCallbacks({
+        onTranscript: (transcript) => {
+          subtitle.show(transcript.text, transcript.speaker)
+        }
       })
+      await dialog.startMixedRecording()
+      console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
+    } catch (err) {
+      console.error('[TestView] 后测阶段重连 WebRTC 失败:', err)
     }
   } else {
-    // 先切换图版索引（快速操作）
-    testStore.nextPlate()
+    const completedPlate = testStore.currentPlate
 
-    // 立即记录新图版的时间戳（在用户点击按钮的瞬间，确保与音频时间严格同步）
-    tracker.startTracking(testStore.currentPlate)
+    // 停止当前图版录音并异步上传（不阻塞切图）
+    await stopAndUploadCurrentPlateAudio(completedPlate)
+
+    // 切换图版索引
+    testStore.nextPlate()
 
     uiStore.setBackgroundTheme(testStore.currentPlate)
     imageCanvasRef.value?.resetTransform()
 
     // 懒加载：预加载当前图片和后续 2 张
     imagePreloader.preloadAhead(testStore.currentPlate, 2)
-    
+
+    // 重新连接 WebRTC（新会话、清空历史）并开始新录音
+    const recordingStartTime = await reconnectAndStartRecording()
+
+    // 立即记录新图版的时间戳
+    tracker.startTracking(testStore.currentPlate, recordingStartTime)
+
+    // 刷新去重标记（新连接后重置，确保新图版会刷新）
+    lastSystemPromptRefreshedPlate.value = testStore.currentPlate
+
     // 播报当前图片的提示语音
     try {
       const promptText = '这张图你可以看到什么？'
@@ -476,31 +586,35 @@ async function handleNextPlate() {
 function handlePreviousPlate() {
   testStore.previousPlate()
   uiStore.setBackgroundTheme(testStore.currentPlate)
+  
+  // 每张图刷新一次系统提示词（不断开连接）
+  try {
+    refreshSystemPromptForPlate(testStore.currentPlate)
+  } catch (err) {
+    console.warn('[TestView] 刷新系统提示词失败:', err)
+  }
 }
 
 // 后测问卷提交 - 直接进入上传阶段
 async function handlePostTestSubmit(answers) {
-  // 停止语音对话
-  await stopVoiceDialog()
-
   // 保存问卷答案
   Object.entries(answers).forEach(([key, value]) => {
     testStore.setPostTestAnswer(key, value)
   })
   session.saveSnapshot('posttest_complete')
 
-  // 关闭 WebRTC 连接（保留音频数据）
+  // 关闭 WebRTC 连接（后测阶段的录音不再使用，直接清空）
   console.log('[TestView] 进入上传阶段，关闭 WebRTC 连接')
   try {
     if (dialog.isConnected.value) {
-      await dialog.disconnect(false)
-      console.log('[TestView] WebRTC 连接已关闭，音频数据已保留')
+      await dialog.disconnect(true)
+      console.log('[TestView] WebRTC 连接已关闭')
     }
   } catch (error) {
     console.warn('[TestView] 关闭 WebRTC 连接失败:', error)
   }
 
-  // 直接进入上传阶段
+  // 直接进入上传阶段（各图版音频已在切图时逐张上传）
   testStore.setPhase('uploading')
 }
 
@@ -670,31 +784,9 @@ async function handleSubmit() {
     await api.upload5Questions(testStore.postTestAnswers, userId)
     console.log('[TestView] 问卷答案已上传')
     
-    // 7. 上传音频（如果有混合录音）
-    try {
-      const recordingStatus = dialog.getMixedRecordingStatus()
-      if (recordingStatus.isRecording || recordingStatus.chunksCount > 0) {
-        uiStore.loadingMessage = '正在停止录音...'
-        // 停止混合录音并获取 WebM
-        const webmBlob = await dialog.stopMixedRecording()
-        
-        if (webmBlob && webmBlob.size > 0) {
-          uiStore.loadingMessage = '正在转换音频格式...'
-          // 转换为 MP3
-          const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
-          
-          uiStore.loadingMessage = '正在上传音频...'
-          await api.uploadMedia(mp3Blob, userId)
-          console.log('[TestView] 音频已上传')
-        }
-      } else {
-        console.log('[TestView] 无混合录音数据')
-      }
-    } catch (audioError) {
-      console.warn('[TestView] 音频上传失败:', audioError)
-    }
-    
-    // 8. 触发分析
+    // 注意：各图版音频已在切图时逐张上传（media1.mp3 ~ media10.mp3），无需在此重复上传
+
+    // 7（原8）. 触发分析
     uiStore.loadingMessage = '正在启动分析...'
     await api.analyzeTest(userId)
     console.log('[TestView] 分析已启动')
@@ -760,36 +852,8 @@ async function handleDevSubmitAll() {
     await api.upload5Questions(postTestAnswers, userId)
     console.log('[DevTest] 问卷答案已上传:', postTestAnswers)
     
-    // 6. 上传音频（真实录音数据）
-    uiStore.loadingMessage = '正在处理音频...'
-    try {
-      const recordingStatus = dialog.getMixedRecordingStatus()
-      console.log('[DevTest] 录音状态:', recordingStatus)
-      
-      if (recordingStatus.isRecording || recordingStatus.chunksCount > 0) {
-        uiStore.loadingMessage = '正在停止录音...'
-        const webmBlob = await dialog.stopMixedRecording()
-        
-        if (webmBlob && webmBlob.size > 0) {
-          console.log('[DevTest] WebM 录音大小:', (webmBlob.size / 1024 / 1024).toFixed(2), 'MB')
-          
-          uiStore.loadingMessage = '正在转换音频格式...'
-          const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
-          console.log('[DevTest] MP3 音频大小:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB')
-          
-          uiStore.loadingMessage = '正在上传音频...'
-          await api.uploadMedia(mp3Blob, userId)
-          console.log('[DevTest] 音频已上传')
-        } else {
-          console.log('[DevTest] 无有效录音数据')
-        }
-      } else {
-        console.log('[DevTest] 无混合录音')
-      }
-    } catch (audioError) {
-      console.warn('[DevTest] 音频处理失败:', audioError)
-    }
-    
+    // 注意：各图版音频已在切图时逐张上传（media1.mp3 ~ media10.mp3），无需在此重复上传
+
     uiStore.showSuccess('所有真实数据文件已成功上传！')
   } catch (error) {
     uiStore.showError('提交失败: ' + error.message)
