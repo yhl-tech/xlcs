@@ -143,6 +143,18 @@ export function useRealtimeDialog() {
   ],
   iceTransportPolicy: 'relay'  // 强制使用TURN中继
 })
+      
+      pc.onconnectionstatechange = () => {
+        try {
+          console.log('[Dialog] pc connectionState:', pc.connectionState)
+        } catch (e) {}
+      }
+      
+      pc.oniceconnectionstatechange = () => {
+        try {
+          console.log('[Dialog] pc iceConnectionState:', pc.iceConnectionState)
+        } catch (e) {}
+      }
       console.log('[Dialog] ✓ 步骤 4/10: RTCPeerConnection 已创建')
       
       // 5. 设置音频播放
@@ -198,9 +210,11 @@ export function useRealtimeDialog() {
       
       // 等待数据通道打开
       const dataChannelReady = new Promise((resolve, reject) => {
+        // 由于当前场景“频繁断开/重连 + TURN relay”，可能导致 ICE/datachannel 建连偶发超过 10s
+        // 这里适当放大超时时间以提升稳定性。
         const timeout = setTimeout(() => {
           reject(new Error('数据通道打开超时'))
-        }, 10000)
+        }, 30000)
         
         dc.onopen = () => {
           clearTimeout(timeout)

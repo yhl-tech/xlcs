@@ -55,7 +55,8 @@ export default defineConfig(({ mode }) => {
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
+        // 保留 console.*，便于线上排查问题
+        drop_console: false,
         drop_debugger: true
       },
       mangle: true,

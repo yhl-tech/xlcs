@@ -134,6 +134,7 @@ const subtitleSpeaker = ref('assistant')
 const showRestoreDialog = ref(false)
 const brushColor = ref('#ef4444') // 默认红色
 const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
+const isPlateSwitching = ref(false)
 
 // TTS 播报提示词（让 AI 只朗读不添加额外解释）
 const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
@@ -190,32 +191,43 @@ async function stopAndUploadCurrentPlateAudio(plateIndex) {
  * @returns {number|null} 新录音开始时间戳
  */
 async function reconnectAndStartRecording() {
-  try {
-    // 断开旧连接（录音已在 stopAndUploadCurrentPlateAudio 里停了，这里清空数据）
-    if (dialog.isConnected.value) {
-      console.log('[TestView] 断开旧 WebRTC 连接...')
-      await dialog.disconnect(true)
-    }
-
-    // 重新连接
-    console.log('[TestView] 重新建立 WebRTC 连接（新会话）...')
-    await dialog.connect(SYSTEM_PROMPT, 'alloy')
-
-    dialog.setCallbacks({
-      onTranscript: (transcript) => {
-        subtitle.show(transcript.text, transcript.speaker)
+  const MAX_RETRIES = 3
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // 断开旧连接（录音已在 stopAndUploadCurrentPlateAudio 里停了，这里清空数据）
+      if (dialog.isConnected.value) {
+        console.log(`[TestView] 断开旧 WebRTC 连接... (attempt ${attempt}/${MAX_RETRIES})`)
+        await dialog.disconnect(true)
       }
-    })
 
-    // 开始新录音
-    const recordingStartTime = Date.now()
-    await dialog.startMixedRecording()
-    console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
-    return recordingStartTime
-  } catch (err) {
-    console.error('[TestView] 重新连接 WebRTC 失败:', err)
-    return null
+      // 让上一次连接的资源释放有足够时间，降低“紧跟着重连导致 datachannel 建连慢/失败”的概率（TURN relay 下更常见）
+      await new Promise(resolve => setTimeout(resolve, 5000))
+
+      // 重新连接
+      console.log('[TestView] 重新建立 WebRTC 连接（新会话）...')
+      await dialog.connect(SYSTEM_PROMPT, 'alloy')
+
+      dialog.setCallbacks({
+        onTranscript: (transcript) => {
+          subtitle.show(transcript.text, transcript.speaker)
+        }
+      })
+
+      // 开始新录音
+      const recordingStartTime = Date.now()
+      await dialog.startMixedRecording()
+      console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
+      return recordingStartTime
+    } catch (err) {
+      console.error(`[TestView] 重新连接 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
+      if (attempt < MAX_RETRIES) {
+        // 简单退避：给 ICE/TURN 一点时间恢复
+        await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
+      }
+    }
   }
+
+  return null
 }
 
 // 构建 TTS 播报查询文本
@@ -513,8 +525,14 @@ function handleClearAll() {
 
 // 下一张图版
 async function handleNextPlate() {
-  // 结束当前图版的追踪（会自动保存未完成的画笔轨迹）
-  tracker.stopTracking(testStore.currentPlate)
+  if (isPlateSwitching.value) {
+    console.warn('[TestView] handleNextPlate：切图进行中，忽略本次点击')
+    return
+  }
+  isPlateSwitching.value = true
+  try {
+    // 结束当前图版的追踪（会自动保存未完成的画笔轨迹）
+    tracker.stopTracking(testStore.currentPlate)
   
   // 检查是否是最后一张图（索引 9，即第 10 张）
   const isLastPlate = testStore.currentPlate >= 9
@@ -531,20 +549,32 @@ async function handleNextPlate() {
     testStore.setPhase('postTest')
 
     // 重新连接 WebRTC（后测阶段使用后测提示词）
-    try {
-      if (dialog.isConnected.value) {
-        await dialog.disconnect(true)
-      }
-      await dialog.connect(POSTTEST_PROMPT, 'alloy')
-      dialog.setCallbacks({
-        onTranscript: (transcript) => {
-          subtitle.show(transcript.text, transcript.speaker)
+    // 使用与主测试相同的重连策略，提高频繁断开/重连时的成功率
+    const MAX_RETRIES = 5
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (dialog.isConnected.value) {
+          console.log(`[TestView] 后测阶段断开旧 WebRTC 连接... (attempt ${attempt}/${MAX_RETRIES})`)
+          await dialog.disconnect(true)
         }
-      })
-      await dialog.startMixedRecording()
-      console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
-    } catch (err) {
-      console.error('[TestView] 后测阶段重连 WebRTC 失败:', err)
+
+        await new Promise(resolve => setTimeout(resolve, 5000))
+
+        await dialog.connect(POSTTEST_PROMPT, 'alloy')
+        dialog.setCallbacks({
+          onTranscript: (transcript) => {
+            subtitle.show(transcript.text, transcript.speaker)
+          }
+        })
+        await dialog.startMixedRecording()
+        console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
+        break
+      } catch (err) {
+        console.error(`[TestView] 后测阶段重连 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
+        }
+      }
     }
   } else {
     const completedPlate = testStore.currentPlate
@@ -565,7 +595,11 @@ async function handleNextPlate() {
     const recordingStartTime = await reconnectAndStartRecording()
 
     // 立即记录新图版的时间戳
-    tracker.startTracking(testStore.currentPlate, recordingStartTime)
+    if (recordingStartTime) {
+      tracker.startTracking(testStore.currentPlate, recordingStartTime)
+    } else {
+      console.warn('[TestView] 新录音时间戳为空，跳过本图 startTracking')
+    }
 
     // 刷新去重标记（新连接后重置，确保新图版会刷新）
     lastSystemPromptRefreshedPlate.value = testStore.currentPlate
@@ -579,7 +613,10 @@ async function handleNextPlate() {
       console.warn('[TestView] 播报提示失败:', err)
     }
   }
-  session.saveSnapshot('next_plate')
+    session.saveSnapshot('next_plate')
+  } finally {
+    isPlateSwitching.value = false
+  }
 }
 
 // 上一张图版
@@ -603,12 +640,44 @@ async function handlePostTestSubmit(answers) {
   })
   session.saveSnapshot('posttest_complete')
 
-  // 关闭 WebRTC 连接（后测阶段的录音不再使用，直接清空）
-  console.log('[TestView] 进入上传阶段，关闭 WebRTC 连接')
+  // 先停止后测阶段录音并上传音频
+  const userId = authStore.userInfo?.username || authStore.userInfo?.phone || authStore.userId
+  try {
+    const recordingStatus = dialog.getMixedRecordingStatus()
+    console.log('[TestView] 后测提交前录音状态:', JSON.stringify(recordingStatus))
+
+    if (recordingStatus.isRecording || recordingStatus.chunksCount > 0) {
+      uiStore.loadingMessage = '正在停止后测录音...'
+      const webmBlob = await dialog.stopMixedRecording()
+
+      if (webmBlob && webmBlob.size > 0) {
+        uiStore.loadingMessage = '正在转换后测音频格式...'
+        const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
+
+        if (mp3Blob && mp3Blob.size > 0) {
+          uiStore.loadingMessage = '正在上传后测音频...'
+          // plateIndex=10 => 文件名为 userId_11.mp3（media11）
+          await api.uploadMedia(mp3Blob, userId, null, 10)
+          console.log('[TestView] 后测音频上传完成（userId_11.mp3）')
+        } else {
+          console.warn('[TestView] 后测 MP3 转码结果为空，跳过上传')
+        }
+      } else {
+        console.warn('[TestView] 后测 WebM blob 为空，跳过上传')
+      }
+    } else {
+      console.log('[TestView] 后测阶段无录音数据，跳过后测音频上传')
+    }
+  } catch (err) {
+    console.warn('[TestView] 后测音频上传失败:', err)
+  }
+
+  // 关闭 WebRTC 连接
+  console.log('[TestView] 后测提交后，关闭 WebRTC 连接')
   try {
     if (dialog.isConnected.value) {
       await dialog.disconnect(true)
-      console.log('[TestView] WebRTC 连接已关闭')
+      console.log('[TestView] WebRTC 连接已关闭（后测音频已处理）')
     }
   } catch (error) {
     console.warn('[TestView] 关闭 WebRTC 连接失败:', error)
