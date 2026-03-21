@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="modelValue" class="login-modal-overlay" @click.self="close">
+      <div v-if="modelValue" class="login-modal-overlay">
         <div class="login-modal-container">
           <!-- 关闭按钮 -->
           <button class="modal-close" @click="close">

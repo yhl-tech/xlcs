@@ -106,7 +106,7 @@ import { useImagePreloader } from '@/composables/useImagePreloader'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { useSubtitle } from '@/composables/useSubtitle'
 import { useApi } from '@/composables/useApi'
-import { SYSTEM_PROMPT, POSTTEST_PROMPT } from '@/utils/constants'
+import { getSystemPromptForPlate, POSTTEST_PROMPT } from '@/utils/constants'
 import { stopAllAudios } from '@/utils/audioManager'
 
 const router = useRouter()
@@ -203,9 +203,9 @@ async function reconnectAndStartRecording() {
       // 让上一次连接的资源释放有足够时间，降低“紧跟着重连导致 datachannel 建连慢/失败”的概率（TURN relay 下更常见）
       await new Promise(resolve => setTimeout(resolve, 5000))
 
-      // 重新连接
+      // 重新连接（使用新图版对应的提示词）
       console.log('[TestView] 重新建立 WebRTC 连接（新会话）...')
-      await dialog.connect(SYSTEM_PROMPT, 'alloy')
+      await dialog.connect(getSystemPromptForPlate(testStore.currentPlate), 'alloy')
 
       dialog.setCallbacks({
         onTranscript: (transcript) => {
@@ -241,8 +241,8 @@ function refreshSystemPromptForPlate(plateIndex) {
   if (testStore.phase !== 'test') return false
   if (plateIndex === lastSystemPromptRefreshedPlate.value) return true
 
-  // 直接重新下发系统提示词（当前 Realtime 版本不支持真正的 conversation.clear）
-  const updated = dialog.updateSession({ systemPrompt: SYSTEM_PROMPT })
+  // 根据图版索引选择对应提示词：第 1 张用 SYSTEM_1_PROMPT，第 2-10 张用 SYSTEM_2_10_PROMPT
+  const updated = dialog.updateSession({ systemPrompt: getSystemPromptForPlate(plateIndex) })
 
   if (updated) {
     lastSystemPromptRefreshedPlate.value = plateIndex
@@ -707,12 +707,12 @@ function handleDiscardSession() {
   showRestoreDialog.value = false
 }
 
-// 根据当前阶段获取对应的提示词
+// 根据当前阶段和图版索引获取对应的提示词
 function getPromptForCurrentPhase() {
   if (testStore.phase === 'postTest') {
     return POSTTEST_PROMPT
   }
-  return SYSTEM_PROMPT
+  return getSystemPromptForPlate(testStore.currentPlate)
 }
 
 // 开始语音对话
