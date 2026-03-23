@@ -491,43 +491,64 @@ export function useApi() {
    * @param {number|null} plateIndex - 图版索引（0-9），传入时文件名为 media1.mp3 ~ media10.mp3
    */
   const uploadMedia = async (file, userId = null, onProgress = null, plateIndex = null) => {
-    // 确保文件有正确的文件名和类型
-    let fileToUpload = file
-    
-    // 如果是 Blob，转换为 File
-    if (file instanceof Blob && !(file instanceof File)) {
-      const extension = file.type.includes('mp4') ? 'mp4' : 'mp3'
-      // 有图版编号时使用 userId_1 ~ userId_10，否则使用用户 ID
-      const baseName = plateIndex !== null
-        ? `${userId || 'unknown'}_${plateIndex + 1}`
-        : (userId || 'unknown')
-      const fileName = `${baseName}.${extension}`
-      fileToUpload = new File([file], fileName, { type: file.type || 'audio/mp3' })
-    }
-    
-    // 验证文件类型
-    const fileName = fileToUpload.name.toLowerCase()
-    const isValidFormat = fileName.endsWith('.mp3') || fileName.endsWith('.mp4')
-    if (!isValidFormat) {
-      throw new Error('只支持上传MP3/MP4格式文件')
-    }
+    if (!userId) throw new Error('userId 不能为空')
+
+    // 构建符合后端规则的文件名：{userId}-{plateNumber}.mp3/mp4
+    const extension = (file.type || '').includes('mp4') ? 'mp4' : 'mp3'
+    const plateNumber = plateIndex !== null ? plateIndex + 1 : 'select'
+    const fileName = `${userId}-${plateNumber}.${extension}`
+
+    const fileToUpload = (file instanceof File && file.name === fileName)
+      ? file
+      : new File([file], fileName, { type: file.type || 'audio/mp3' })
 
     const formData = new FormData()
     formData.append('file', fileToUpload)
-    
+
     const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
-    console.log('[API] 上传音频文件:', { 
-      fileName: fileToUpload.name, 
-      size: `${fileSizeMB}MB`,
-      userId 
+    console.log('[API] 上传音频文件:', { fileName, size: `${fileSizeMB}MB`, userId, plateNumber })
+
+    saveFileToLocal(fileToUpload, fileName)
+
+    const response = await client.post('/rorschach/user/upload_sub_media', formData, {
+      headers: { 'user-id': userId },
+      timeout: 300000,
+      onUploadProgress: onProgress ? (progressEvent) => {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        onProgress(percent)
+      } : undefined
     })
-    
-    // 保存文件到本地
-    const mediaFileName = `media_${userId || 'unknown'}_${Date.now()}_${fileToUpload.name}`
-    saveFileToLocal(fileToUpload, mediaFileName)
-    
-    const response = await client.post('/rorschach/user/upload_media', formData, {
-      timeout: 300000, // 5分钟超时
+    return response
+  }
+
+  /**
+   * 上传图版音/视频文件
+   * POST /rorschach/user/upload_sub_media
+   * @param {Blob|File} file - 音频文件
+   * @param {string} userId - 用户ID
+   * @param {number|string} plateNumber - 图版编号（1-10 的整数，或 'select'）
+   * @param {Function|null} onProgress - 上传进度回调
+   */
+  const uploadSubMedia = async (file, userId, plateNumber, onProgress = null) => {
+    if (!userId) throw new Error('userId 不能为空')
+
+    // 构建符合后端规则的文件名：{userId}-{plateNumber}.mp3
+    const extension = (file.type || '').includes('mp4') ? 'mp4' : 'mp3'
+    const fileName = `${userId}-${plateNumber}.${extension}`
+
+    const fileToUpload = file instanceof File && file.name === fileName
+      ? file
+      : new File([file], fileName, { type: file.type || 'audio/mp3' })
+
+    const formData = new FormData()
+    formData.append('file', fileToUpload)
+
+    const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
+    console.log('[API] 上传图版音频文件:', { fileName, size: `${fileSizeMB}MB`, userId, plateNumber })
+
+    const response = await client.post('/rorschach/user/upload_sub_media', formData, {
+      headers: { 'user-id': userId },
+      timeout: 300000,
       onUploadProgress: onProgress ? (progressEvent) => {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
         onProgress(percent)
@@ -631,6 +652,7 @@ export function useApi() {
     uploadSegTime,        // 4. video_clip.json - 时间戳切分
     upload5Questions,     // 5. 5_questions.json - 五个问题答案
     uploadMedia,          // 6. 音频文件
+    uploadSubMedia,       // 7. 图版音频文件
     
     // 分析
     analyzeTest,

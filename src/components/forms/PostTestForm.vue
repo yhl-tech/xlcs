@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { 
   POST_TEST_QUESTIONS, 
@@ -77,23 +77,30 @@ let timerId = null
 const dialog = useRealtimeDialog()
 
 // 初始化答案为数组格式
-onMounted(async () => {
+onMounted(() => {
   console.log('[PostTestForm] 组件已挂载')
   console.log('[PostTestForm] 可显示问题数:', displayableQuestions.value.length)
   console.log('[PostTestForm] WebRTC 连接状态:', dialog.isConnected.value)
-  
+
   displayableQuestions.value.forEach(q => {
     answers[q.key] = []
   })
-  
-  // 等待一小段时间确保 WebRTC 状态稳定
-  await new Promise(resolve => setTimeout(resolve, 500))
-  
-  // 播报第一个问题（包含开场语）
-  console.log('[PostTestForm] 准备播报第一个问题')
-  await askCurrentQuestion()
-  startQuestionTimer()
 })
+
+// 等待 WebRTC 连接成功后再播报第一个问题
+let firstQuestionAsked = false
+watch(
+  () => dialog.isConnected.value,
+  async (connected) => {
+    if (connected && !firstQuestionAsked) {
+      firstQuestionAsked = true
+      console.log('[PostTestForm] WebRTC 已连接，开始播报第一个问题')
+      await askCurrentQuestion()
+      startQuestionTimer()
+    }
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => {
   clearQuestionTimer()

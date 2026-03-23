@@ -9,6 +9,9 @@
       <button class="dev-btn" @click="handleDevSkipToPostTest">
         五个问题
       </button>
+      <button class="dev-btn" @click="handleDevSkipToPlate10">
+        第10张
+      </button>
       <button class="dev-btn" @click="handleDevSkipToUploading">
         上传页面
       </button>
@@ -656,9 +659,9 @@ async function handlePostTestSubmit(answers) {
 
         if (mp3Blob && mp3Blob.size > 0) {
           uiStore.loadingMessage = '正在上传后测音频...'
-          // plateIndex=10 => 文件名为 userId_11.mp3（media11）
-          await api.uploadMedia(mp3Blob, userId, null, 10)
-          console.log('[TestView] 后测音频上传完成（userId_11.mp3）')
+          // plateIndex=null => 文件名为 userId-select.mp3
+          await api.uploadMedia(mp3Blob, userId, null, null)
+          console.log('[TestView] 后测音频上传完成（userId-select.mp3）')
         } else {
           console.warn('[TestView] 后测 MP3 转码结果为空，跳过上传')
         }
@@ -930,6 +933,12 @@ async function handleDevSubmitAll() {
   } finally {
     uiStore.hideLoading()
   }
+}
+
+// 开发测试 - 跳到第10张图片
+function handleDevSkipToPlate10() {
+  testStore.setPhase('test')
+  testStore.goToPlate(9)
 }
 
 // 开发测试 - 跳到后测问卷（五个问题）
