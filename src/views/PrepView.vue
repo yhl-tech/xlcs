@@ -338,6 +338,29 @@ onMounted(async () => {
   // 添加点击外部关闭下拉框的监听
   document.addEventListener('click', handleClickOutside)
 
+  // 检查用户是否已提交过测试，若已提交则直接跳转到等待报告页面
+  try {
+    const userId = authStore.userInfo?.username || authStore.userInfo?.phone
+    if (userId) {
+      const uploadStatus = await api.checkUploadFilesStatus(userId)
+      if (uploadStatus.code === 0 && uploadStatus.data === true) {
+        console.log('[PrepView] 用户已提交过测试，跳转到等待报告页面')
+        const reportStatus = await api.checkReportStatus(userId)
+        const isReportReady = reportStatus.code === 0 && reportStatus.data === true
+        testStore.setPhase('waiting')
+        testStore.setReportStatus({
+          status: isReportReady ? 'ready' : 'pending',
+          isReady: isReportReady,
+          message: isReportReady ? '报告已生成' : '报告处理中...'
+        })
+        router.replace('/test')
+        return
+      }
+    }
+  } catch (err) {
+    console.warn('[PrepView] 检查测试状态失败:', err)
+  }
+
   // 播放欢迎语音（使用 MP3 文件，不需要 WebRTC）
   if (!welcomeMessagePlayed) {
     welcomeMessagePlayed = true
