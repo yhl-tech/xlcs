@@ -36,6 +36,11 @@
           @drawing-move="handleDrawingMove"
           @drawing-end="handleDrawingEnd"
         />
+        <!-- 音频连接等待遮罩 -->
+        <div v-if="!isAudioReady" class="audio-connecting-overlay">
+          <div class="audio-connecting-spinner" />
+          <span>连接中...</span>
+        </div>
       </div>
 
       <!-- 能量柱 -->
@@ -69,6 +74,11 @@
 
     <!-- 后测问卷阶段 -->
     <div v-else-if="testStore.phase === 'postTest'" class="post-test-screen">
+      <!-- 音频连接等待遮罩 -->
+      <div v-if="!isAudioReady" class="audio-connecting-overlay">
+        <div class="audio-connecting-spinner" />
+        <span>连接中...</span>
+      </div>
       <PostTestForm @submit="handlePostTestSubmit" />
     </div>
 
@@ -138,6 +148,7 @@ const showRestoreDialog = ref(false)
 const brushColor = ref('#ef4444') // 默认红色
 const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 const isPlateSwitching = ref(false)
+const isAudioReady = ref(true) // 音频连接就绪后才展示图片
 
 // TTS 播报提示词（让 AI 只朗读不添加额外解释）
 const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
@@ -361,7 +372,9 @@ onMounted(async () => {
     
     // 先启动语音对话和录音（WebRTC 连接可能需要几秒）
     console.log('[TestView] 测试阶段，启动 WebRTC 语音对话...')
+    isAudioReady.value = false
     const recordingStartTime = await startVoiceDialog()
+    isAudioReady.value = true
 
     // 录音启动后再开始追踪，使用录音开始时间作为基准时间
     if (!tracker.isTracking.value) {
@@ -552,6 +565,7 @@ async function handleNextPlate() {
     testStore.setPhase('postTest')
 
     // 重新连接 WebRTC（后测阶段使用后测提示词）
+    isAudioReady.value = false
     // 使用与主测试相同的重连策略，提高频繁断开/重连时的成功率
     const MAX_RETRIES = 5
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -571,11 +585,15 @@ async function handleNextPlate() {
         })
         await dialog.startMixedRecording()
         console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
+        isAudioReady.value = true
         break
       } catch (err) {
         console.error(`[TestView] 后测阶段重连 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
+        } else {
+          // 全部重试失败，解除遮罩避免界面卡死
+          isAudioReady.value = true
         }
       }
     }
@@ -591,11 +609,17 @@ async function handleNextPlate() {
     uiStore.setBackgroundTheme(testStore.currentPlate)
     imageCanvasRef.value?.resetTransform()
 
+    // 音频未就绪，遮罩图片
+    isAudioReady.value = false
+
     // 懒加载：预加载当前图片和后续 2 张
     imagePreloader.preloadAhead(testStore.currentPlate, 2)
 
     // 重新连接 WebRTC（新会话、清空历史）并开始新录音
     const recordingStartTime = await reconnectAndStartRecording()
+
+    // 连接成功，揭开遮罩
+    isAudioReady.value = true
 
     // 立即记录新图版的时间戳
     if (recordingStartTime) {
@@ -1029,6 +1053,35 @@ function handleDevClearData() {
   position: relative;
   overflow: hidden;
   background: transparent;
+}
+
+.audio-connecting-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.audio-connecting-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 // 字幕样式 - 单行显示，宽度更大

@@ -236,17 +236,10 @@
           </div>
 
           <p class="device-check-desc">
-            点击下方按钮播放测试音，并在浏览器弹出提示时允许使用麦克风，然后对着麦克风说一句平时说话的句子。
+            点击下方按钮，在浏览器弹出提示时允许使用麦克风，然后对着麦克风说一句平时说话的句子。
           </p>
 
           <div class="device-check-actions">
-            <button
-              type="button"
-              :disabled="isSpeakerTesting"
-              @click="handleSpeakerTest"
-            >
-              🔊 {{ isSpeakerTesting ? '测试中...' : '测试语音（音响）播放' }}
-            </button>
             <button
               type="button"
               :disabled="isMicTesting"
@@ -311,9 +304,9 @@ const educationOptions = ['小学', '初中', '高中', '中专', '大专', '本
 const isSpeakerTestPassed = ref(false)
 const isMicTestPassed = ref(false)
 
-// 计算属性：是否设备测试都通过
+// 计算属性：是否设备测试都通过（只需麦克风通过）
 const isDeviceTestPassed = computed(() => {
-  return isSpeakerTestPassed.value && isMicTestPassed.value
+  return isMicTestPassed.value
 })
 
 // 设备检测状态
@@ -512,8 +505,8 @@ async function handleMicTest() {
     
     // 检测音量
     let checkCount = 0
-    const maxChecks = 30 // 最多检测3秒
-    const volumeThreshold = 10 // 音量阈值
+    const maxChecks = 100 // 最多检测10秒
+    const volumeThreshold = 10// 音量阈值（降低，更灵敏）
     let consecutiveDetections = 0 // 连续检测到声音的次数
     const requiredDetections = 3 // 需要连续检测到3次才算成功
     

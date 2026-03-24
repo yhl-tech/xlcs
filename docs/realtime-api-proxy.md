@@ -1,66 +1,105 @@
-# 方案一：后端代理 OpenAI Realtime（通俗版）
+# 实时语音对话技术方案（当前实现）
 
 ---
 
-## 一句话在干什么
+## 整体架构
 
-**现在**：网页里的语音对话，是浏览器自己拿着 API Key 去连 OpenAI，你这边连不上 OpenAI，所以就失败。
+```
+浏览器（Vue3）
+  │
+  ├─ POST /realtime/token        ← 1. 获取临时令牌
+  ├─ POST /realtime/sdp?model=   ← 2. SDP 交换
+  │
+后端代理（Python FastAPI / xlcp）
+  │
+  └─ OpenAI Realtime API
+       └─ WebRTC 直连（TURN 中继）
+```
 
-**改完后**：浏览器不直接找 OpenAI，而是找你自己的服务器；你的服务器能访问 OpenAI，就替浏览器去要「会话」和「建连信息」，再原样转给浏览器。API Key 只放在你服务器上，浏览器看不到。
-
----
-
-## 打个比方
-
-- 现在：你（浏览器）自己拿钥匙（API Key）去 OpenAI 开门，但路不通（网络限制），进不去。
-- 改完后：你只跟你家管家（你的后端）说话，管家拿着钥匙去 OpenAI 拿东西，再把拿到的结果交给你。你从来没碰过钥匙，也没直接去过 OpenAI。
-
----
-
-## 整体分几步（按顺序）
-
-1. **浏览器** 对你自己的服务器说：「我要开一个语音会话」，并告诉服务器：用哪个模型、什么提示词等（**不**带 API Key）。
-2. **你的服务器** 拿着自己保存的 API Key，去 OpenAI 开这个会话，拿到一个「临时通行证」。
-3. **你的服务器** 把这个「临时通行证」原样交给浏览器。
-4. **浏览器** 拿着临时通行证，再对你自己的服务器说：「这是我要建连用的信息（一段 SDP 文本），你帮我换回对方的回复」。
-5. **你的服务器** 把这段信息和临时通行证原样转给 OpenAI，拿到 OpenAI 的回复（另一段 SDP 文本）。
-6. **你的服务器** 把这段回复原样交给浏览器。
-7. **浏览器** 用拿到的回复和 OpenAI **直接**建立语音通道（这一步不再经过你服务器，所以如果你网络到 OpenAI 的通道本身就不通，这里仍可能失败）。
-
-前面 1～6 步都是「你服务器在中间转手」；第 7 步是浏览器和 OpenAI 直连，你服务器参与不了。
+浏览器不持有 OpenAI API Key，所有鉴权由后端代理完成。连接建立后，语音数据走 WebRTC 点对点通道，后端不再参与媒体转发。
 
 ---
 
-## 你的后端要做的只有两件事
+## 当前使用的模型
+
+```
+gpt-realtime-1.5
+```
+
+配置位置：`src/utils/constants.js` → `OPENAI_CONFIG.model`
 
 ---
 
-### 第一件事：提供一个「创建会话」的接口
+## 连接流程（10 步）
 
-**浏览器会怎么调你：**
+### 1. 获取临时令牌
+```
+POST /realtime/token
+```
+- 前端不携带 API Key
+- 后端用自己的 API Key 调 OpenAI，返回 `ephemeral_key`
+- 前端拿到 `ephemeral_key` 用于后续 SDP 交换的 `X-Ephemeral-Key` 请求头
 
-- 方法：`POST`
-- 地址：你定，比如 `https://你的域名/xlcp/api/realtime/sessions`（和现有 API 同一个域名即可）
-- 请求头：`Content-Type: application/json`，**不要**带 `Authorization`
-- 请求体：一段 JSON，里面包含：用哪个模型、什么提示词、语音检测参数等（下面给一个完整示例）
+### 2 ～ 7. WebRTC 本地准备
+| 步骤 | 内容 |
+|------|------|
+| 2 | 请求麦克风权限（`getUserMedia`） |
+| 3 | 创建 `AudioContext`（采样率 24000 Hz） |
+| 4 | 创建 `RTCPeerConnection`（见 ICE/TURN 配置） |
+| 5 | 创建 `<audio>` 元素，绑定远程音频流 |
+| 6 | 创建麦克风延迟管道（1 秒延迟），添加到 WebRTC |
+| 7 | 创建数据通道 `oai-events`，设置 30 秒超时 |
 
-**你的服务器收到后要做啥：**
+### 8 ～ 10. SDP 交换
+```
+POST /realtime/sdp?model=gpt-realtime-1.5
+Headers:
+  X-Ephemeral-Key: <临时令牌>
+  Content-Type: application/sdp
+Body: <SDP offer 纯文本>
+```
+- 后端把 SDP offer 转发给 OpenAI，返回 SDP answer
+- 前端设置 `RemoteDescription`，等待数据通道打开
+- 数据通道打开后，发送 `session.update` 注入系统提示词和 VAD 配置
 
-1. 从**自己**的配置里拿出 OpenAI 的 API Key（不要从浏览器请求里拿）。
-2. 用这个 Key，替浏览器去请求 OpenAI：  
-   `POST https://api.openai.com/v1/realtime/sessions`  
-   请求体就用浏览器发给你的那段 JSON，原样转发。
-3. OpenAI 会返回一段 JSON，里面有一个「临时通行证」（在 `client_secret.value` 里）。  
-   你把 **OpenAI 的整段响应**（状态码 + 内容）原样返回给浏览器，不要改、不要只取一部分。
+---
 
-**浏览器发来的 JSON 长什么样（示例，你原样转发给 OpenAI 即可）：**
+## ICE / TURN 配置
+
+```js
+iceServers: [
+  { urls: 'stun:129.226.147.53:3478' },
+  { urls: 'turn:129.226.147.53:3478',  username: 'rtcuser', credential: 'Pass2024WebRTC' },
+  { urls: 'turn:129.226.147.53:5349',  username: 'rtcuser', credential: 'Pass2024WebRTC' }
+],
+iceTransportPolicy: 'relay'   // 强制 TURN 中继，不走直连
+```
+
+> 强制 relay 是为了保证国内网络环境下穿透稳定。代价是延迟略高。
+
+---
+
+## 音频配置
+
+| 项目 | 值 |
+|------|-----|
+| 输入采样率 | 24000 Hz |
+| 输出采样率 | 24000 Hz |
+| AudioContext 采样率 | 24000 Hz |
+| 声道数 | 单声道（1）|
+| 回声消除 | 开启 |
+| 降噪 | 开启 |
+| 自动增益 | 开启 |
+| 麦克风延迟 | **1 秒**（避免 AI 听到自己的声音） |
+
+---
+
+## VAD（语音活动检测）配置
+
+连接成功后通过 `session.update` 事件下发：
 
 ```json
 {
-  "model": "gpt-4o-realtime-preview-2024-12-17",
-  "voice": "alloy",
-  "instructions": "你是一个专业的知己心探测试线上AI 助手...",
-  "input_audio_transcription": { "model": "whisper-1" },
   "turn_detection": {
     "type": "server_vad",
     "threshold": 0.6,
@@ -70,63 +109,66 @@
 }
 ```
 
-总结：**接到浏览器的 JSON → 加上自己的 API Key 转发给 OpenAI → 把 OpenAI 的响应原样返回给浏览器。**
+---
+
+## 混合录音（本地存档）
+
+每张图版的对话音频（麦克风 + AI 语音）混合录制为一个文件：
+
+- **麦克风**：经 1 秒延迟节点后混入
+- **AI 语音**：从远程音频流接入混合目标
+- 录制格式：WebM → 上传前转码为 **MP3（128kbps）**，使用 `lamejs`（通过 `<script>` 标签加载，非 ES Module）
+
+### 文件命名规则（上传到后端）
+
+| 阶段 | 文件名 |
+|------|--------|
+| 图版 1 ～ 10 | `{userId}-1.mp3` ～ `{userId}-10.mp3` |
+| 后测五问 | `{userId}-select.mp3` |
+
+上传接口：`POST /rorschach/user/upload_sub_media`，headers 需携带 `user-id: {userId}`。
 
 ---
 
-### 第二件事：提供一个「SDP 交换」的接口
+## 阶段切换（Phase）与提示词
 
-**浏览器会怎么调你：**
+每张图版和后测阶段各有独立提示词，切换图版时**断开旧连接 → 等 5 秒 → 重新建立新连接**：
 
-- 方法：`POST`
-- 地址：你定，比如 `https://你的域名/xlcp/api/realtime/sdp?model=gpt-4o-realtime-preview-2024-12-17`（同上，和现有 API 同域名）
-- 请求头：  
-  - `Authorization: Bearer 临时通行证`（就是上一步你返回给浏览器的那个 `client_secret.value`）  
-  - `Content-Type: application/sdp`
-- 请求体：一大段**纯文本**（不是 JSON），是浏览器生成的「建连请求」（叫 SDP offer）
+| Phase | 提示词来源 | 说明 |
+|-------|-----------|------|
+| `test`（图版 1） | `INTEST_1_PROMPT` | 第一张图专用 |
+| `test`（图版 2～10） | `INTEST_2_TO_10_PROMPT` | 通用图版提示词 |
+| `postTest` | `POSTTEST_PROMPT` | 后测五问提示词 |
 
-**你的服务器收到后要做啥：**
-
-1. 从请求里拿到：  
-   - 地址里的 `model` 参数（没有就用默认的 `gpt-4o-realtime-preview-2024-12-17`）  
-   - 请求头里的 `Authorization`（**整行原样保留**，不要换成你自己的 API Key）  
-   - 请求体整段**当纯文本**读出来（不要当 JSON 解析）
-2. 用这些去请求 OpenAI：  
-   `POST https://api.openai.com/v1/realtime?model=上面那个model`  
-   请求头：和浏览器发给你的一样，`Authorization` 和 `Content-Type: application/sdp` 都原样带过去  
-   请求体：把浏览器发来的那段文本原样发过去
-3. OpenAI 会返回另一段**纯文本**（叫 SDP answer）。  
-   你把 **OpenAI 的整段响应**（状态码 + 这段文本）原样返回给浏览器。
-
-总结：**接到浏览器的「临时通行证 + 一段 SDP 文本」→ 原样转给 OpenAI → 把 OpenAI 返回的文本原样返回给浏览器。**
-
-注意：这里必须用浏览器带来的「临时通行证」，不能换成你自己的 API Key，否则 OpenAI 不认。
+切换时机（`TestView.vue → handleNextPlate`）：
+1. 停止当前图版录音并上传
+2. 切换 `testStore.currentPlate`
+3. 显示**连接中遮罩**（`isAudioReady = false`）
+4. `reconnectAndStartRecording()`（最多重试 3 次，退避 3/6/9 秒）
+5. 连接成功 → 移除遮罩（`isAudioReady = true`）
+6. 播报提示语「这张图你可以看到些什么？」
 
 ---
 
-## 容易出错的地方
+## 后端需要实现的两个接口
 
-1. **第二件事的请求体**：是纯文本，不是 JSON。后端要按「原始文本」读，不要用 JSON 解析，否则转发给 OpenAI 会错。
-2. **第二件事的 Authorization**：必须原样转发浏览器带来的 `Authorization`，不能改成 `Bearer 你的API Key`。
-3. **两件事的响应**：都是「OpenAI 返回什么，你就原样返回给浏览器」，不要多加一层包装或改字段名。
+### `POST /realtime/token`
+- 用自己的 `OPENAI_API_KEY` 调 `POST https://api.openai.com/v1/realtime/sessions`
+- 请求体中包含模型名（`gpt-realtime-1.5`）
+- 把 `client_secret.value`（临时令牌）返回给前端
+
+### `POST /realtime/sdp?model=gpt-realtime-1.5`
+- 从 header `X-Ephemeral-Key` 取临时令牌
+- 把 body（纯文本 SDP offer）转发给 `POST https://api.openai.com/v1/realtime?model=gpt-realtime-1.5`
+- 请求头带 `Authorization: Bearer <临时令牌>`、`Content-Type: application/sdp`
+- 把 OpenAI 返回的 SDP answer（纯文本）原样返回
 
 ---
 
-## 做完之后
+## 常见问题
 
-- 浏览器会先请求你的 `/realtime/sessions`，再请求你的 `/realtime/sdp`，拿到两样东西后，自己去和 OpenAI 建立语音通道。
-- API Key 只存在你服务器上，浏览器从未见过。
-- 如果到第 7 步（浏览器直连 OpenAI）仍然失败或很卡，说明问题不在「要钥匙」和「换建连信息」，而在「你家到 OpenAI 的路」本身不通，那时就要考虑用国内语音服务（方案二），而不是继续折腾代理。
-
----
-
-## 对照表：两个接口一眼看懂
-
-| 项目 | 第一件事（创建会话） | 第二件事（SDP 交换） |
-|------|----------------------|----------------------|
-| 浏览器调你的地址 | `POST /xlcp/api/realtime/sessions` | `POST /xlcp/api/realtime/sdp?model=xxx` |
-| 浏览器带什么 | 一段 JSON（模型、提示词等），**不带** Key | 请求头里带「临时通行证」，body 是一大段纯文本 |
-| 你服务器做什么 | 用自己的 Key 把这段 JSON 转给 OpenAI，把 OpenAI 的响应原样返回 | 把「临时通行证 + 这段文本」原样转给 OpenAI，把 OpenAI 返回的文本原样返回 |
-| 你转发给 OpenAI 的地址 | `POST https://api.openai.com/v1/realtime/sessions` | `POST https://api.openai.com/v1/realtime?model=xxx` |
-
-如果你愿意，我可以按你后端用的语言（比如 Node、Python、Java）写一份「接到请求后具体怎么调 OpenAI」的示例代码（只写这两段逻辑）。
+| 问题 | 原因 | 处理 |
+|------|------|------|
+| 数据通道 30 秒超时 | ICE 协商慢（TURN relay 下偶发） | 最多重试 3 次，退避等待 |
+| 切图后 AI 不开口 | 切图时 `PostTestForm` 比 WebRTC 先 mount | 改为 `watch(isConnected)` 连接后才发送第一个问题 |
+| 后测 AI 不开口 | 断连/重连 + 5 秒延迟 > 组件 mount 时机 | 同上 |
