@@ -60,7 +60,7 @@ vue3/                                                    总计: 21,805 行
 │   │   │
 │   │   ├── forms/              # 表单组件
 │   │   │   ├── BasicInfoForm.vue   # 基本信息表单            249 行
-│   │   │   └── PostTestForm.vue    # 后测问卷表单（含倒计时）  474 行
+│   │   │   └── PostTestForm.vue    # 后测问卷表单（含倒计时）  480 行
 │   │   │
 │   │   ├── media/              # 媒体组件
 │   │   │   └── SubtitleDisplay.vue # 字幕显示                127 行
@@ -69,18 +69,18 @@ vue3/                                                    总计: 21,805 行
 │   │       ├── ControlsBar.vue     # 控制栏（缩放/旋转/画笔） 322 行
 │   │       ├── EnergyPillar.vue    # 能量柱（含粒子效果）    430 行
 │   │       ├── ImageCanvas.vue     # 墨迹图版画布            680 行
-│   │       └── IntroOverlay.vue    # 操作说明引导          1,111 行
+│   │       └── IntroOverlay.vue    # 操作说明引导          1,110 行
 │   │
 │   ├── composables/            # 组合式函数
 │   │   ├── data.js                 # 数据处理                111 行
-│   │   ├── useApi.js               # API 请求封装            639 行
+│   │   ├── useApi.js               # API 请求封装            669 行
 │   │   ├── useAudioRecorder.js     # 音频录制                229 行
 │   │   ├── useCanvas.js            # 画布操作                289 行
 │   │   ├── useDeviceCheck.js       # 设备检测                301 行
 │   │   ├── useGuide.js             # 新手引导                250 行
 │   │   ├── useImagePreloader.js    # 图片预加载              239 行
-│   │   ├── useInteractionTracker.js # 交互追踪               544 行
-│   │   ├── useRealtimeDialog.js    # WebRTC 实时对话         834 行
+│   │   ├── useInteractionTracker.js # 交互追踪               555 行
+│   │   ├── useRealtimeDialog.js    # WebRTC 实时对话         1,017 行
 │   │   ├── useSession.js           # 会话管理                255 行
 │   │   └── useSubtitle.js          # 字幕管理                239 行
 │   │
@@ -95,7 +95,7 @@ vue3/                                                    总计: 21,805 行
 │   │
 │   ├── utils/                  # 工具函数
 │   │   ├── audioManager.js     # 音频管理                    100 行
-│   │   ├── constants.js        # 常量定义                    255 行
+│   │   ├── constants.js        # 常量定义                    296 行
 │   │   └── helpers.js          # 辅助函数                    195 行
 │   │
 │   └── views/                  # 页面视图
@@ -103,7 +103,7 @@ vue3/                                                    总计: 21,805 行
 │       ├── LoginView.vue       # 登录页                      889 行
 │       ├── PrepView.vue        # 测试准备页                1,238 行
 │       ├── IntroView.vue       # 介绍说明页                   51 行
-│       ├── TestView.vue        # 正式测试页                  994 行
+│       ├── TestView.vue        # 正式测试页                  1,217 行
 │       └── ReportView.vue      # 报告页                      252 行
 │
 ├── public/                     # 静态资源（直接复制）
@@ -131,15 +131,21 @@ vue3/                                                    总计: 21,805 行
 - **AI 响应**：接收并播放 AI 语音回复
 - **转写显示**：实时显示语音转文字内容
 
+连接流程（关键调用链）：
+1. `TestView.vue`：`startVoiceDialog()` 在未连接时调用 `dialog.connect(currentPrompt, 'alloy')`，并在连接成功后调用 `dialog.startMixedRecording()` 开始“麦克风 + AI 回复”的混合录音。
+2. `useRealtimeDialog.js`：`connect()` 内依次完成 `POST /realtime/token` 获取临时密钥、`getUserMedia()` 申请麦克风、创建 `RTCPeerConnection`（含 TURN relay，`iceTransportPolicy: 'relay'`）与 dataChannel `oai-events`、进行 SDP offer/answer（`POST /realtime/sdp`），并等待 `dc.onopen`。
+3. 会话配置：dataChannel 打开后通过 `updateSession()` 发送 `instructions`（systemPrompt）、`turn_detection(server_vad)`，并设置 `max_response_output_tokens` 控制回复长度以降低音频输出成本。
+4. 逐图重连：`TestView.vue` 切图时先 `stopMixedRecording()`（转码上传），再 `disconnect(true)` + `connect(对应图版prompt)`，保证每张图的会话独立。
+
 ```javascript
 // 使用示例
-const { connect, disconnect, sendText, isConnected } = useRealtimeDialog()
+const { connect, disconnect, sendTextMessage, isConnected } = useRealtimeDialog()
 
 // 连接对话服务
 await connect()
 
 // 发送文本消息
-sendText('用户输入的内容')
+sendTextMessage('用户输入的内容')
 
 // 断开连接
 disconnect()
@@ -779,11 +785,15 @@ server: {
 - **WebRTC 实时通信**：基于 OpenAI Realtime API 实现低延迟语音对话
 - **语音转文字**：实时显示用户语音和 AI 回复的文字内容
 - **字幕显示**：单行字幕显示，支持打字机效果，宽度自适应
-- **VAD 参数配置**：
-  - `create_response: true`：用户说完后自动创建响应
+- **模型配置**：当前默认使用 `gpt-realtime-1.5`（在 `src/utils/constants.js` 的 `OPENAI_CONFIG.model`）
+- **VAD 参数配置**（服务端语音检测触发回复）：
+  - `type: 'server_vad'`
+  - `threshold: 0.6`
   - `prefix_padding_ms: 500`：语音开始前的缓冲时间
   - `silence_duration_ms: 1500`：需要 1.5 秒静音才认为用户说完
 - **音频延迟**：用户语音延迟 1 秒发送，确保完整采集
+- **回复长度控制（降成本）**：在 `session.update` 中设置 `max_response_output_tokens = 200`，避免模型过度啰嗦导致输出音频过长。
+- **Prompt 缓存（降成本）**：只要系统提示词内容在同类会话中保持一致，instructions 前缀会更容易命中缓存，从而降低系统提示词的输入成本（缓存由 Realtime 自动处理，非你手动开启）。
 - **AI 提示词优化**：
   - **测试阶段提示词**：引导用户描述看到的图版内容，保持中立、客观、温和的语气
   - **后测问卷提示词**：引导用户完成 5 个问题，等待用户完整回答后再提示操作
@@ -831,7 +841,7 @@ server: {
 
 ---
 
-*文档最后更新：2026-02-03*
+*文档最后更新：2026-03-25*
 
 docker build \
   --platform linux/amd64 \

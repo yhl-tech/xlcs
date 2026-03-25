@@ -147,13 +147,17 @@ export function useRealtimeDialog() {
       pc.onconnectionstatechange = () => {
         try {
           console.log('[Dialog] pc connectionState:', pc.connectionState)
-        } catch (e) {}
+        } catch (e) {
+          // 忽略日志打印失败（例如浏览器限制/对象状态异常）
+        }
       }
       
       pc.oniceconnectionstatechange = () => {
         try {
           console.log('[Dialog] pc iceConnectionState:', pc.iceConnectionState)
-        } catch (e) {}
+        } catch (e) {
+          // 忽略日志打印失败（例如浏览器限制/对象状态异常）
+        }
       }
       console.log('[Dialog] ✓ 步骤 4/10: RTCPeerConnection 已创建')
       
@@ -924,7 +928,7 @@ export function useRealtimeDialog() {
    * 同步编码 MP3（回退方案，使用 requestIdleCallback 分片）
    */
   function encodeMP3Sync(int16Data, sampleRate) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const Lame = getLamejs()
       const mp3encoder = new Lame.Mp3Encoder(1, sampleRate, 128)
       const sampleBlockSize = 1152
