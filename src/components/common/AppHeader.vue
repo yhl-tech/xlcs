@@ -22,7 +22,7 @@
       <span v-if="authStore.isLoggedIn" class="username">
         {{ displayName }}
       </span>
-      <button class="header-btn primary" @click="handleEnterTest">
+      <button v-if="isDevelopment" class="header-btn primary" @click="handleEnterTest">
         直接进入
       </button>
       <button 
@@ -43,6 +43,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { stopAllAudios } from '@/utils/audioManager'
+import { isDevelopment } from '@/utils/constants'
 
 // 获取 BASE_URL 用于资源路径
 const baseUrl = import.meta.env.BASE_URL

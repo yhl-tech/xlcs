@@ -2,7 +2,7 @@
   <div class="test-view">
     
     <!-- 开发测试按钮 -->
-    <div class="dev-test-buttons">
+    <div v-if="isDevelopment" class="dev-test-buttons">
       <button class="dev-btn" @click="handleDevSubmitAll">
         测试提交文件
       </button>
@@ -119,7 +119,7 @@ import { useImagePreloader } from '@/composables/useImagePreloader'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import { useSubtitle } from '@/composables/useSubtitle'
 import { useApi } from '@/composables/useApi'
-import { getSystemPromptForPlate, POSTTEST_PROMPT } from '@/utils/constants'
+import { getSystemPromptForPlate, POSTTEST_PROMPT, isDevelopment } from '@/utils/constants'
 import { stopAllAudios } from '@/utils/audioManager'
 
 const router = useRouter()
