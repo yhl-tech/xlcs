@@ -347,7 +347,7 @@ export function useRealtimeDialog() {
    * 处理服务器事件
    */
   function handleServerEvent(event) {
-    console.log('[Dialog] 服务器事件:', event.type)
+    // console.log('[Dialog] 服务器事件:', event.type)
     
     if (callbacks.onMessage) {
       callbacks.onMessage(event)

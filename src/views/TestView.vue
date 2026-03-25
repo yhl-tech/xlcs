@@ -566,6 +566,8 @@ async function handleNextPlate() {
 
     // 重新连接 WebRTC（后测阶段使用后测提示词）
     isAudioReady.value = false
+    showSubtitles.value = false
+    currentSubtitle.value = ''
     // 使用与主测试相同的重连策略，提高频繁断开/重连时的成功率
     const MAX_RETRIES = 5
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -609,8 +611,10 @@ async function handleNextPlate() {
     uiStore.setBackgroundTheme(testStore.currentPlate)
     imageCanvasRef.value?.resetTransform()
 
-    // 音频未就绪，遮罩图片
+    // 音频未就绪，遮罩图片；同时清空上一张图版的字幕
     isAudioReady.value = false
+    showSubtitles.value = false
+    currentSubtitle.value = ''
 
     // 懒加载：预加载当前图片和后续 2 张
     imagePreloader.preloadAhead(testStore.currentPlate, 2)
@@ -1063,8 +1067,10 @@ function handleDevClearData() {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
+  /* 强模糊为主、底色为辅：既难辨认原图，又不会一片死黑 */
+  background: rgba(22, 22, 30, 0.72);
+  backdrop-filter: blur(36px) saturate(0.55);
+  -webkit-backdrop-filter: blur(36px) saturate(0.55);
   z-index: 10;
   color: #fff;
   font-size: 16px;

@@ -217,7 +217,7 @@ export function useInteractionTracker() {
     
     data.rotate[plateKey].push(angle)
     
-    console.log('[InteractionTracker] 记录旋转:', { plateKey, angle })
+    // console.log('[InteractionTracker] 记录旋转:', { plateKey, angle })
   }
   
   // ==================== 画笔轨迹追踪 ====================
@@ -237,7 +237,7 @@ export function useInteractionTracker() {
     currentTrackColor.value = color
     lastDrawingPoint.value = { x, y }
     
-    console.log('[InteractionTracker] 开始画笔轨迹:', { plateKey, x, y, color })
+    // console.log('[InteractionTracker] 开始画笔轨迹:', { plateKey, x, y, color })
   }
   
   /**
