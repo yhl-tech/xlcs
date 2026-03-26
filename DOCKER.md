@@ -256,5 +256,6 @@ docker save -o xlcs-vue3.tar xlcs-vue3:latest
 
 docker stop xlcs-vue3
   docker rm xlcs-vue3
+cd /root/xlpc/frontEnd/
 docker load -i xlcs-vue3.tar
   docker run -d -p 8081:80 --name xlcs-vue3 xlcs-vue3:latest

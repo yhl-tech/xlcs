@@ -1,6 +1,5 @@
 <template>
   <div class="test-view">
-    
     <!-- 开发测试按钮 -->
     <div v-if="isDevelopment" class="dev-test-buttons">
       <button class="dev-btn" @click="handleDevSubmitAll">
@@ -148,7 +147,7 @@ const showRestoreDialog = ref(false)
 const brushColor = ref('#ef4444') // 默认红色
 const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 const isPlateSwitching = ref(false)
-const isAudioReady = ref(true) // 音频连接就绪后才展示图片
+const isAudioReady = ref(false) // 默认显示遮罩，WebRTC 连接就绪后再置 true
 
 // TTS 播报提示词（让 AI 只朗读不添加额外解释）
 const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
@@ -363,6 +362,18 @@ onMounted(async () => {
     showRestoreDialog.value = true
   }
 
+  // uploading / waiting 阶段不需要 WebRTC，直接移除遮罩
+  if (testStore.phase === 'uploading' || testStore.phase === 'waiting') {
+    isAudioReady.value = true
+  }
+
+  // postTest 阶段（页面刷新恢复）需要连接 WebRTC
+  if (testStore.phase === 'postTest') {
+    console.log('[TestView] 后测问卷阶段（恢复），启动 WebRTC...')
+    await startVoiceDialog()
+    isAudioReady.value = true
+  }
+
   // 如果是测试阶段，确保追踪已开始
   if (testStore.phase === 'test') {
     console.log('[TestView] 测试阶段，确保追踪已启动')
@@ -433,6 +444,11 @@ watch(() => testStore.phase, async (newPhase, oldPhase) => {
   // 当 phase 变为 'test' 时，启动 WebRTC（如果还没连接）
   if (newPhase === 'test' && oldPhase !== 'test') {
     console.log('[TestView] phase 切换到 test，检查 WebRTC 连接状态...')
+
+    // 切换到测试阶段时立刻显示连接遮罩，避免从说明页跳转时出现延迟才显示
+    isAudioReady.value = false
+    showSubtitles.value = false
+    currentSubtitle.value = ''
     
     // 设置背景主题
     uiStore.setBackgroundTheme(testStore.currentPlate)
@@ -445,6 +461,9 @@ watch(() => testStore.phase, async (newPhase, oldPhase) => {
     } else {
       console.log('[TestView] WebRTC 已连接，跳过重新连接')
     }
+
+    // WebRTC/混合录音启动完成后再移除遮罩
+    isAudioReady.value = true
 
     // 录音启动后再开始追踪，使用录音开始时间作为基准时间
     if (!tracker.isTracking.value) {

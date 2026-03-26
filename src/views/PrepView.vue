@@ -265,7 +265,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import useApi from '@/composables/useApi'
-import { playAudio, stopAllAudios } from '@/utils/audioManager'
+import { playAudio, stopAllAudios, getActiveAudioCount } from '@/utils/audioManager'
 import { useImagePreloader } from '@/composables/useImagePreloader'
 
 const router = useRouter()
@@ -513,6 +513,56 @@ async function handleMicTest() {
   deviceCheckTip.value = '请在浏览器弹出提示时允许使用麦克风。'
 
   try {
+    // 如果当前仍有 MP3/音频在播放（欢迎语/音响测试音），先等待播放结束再检测麦克风。
+    // 否则麦克风采样会捕获回声，从而误判为“检测到声音”。
+    try {
+      const activeCount = getActiveAudioCount?.() || 0
+      if (activeCount > 0) {
+        deviceCheckResult.value = '正在等待语音播放结束...'
+        deviceCheckTip.value = '请稍等，待音频播放结束后开始检测麦克风。'
+
+        const startedAt = Date.now()
+        while ((getActiveAudioCount?.() || 0) > 0 && Date.now() - startedAt < 15000) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+    } catch (e) {
+      console.warn('[PrepView] 检测当前播放音频状态失败，继续检测麦克风:', e)
+    }
+
+    // 兜底：停止所有音频输出，确保检测期间没有回声干扰。
+    try {
+      stopAllAudios()
+    } catch (e) {
+      console.warn('[PrepView] 停止音频失败（忽略）:', e)
+    }
+    try {
+      if (testAudio) {
+        testAudio.pause()
+        testAudio.currentTime = 0
+        testAudio = null
+      }
+    } catch (e) {
+      console.warn('[PrepView] 停止 testAudio 失败（忽略）:', e)
+    }
+
+    // 先检测是否存在麦克风设备（没有 audioinput 时直接提示）
+    // 注意：labels 可能需要权限才会有值，但 audioinput 的数量一般可直接判断。
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const hasMic = devices.some(d => d.kind === 'audioinput')
+      if (!hasMic) {
+        deviceCheckStatus.value = 'error'
+        deviceCheckResult.value = '✗ 未检测到麦克风设备'
+        deviceCheckTip.value = '请先连接麦克风设备（或在系统音频设置里启用输入设备），然后重试。'
+        isMicTesting.value = false
+        return
+      }
+    } catch (e) {
+      // enumerateDevices 失败不直接中断，后续 getUserMedia 会给更准确错误
+      console.warn('[PrepView] enumerateDevices 检测麦克风失败，继续 getUserMedia:', e)
+    }
+
     // 请求麦克风权限
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     
@@ -529,9 +579,23 @@ async function handleMicTest() {
     // 检测音量
     let checkCount = 0
     const maxChecks = 100 // 最多检测10秒
-    const volumeThreshold = 10// 音量阈值（降低，更灵敏）
     let consecutiveDetections = 0 // 连续检测到声音的次数
     const requiredDetections = 3 // 需要连续检测到3次才算成功
+
+    // 先采样一小段 baseline，避免背景噪音导致误判
+    const volumeThreshold = 10 // 最低阈值（保留你原来的灵敏度基线）
+    const baselineChecks = 10
+    const baselineIntervalMs = 80
+    const baselineVolumes = []
+    for (let i = 0; i < baselineChecks; i++) {
+      analyser.getByteFrequencyData(dataArray)
+      const v = dataArray.reduce((a, b) => a + b) / bufferLength
+      baselineVolumes.push(v)
+      await new Promise(resolve => setTimeout(resolve, baselineIntervalMs))
+    }
+    const baselineAvg = baselineVolumes.reduce((a, b) => a + b, 0) / baselineVolumes.length
+    // 动态阈值：至少高于 baseline 3 倍，且不低于最低阈值
+    const effectiveThreshold = Math.max(volumeThreshold, baselineAvg * 3)
     
     deviceCheckResult.value = '正在检测麦克风...请说话...'
     deviceCheckTip.value = '请对着麦克风说一句话。'
@@ -567,7 +631,7 @@ async function handleMicTest() {
       checkCount++
       
       // 检测到足够的音量
-      if (volume > volumeThreshold) {
+      if (volume > effectiveThreshold) {
         consecutiveDetections++
         // 连续检测到声音3次，立即成功
         if (consecutiveDetections >= requiredDetections) {
@@ -586,8 +650,15 @@ async function handleMicTest() {
   } catch (error) {
     console.error('麦克风测试失败:', error)
     deviceCheckStatus.value = 'error'
-    deviceCheckResult.value = '✗ 麦克风测试失败，请检查权限'
-    deviceCheckTip.value = '请在浏览器设置中允许使用麦克风。'
+    // 没有设备接入时，通常会抛 NotFoundError
+    const name = error?.name || ''
+    if (name === 'NotFoundError') {
+      deviceCheckResult.value = '✗ 未检测到麦克风设备'
+      deviceCheckTip.value = '请先连接麦克风设备，然后重试。'
+    } else {
+      deviceCheckResult.value = '✗ 麦克风测试失败，请检查权限'
+      deviceCheckTip.value = '请在浏览器设置中允许使用麦克风。'
+    }
     isMicTesting.value = false
   }
 }
