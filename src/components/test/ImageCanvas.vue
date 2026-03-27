@@ -318,7 +318,7 @@ function handlePointerMove(e) {
     })
   } else if (currentTool.value === 'eraser') {
     ctx.strokeStyle = 'rgba(0,0,0,1)'
-    ctx.lineWidth = brushSize.value * 3
+    ctx.lineWidth = brushSize.value * 5
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.globalCompositeOperation = 'destination-out'
@@ -402,7 +402,7 @@ function redrawHistory() {
 
     ctx.beginPath()
     ctx.strokeStyle = stroke.tool === 'eraser' ? 'rgba(0,0,0,1)' : stroke.color
-    ctx.lineWidth = stroke.tool === 'eraser' ? stroke.size * 3 : stroke.size
+    ctx.lineWidth = stroke.tool === 'eraser' ? stroke.size * 5 : stroke.size
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
 

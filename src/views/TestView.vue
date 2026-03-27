@@ -38,7 +38,7 @@
         <!-- 音频连接等待遮罩 -->
         <div v-if="!isAudioReady" class="audio-connecting-overlay">
           <div class="audio-connecting-spinner" />
-          <span>连接中...</span>
+          <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
         </div>
       </div>
 
@@ -76,7 +76,7 @@
       <!-- 音频连接等待遮罩 -->
       <div v-if="!isAudioReady" class="audio-connecting-overlay">
         <div class="audio-connecting-spinner" />
-        <span>连接中...</span>
+        <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
       </div>
       <PostTestForm @submit="handlePostTestSubmit" />
     </div>
@@ -740,6 +740,9 @@ async function handlePostTestSubmit(answers) {
 // 上传完成后进入等待报告阶段
 async function handleUploadComplete() {
   console.log('[TestView] 上传完成')
+
+  // 清除本地会话快照，防止刷新后恢复到上传阶段
+  session.markCompleted()
 
   // 进入等待报告阶段
   testStore.setPhase('waiting')

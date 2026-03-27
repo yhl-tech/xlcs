@@ -205,8 +205,8 @@ export function useSession() {
     if (autoSaveTimer) return
     
     autoSaveTimer = setInterval(() => {
-      // 只在测试进行中自动保存
-      if (testStore.phase !== 'info' && testStore.phase !== 'waiting') {
+      // 只在测试进行中自动保存，上传和等待阶段不保存（避免刷新后误恢复到上传阶段）
+      if (testStore.phase !== 'info' && testStore.phase !== 'uploading' && testStore.phase !== 'waiting') {
         saveSnapshot('auto')
       }
     }, AUTO_SAVE_INTERVAL)
