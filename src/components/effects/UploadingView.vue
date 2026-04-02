@@ -434,67 +434,42 @@ async function startUpload() {
     uploadProgress.value = 50
     console.log('[Uploading] 问卷答案已上传')
     
-    // 6. 上传音频（占 50% 进度，从 50% 到 100%）
+    // 6. 上传后测音频（从 testStore 获取已转码的 MP3 blob）
     progressText.value = '处理语音交互数据...'
     try {
-      console.log('[Uploading] ========== 开始音频处理 ==========')
-      console.log('[Uploading] WebRTC 连接状态:', dialog.isConnected.value)
-      
-      const recordingStatus = dialog.getMixedRecordingStatus()
-      console.log('[Uploading] 录音状态:', JSON.stringify(recordingStatus))
-      
-      if (recordingStatus.isRecording || recordingStatus.hasData || recordingStatus.chunksCount > 0) {
-        console.log('[Uploading] 有录音数据，正在停止混合录音...')
-        const webmBlob = await dialog.stopMixedRecording()
-        console.log('[Uploading] WebM blob:', webmBlob ? `${(webmBlob.size / 1024).toFixed(2)} KB` : '无数据')
-        
-        if (webmBlob && webmBlob.size > 0) {
-          progressText.value = '语音数据编码转换中...'
-          uploadProgress.value = 55
-          console.log('[Uploading] 开始转换为 MP3...')
-          
-          const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
-          uploadProgress.value = 65
-          
-          if (mp3Blob && mp3Blob.size > 0) {
-            progressText.value = '语音数据上传中...'
-            console.log('[Uploading] MP3 大小:', (mp3Blob.size / 1024).toFixed(2), 'KB')
-            
-            // 使用真实上传进度回调
-            await api.uploadMedia(mp3Blob, userId, (percent) => {
-              // 音频上传占 65% 到 98% 的进度
-              const audioProgress = 65 + Math.round(percent * 0.33)
-              uploadProgress.value = audioProgress
-              
-              // 每隔一段进度更新提示文字
-              if (percent < 30) {
-                progressText.value = '语音数据传输中...'
-              } else if (percent < 60) {
-                progressText.value = '语音特征同步中...'
-              } else if (percent < 90) {
-                progressText.value = '语音数据校验中...'
-              } else {
-                progressText.value = '语音数据写入中...'
-              }
-            })
-            console.log('[Uploading] ✓ 音频已上传成功')
+      const mp3Blob = testStore.getPostTestAudioBlob()
+      if (mp3Blob && mp3Blob.size > 0) {
+        progressText.value = '语音数据上传中...'
+        console.log('[Uploading] MP3 大小:', (mp3Blob.size / 1024).toFixed(2), 'KB')
+
+        await api.uploadMedia(mp3Blob, userId, (percent) => {
+          const audioProgress = 50 + Math.round(percent * 0.45)
+          uploadProgress.value = audioProgress
+
+          if (percent < 30) {
+            progressText.value = '语音数据传输中...'
+          } else if (percent < 60) {
+            progressText.value = '语音特征同步中...'
+          } else if (percent < 90) {
+            progressText.value = '语音数据校验中...'
           } else {
-            console.warn('[Uploading] ✗ MP3 转换结果为空')
+            progressText.value = '语音数据写入中...'
           }
-        } else {
-          console.warn('[Uploading] ✗ 没有录音数据可上传（WebM blob 为空）')
+        })
+        console.log('[Uploading] ✓ 音频已上传成功')
+
+        // 所有文件上传完成，触发 AI 分析
+        try {
+          await api.startAiAnalysis(userId)
+          console.log('[Uploading] ✓ AI 分析任务已启动')
+        } catch (analysisError) {
+          console.error('[Uploading] ✗ 启动 AI 分析失败:', analysisError)
         }
       } else {
-        console.warn('[Uploading] ✗ 没有进行中的录音，跳过音频上传')
-        console.warn('[Uploading] - isRecording:', recordingStatus.isRecording)
-        console.warn('[Uploading] - hasData:', recordingStatus.hasData)
-        console.warn('[Uploading] - chunksCount:', recordingStatus.chunksCount)
+        console.warn('[Uploading] 无后测音频数据，跳过音频上传')
       }
-      console.log('[Uploading] ========== 音频处理完成 ==========')
     } catch (audioError) {
       console.error('[Uploading] ✗ 音频处理失败:', audioError)
-      console.error('[Uploading] - 错误信息:', audioError.message)
-      // 不抛出错误，继续后续流程
     }
 
     uploadProgress.value = 100

@@ -62,6 +62,9 @@ export const useTestStore = defineStore('test', () => {
   
   // 当前测试阶段（不持久化）
   const phase = ref(PHASES.INFO)
+
+  // 后测音频 MP3 Blob（不持久化，由 TestView 存入，UploadingView 取出上传）
+  let postTestAudioBlob = null
   
   // 当前图版索引（0-9）（不持久化）
   const currentPlate = ref(0)
@@ -453,6 +456,10 @@ export const useTestStore = defineStore('test', () => {
     addEnergy,
     removeEnergy,
     resetEnergy,
-    setEnergy
+    setEnergy,
+
+    // 后测音频
+    setPostTestAudioBlob: (blob) => { postTestAudioBlob = blob },
+    getPostTestAudioBlob: () => postTestAudioBlob
   }
 })

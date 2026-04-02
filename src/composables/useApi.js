@@ -521,41 +521,6 @@ export function useApi() {
     return response
   }
 
-  /**
-   * 上传图版音/视频文件
-   * POST /rorschach/user/upload_sub_media
-   * @param {Blob|File} file - 音频文件
-   * @param {string} userId - 用户ID
-   * @param {number|string} plateNumber - 图版编号（1-10 的整数，或 'select'）
-   * @param {Function|null} onProgress - 上传进度回调
-   */
-  const uploadSubMedia = async (file, userId, plateNumber, onProgress = null) => {
-    if (!userId) throw new Error('userId 不能为空')
-
-    // 构建符合后端规则的文件名：{userId}-{plateNumber}.mp3
-    const extension = (file.type || '').includes('mp4') ? 'mp4' : 'mp3'
-    const fileName = `${userId}-${plateNumber}.${extension}`
-
-    const fileToUpload = file instanceof File && file.name === fileName
-      ? file
-      : new File([file], fileName, { type: file.type || 'audio/mp3' })
-
-    const formData = new FormData()
-    formData.append('file', fileToUpload)
-
-    const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
-    console.log('[API] 上传图版音频文件:', { fileName, size: `${fileSizeMB}MB`, userId, plateNumber })
-
-    const response = await client.post('/rorschach/user/upload_sub_media', formData, {
-      headers: { 'user-id': userId },
-      timeout: 300000,
-      onUploadProgress: onProgress ? (progressEvent) => {
-        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        onProgress(percent)
-      } : undefined
-    })
-    return response
-  }
 
   /**
    * 触发分析
@@ -563,6 +528,17 @@ export function useApi() {
    */
   const analyzeTest = async (userId) => {
     const response = await client.post('/rorschach/analyze', {
+      user_id: userId
+    })
+    return response
+  }
+
+  /**
+   * 开始 AI 全自动分析
+   * POST /rorschach/user/start_ai_analysis
+   */
+  const startAiAnalysis = async (userId) => {
+    const response = await client.post('/rorschach/user/start_ai_analysis', {
       user_id: userId
     })
     return response
@@ -652,10 +628,10 @@ export function useApi() {
     uploadSegTime,        // 4. video_clip.json - 时间戳切分
     upload5Questions,     // 5. 5_questions.json - 五个问题答案
     uploadMedia,          // 6. 音频文件
-    uploadSubMedia,       // 7. 图版音频文件
     
     // 分析
     analyzeTest,
+    startAiAnalysis,
     
     // 报告
     checkReportStatus,

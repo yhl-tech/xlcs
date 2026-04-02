@@ -690,7 +690,7 @@ async function handlePostTestSubmit(answers) {
   })
   session.saveSnapshot('posttest_complete')
 
-  // 先停止后测阶段录音并上传音频
+  // 先停止后测阶段录音并转码，保存 blob 待上传阶段使用
   const userId = authStore.userInfo?.username || authStore.userInfo?.phone || authStore.userId
   try {
     const recordingStatus = dialog.getMixedRecordingStatus()
@@ -705,21 +705,19 @@ async function handlePostTestSubmit(answers) {
         const mp3Blob = await dialog.convertWebMToMP3(webmBlob)
 
         if (mp3Blob && mp3Blob.size > 0) {
-          uiStore.loadingMessage = '正在上传后测音频...'
-          // plateIndex=null => 文件名为 userId-select.mp3
-          await api.uploadMedia(mp3Blob, userId, null, null)
-          console.log('[TestView] 后测音频上传完成（userId-select.mp3）')
+          testStore.setPostTestAudioBlob(mp3Blob)
+          console.log('[TestView] 后测音频已转码并暂存，等待上传阶段上传')
         } else {
-          console.warn('[TestView] 后测 MP3 转码结果为空，跳过上传')
+          console.warn('[TestView] 后测 MP3 转码结果为空')
         }
       } else {
-        console.warn('[TestView] 后测 WebM blob 为空，跳过上传')
+        console.warn('[TestView] 后测 WebM blob 为空')
       }
     } else {
-      console.log('[TestView] 后测阶段无录音数据，跳过后测音频上传')
+      console.log('[TestView] 后测阶段无录音数据')
     }
   } catch (err) {
-    console.warn('[TestView] 后测音频上传失败:', err)
+    console.warn('[TestView] 后测音频处理失败:', err)
   }
 
   // 关闭 WebRTC 连接

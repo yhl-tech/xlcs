@@ -13,7 +13,7 @@
             <span>报告已生成完毕</span>
           </div>
           <div class="rf-download-buttons">
-            <button class="rf-download-btn rf-download-btn-primary" @click="handleDownloadReport">
+            <button class="rf-download-btn rf-download-btn-primary" @click="handleDownloadReport" :disabled="!reportNewPdf">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -21,7 +21,7 @@
               </svg>
               下载测试报告
             </button>
-            <button class="rf-download-btn rf-download-btn-secondary" @click="handleOpenPublicityReport">
+            <button class="rf-download-btn rf-download-btn-secondary" @click="handleOpenPublicityReport" :disabled="!reportHtml">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -328,6 +328,8 @@ const steps = [
 // 状态
 const currentStepIndex = ref(2) // 默认在 AI 模型计算阶段
 const isCompleted = ref(false)
+const reportNewPdf = ref(false)
+const reportHtml = ref(false)
 const dots = ref('...')
 
 // 定时器
@@ -442,11 +444,15 @@ async function checkReportStatus() {
     
     const response = await api.checkReportStatus(userId)
     console.log('[WaitingReport] 报告状态:', response)
-    
-    // 解析报告状态: code === 0 表示请求成功，data === true 表示报告已生成
-    const isReady = response.code === 0 && response.data === true
-    
-    if (isReady) {
+
+    // 解析报告状态: new_pdf 对应下载测试报告，html 对应报告解读版
+    const newPdf = response.code === 0 && response.data?.new_pdf === true
+    const html = response.code === 0 && response.data?.html === true
+
+    reportNewPdf.value = newPdf
+    reportHtml.value = html
+
+    if (newPdf || html) {
       isCompleted.value = true
       currentStepIndex.value = steps.length - 1
       testStore.setReportStatus({
