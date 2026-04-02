@@ -58,7 +58,7 @@
       <ControlsBar
         :current-plate="testStore.currentPlate + 1"
         :total-plates="10"
-        :min-view-time="1"
+        :min-view-time="30"
         @tool-change="handleToolChange"
         @color-change="handleColorChange"
         @zoom-in="handleZoomIn"

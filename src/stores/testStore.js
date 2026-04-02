@@ -213,9 +213,15 @@ export const useTestStore = defineStore('test', () => {
         }
         interactionData.value.timestamps[plateIndex].end = Date.now()
       }
-      
+
       currentPlate.value++
-      
+
+      // 翻页后将能量提升到已完成页数对应的基准值
+      const baseEnergy = currentPlate.value * 100
+      if (energy.value < baseEnergy) {
+        energy.value = baseEnergy
+      }
+
       // 记录新图版开始时间
       if (currentPlate.value < totalPlates.value) {
         plateStartTimes.value[currentPlate.value] = Date.now()
