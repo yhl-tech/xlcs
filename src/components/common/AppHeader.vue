@@ -23,12 +23,12 @@
       <span v-if="authStore.isLoggedIn" class="username">
         {{ displayName }}
       </span>
-      <!-- <button v-if="isDevelopment" class="header-btn primary" @click="handleEnterTest">
-        直接进入
-      </button> -->
-      <button class="header-btn primary" @click="handleEnterTest">
+      <button v-if="isDevelopment" class="header-btn primary" @click="handleEnterTest">
         直接进入
       </button>
+      <!-- <button class="header-btn primary" @click="handleEnterTest">
+        直接进入
+      </button> -->
       <button 
         v-if="authStore.isLoggedIn" 
         class="header-btn danger" 
