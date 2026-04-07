@@ -68,6 +68,9 @@ let mixedAudioChunks = []
 let micSource = null
 let remoteAudioSource = null
 
+/** 后端代理登记的 connection_id（与 POST /realtime/token 响应一致，用于 SDP 与关闭连接） */
+let proxyConnectionId = null
+
 // 回调
 const callbacks = {
   onConnect: null,
@@ -75,6 +78,28 @@ const callbacks = {
   onError: null,
   onMessage: null,
   onTranscript: null
+}
+
+/**
+ * 告知代理服务释放连接登记（DELETE /realtime/connection），失败不影响本地 WebRTC 清理
+ */
+async function notifyProxyConnectionClosed() {
+  const id = proxyConnectionId
+  if (!id) return
+  proxyConnectionId = null
+  try {
+    const res = await fetch('/realtime/connection', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connection_id: id })
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      console.warn('[Dialog] 通知代理关闭连接失败:', res.status, text)
+    }
+  } catch (e) {
+    console.warn('[Dialog] 通知代理关闭连接异常:', e)
+  }
 }
 
 export function useRealtimeDialog() {
@@ -103,7 +128,12 @@ export function useRealtimeDialog() {
       console.log('[Dialog] 步骤 1/10: 获取临时令牌...')
       const session = await getEphemeralToken(systemPrompt, speaker)
       const ephemeralKey = session.client_secret.value
-      console.log('[Dialog] ✓ 步骤 1/10: 已获取临时令牌')
+      proxyConnectionId = session.connection_id || null
+      if (proxyConnectionId) {
+        console.log('[Dialog] ✓ 步骤 1/10: 已获取临时令牌，proxy connection_id:', proxyConnectionId)
+      } else {
+        console.log('[Dialog] ✓ 步骤 1/10: 已获取临时令牌（响应未含 connection_id，SDP 将不传 X-Connection-Id）')
+      }
       
       // 2. 获取麦克风权限
       console.log('[Dialog] 步骤 2/10: 请求麦克风权限...')
@@ -244,12 +274,16 @@ export function useRealtimeDialog() {
       // 9. 发送 SDP 到 OpenAI（经后端代理）
       console.log('[Dialog] 步骤 9/10: 发送 SDP 到 OpenAI...')
       const model = DIALOG_CONFIG.openai.model || 'gpt-4o-realtime-preview-2024-12-17'
+      const sdpHeaders = {
+        'X-Ephemeral-Key': ephemeralKey,
+        'Content-Type': 'application/sdp'
+      }
+      if (proxyConnectionId) {
+        sdpHeaders['X-Connection-Id'] = proxyConnectionId
+      }
       const sdpResponse = await fetch(`/realtime/sdp?model=${model}`, {
         method: 'POST',
-        headers: {
-          'X-Ephemeral-Key': ephemeralKey,
-          'Content-Type': 'application/sdp'
-        },
+        headers: sdpHeaders,
         body: offer.sdp
       })
       
@@ -497,6 +531,8 @@ export function useRealtimeDialog() {
    */
   async function disconnect(clearRecordingData = true) {
     console.log('[Dialog] 断开连接，clearRecordingData:', clearRecordingData)
+
+    await notifyProxyConnectionClosed()
 
     isConnected.value = false
     isConnecting.value = false

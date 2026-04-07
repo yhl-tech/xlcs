@@ -21,6 +21,10 @@
           </div>
         </div>
       </div>
+      <div class="nav-bar-right">
+        <RealtimeStatusBadge />
+        <span v-if="authStore.isLoggedIn" class="nav-username">{{ displayName }}</span>
+      </div>
     </nav>
 
     <!-- 滚动内容区域 -->
@@ -168,14 +172,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, shallowRef, markRaw, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, shallowRef, markRaw, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import LoginModal from '@/components/common/LoginModal.vue'
+import RealtimeStatusBadge from '@/components/common/RealtimeStatusBadge.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+const displayName = computed(() => {
+  return authStore.userInfo?.username || authStore.userInfo?.phone || '用户'
+})
 
 // 登录弹窗状态
 const showLoginModal = ref(false)
@@ -733,6 +742,31 @@ html {
   padding: 2rem 2.5rem;
   background: transparent;
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.nav-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.nav-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.95);
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.12);
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logo-group {

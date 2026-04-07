@@ -2,7 +2,7 @@
 """
 OpenAI Realtime Token 代理服务
 依赖安装: pip install -r requirements.txt
-启动命令: uvicorn main:app --host 0.0.0.0 --port 8000
+启动命令: uvicorn main:app --host 0.0.0.0 --port 8765
 
 .env 文件配置:
   OPENAI_API_KEY=sk-xxxxxx
@@ -13,7 +13,7 @@ import os
 import httpx
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
@@ -52,6 +52,28 @@ active_connections: Dict[str, ConnectionInfo] = {}
 # 请求模型
 class CloseConnectionRequest(BaseModel):
     connection_id: str
+
+
+def get_client_ip(request: Request) -> str:
+    """
+    解析「对用户而言」的客户端 IP。
+
+    经 Nginx/Ingress 反代时，TCP 直连到本服务的是代理，request.client.host 会是 127.0.0.1 或内网 IP；
+    真实浏览器 IP 由反代写入 X-Real-IP 或 X-Forwarded-For。
+
+    注意：若应用**直接暴露公网**且未剥离伪造头，客户端可伪造 X-Forwarded-For；
+    仅建议在反代已规范设置这些头的环境下使用。
+    """
+    real = request.headers.get("X-Real-IP")
+    if real:
+        return real.strip()
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        # 常见格式 "client, proxy1, proxy2" — 取第一个为原始客户端（由可信反代追加时成立）
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
 
 
 # 后台任务：清理超时连接
@@ -109,14 +131,9 @@ async def get_realtime_token(request: Request):
     # 获取响应数据并记录连接
     token_data = response.json()
 
-    # 假设响应中有client_secret或者id可以作为连接标识
-    # 如果没有，我们生成一个基于时间和IP的唯一标识
-    client_ip = request.client.host if request.client else "unknown"
+    # connection_id 仅用于本代理登记/前端 X-Connection-Id，须短且非密钥
+    client_ip = get_client_ip(request)
     connection_id = f"{client_ip}_{datetime.now().timestamp()}"
-
-    # 如果OpenAI返回的数据中有唯一标识，可以使用它
-    if "client_secret" in token_data:
-        connection_id = token_data["client_secret"]["value"]
 
     # 记录新连接
     active_connections[connection_id] = ConnectionInfo(connection_id, client_ip)
@@ -239,5 +256,5 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8083)
+    uvicorn.run(app, host="0.0.0.0", port=8765)
 
