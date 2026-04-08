@@ -20,6 +20,9 @@
       <button class="dev-btn" @click="handleDevClearData" style="background: #ef4444;">
         清除数据
       </button>
+      <button class="dev-btn" @click="handleDevSimulateConnectFail" style="background: #7c3aed;">
+        模拟连接失败
+      </button>
     </div>
     
     <!-- 正式测试阶段 -->
@@ -37,8 +40,20 @@
         />
         <!-- 音频连接等待遮罩 -->
         <div v-if="!isAudioReady" class="audio-connecting-overlay">
-          <div class="audio-connecting-spinner" />
-          <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
+          <template v-if="!showManualReconnect">
+            <div class="audio-connecting-spinner" />
+            <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
+          </template>
+          <template v-else>
+            <span class="audio-reconnect-tip">连接失败，请点击下方按钮手动重试</span>
+            <button
+              class="audio-manual-reconnect-btn"
+              :disabled="isManualReconnecting"
+              @click="handleManualReconnect"
+            >
+              {{ isManualReconnecting ? '重连中…' : '手动重新连接' }}
+            </button>
+          </template>
         </div>
       </div>
 
@@ -75,8 +90,20 @@
     <div v-else-if="testStore.phase === 'postTest'" class="post-test-screen">
       <!-- 音频连接等待遮罩 -->
       <div v-if="!isAudioReady" class="audio-connecting-overlay">
-        <div class="audio-connecting-spinner" />
-        <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
+        <template v-if="!showManualReconnect">
+          <div class="audio-connecting-spinner" />
+          <span>正在连接下一张图版，请不要刷新网页，稍等一下……</span>
+        </template>
+        <template v-else>
+          <span class="audio-reconnect-tip">连接失败，请点击下方按钮手动重试</span>
+          <button
+            class="audio-manual-reconnect-btn"
+            :disabled="isManualReconnecting"
+            @click="handleManualReconnect"
+          >
+            {{ isManualReconnecting ? '重连中…' : '手动重新连接' }}
+          </button>
+        </template>
       </div>
       <PostTestForm @submit="handlePostTestSubmit" />
     </div>
@@ -148,6 +175,9 @@ const brushColor = ref('#ef4444') // 默认红色
 const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 const isPlateSwitching = ref(false)
 const isAudioReady = ref(false) // 默认显示遮罩，WebRTC 连接就绪后再置 true
+const showManualReconnect = ref(false) // 自动重连全部失败后显示手动按钮
+const manualReconnectContext = ref('') // 'plate' | 'postTest'
+const isManualReconnecting = ref(false) // 手动重连中
 
 // TTS 播报提示词（让 AI 只朗读不添加额外解释）
 const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
@@ -205,6 +235,7 @@ async function stopAndUploadCurrentPlateAudio(plateIndex) {
  */
 async function reconnectAndStartRecording() {
   const MAX_RETRIES = 3
+  showManualReconnect.value = false
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       // 断开旧连接（录音已在 stopAndUploadCurrentPlateAudio 里停了，这里清空数据）
@@ -213,7 +244,7 @@ async function reconnectAndStartRecording() {
         await dialog.disconnect(true)
       }
 
-      // 让上一次连接的资源释放有足够时间，降低“紧跟着重连导致 datachannel 建连慢/失败”的概率（TURN relay 下更常见）
+      // 让上一次连接的资源释放有足够时间，降低”紧跟着重连导致 datachannel 建连慢/失败”的概率（TURN relay 下更常见）
       await new Promise(resolve => setTimeout(resolve, 5000))
 
       // 重新连接（使用新图版对应的提示词）
@@ -230,6 +261,7 @@ async function reconnectAndStartRecording() {
       const recordingStartTime = Date.now()
       await dialog.startMixedRecording()
       console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
+      showManualReconnect.value = false
       return recordingStartTime
     } catch (err) {
       console.error(`[TestView] 重新连接 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
@@ -240,7 +272,52 @@ async function reconnectAndStartRecording() {
     }
   }
 
+  // 全部重试失败，显示手动重连按钮
+  manualReconnectContext.value = 'plate'
+  showManualReconnect.value = true
   return null
+}
+
+/**
+ * 手动重连：用户点击按钮后触发
+ */
+async function handleManualReconnect() {
+  if (isManualReconnecting.value) return
+  isManualReconnecting.value = true
+  showManualReconnect.value = false
+
+  try {
+    if (manualReconnectContext.value === 'postTest') {
+      if (dialog.isConnected.value) await dialog.disconnect(true)
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      await dialog.connect(POSTTEST_PROMPT, 'alloy')
+      dialog.setCallbacks({
+        onTranscript: (transcript) => {
+          subtitle.show(transcript.text, transcript.speaker)
+        }
+      })
+      await dialog.startMixedRecording()
+      console.log('[TestView] 手动重连后测阶段成功')
+      isAudioReady.value = true
+    } else {
+      const recordingStartTime = await reconnectAndStartRecording()
+      if (recordingStartTime !== null) {
+        isAudioReady.value = true
+        tracker.startTracking(testStore.currentPlate, recordingStartTime)
+        try {
+          await sendTTSBroadcast('这张图你可以看到什么？')
+        } catch (err) {
+          console.warn('[TestView] 手动重连后播报提示失败:', err)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[TestView] 手动重连失败:', err)
+    // 再次失败，继续显示按钮
+    showManualReconnect.value = true
+  } finally {
+    isManualReconnecting.value = false
+  }
 }
 
 // 构建 TTS 播报查询文本
@@ -587,8 +664,9 @@ async function handleNextPlate() {
     isAudioReady.value = false
     showSubtitles.value = false
     currentSubtitle.value = ''
+    showManualReconnect.value = false
     // 使用与主测试相同的重连策略，提高频繁断开/重连时的成功率
-    const MAX_RETRIES = 5
+    const MAX_RETRIES = 3
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         if (dialog.isConnected.value) {
@@ -607,14 +685,16 @@ async function handleNextPlate() {
         await dialog.startMixedRecording()
         console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
         isAudioReady.value = true
+        showManualReconnect.value = false
         break
       } catch (err) {
         console.error(`[TestView] 后测阶段重连 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
         } else {
-          // 全部重试失败，解除遮罩避免界面卡死
-          isAudioReady.value = true
+          // 全部重试失败，显示手动重连按钮（不解除遮罩，让用户主动重连）
+          manualReconnectContext.value = 'postTest'
+          showManualReconnect.value = true
         }
       }
     }
@@ -641,26 +721,24 @@ async function handleNextPlate() {
     // 重新连接 WebRTC（新会话、清空历史）并开始新录音
     const recordingStartTime = await reconnectAndStartRecording()
 
-    // 连接成功，揭开遮罩
-    isAudioReady.value = true
+    // 仅在连接成功时揭开遮罩；失败时 reconnectAndStartRecording 已设置 showManualReconnect
+    if (recordingStartTime !== null) {
+      isAudioReady.value = true
 
-    // 立即记录新图版的时间戳
-    if (recordingStartTime) {
+      // 立即记录新图版的时间戳
       tracker.startTracking(testStore.currentPlate, recordingStartTime)
-    } else {
-      console.warn('[TestView] 新录音时间戳为空，跳过本图 startTracking')
-    }
 
-    // 刷新去重标记（新连接后重置，确保新图版会刷新）
-    lastSystemPromptRefreshedPlate.value = testStore.currentPlate
+      // 刷新去重标记（新连接后重置，确保新图版会刷新）
+      lastSystemPromptRefreshedPlate.value = testStore.currentPlate
 
-    // 播报当前图片的提示语音
-    try {
-      const promptText = '这张图你可以看到什么？'
-      console.log('[TestView] 切换图片，播报提示:', promptText)
-      await sendTTSBroadcast(promptText)
-    } catch (err) {
-      console.warn('[TestView] 播报提示失败:', err)
+      // 播报当前图片的提示语音
+      try {
+        const promptText = '这张图你可以看到什么？'
+        console.log('[TestView] 切换图片，播报提示:', promptText)
+        await sendTTSBroadcast(promptText)
+      } catch (err) {
+        console.warn('[TestView] 播报提示失败:', err)
+      }
     }
   }
     session.saveSnapshot('next_plate')
@@ -1014,6 +1092,14 @@ function handleDevClearData() {
     alert('数据已清除，请重新进行测试')
   }
 }
+
+// 开发测试 - 模拟连接失败（直接触发手动重连按钮）
+function handleDevSimulateConnectFail() {
+  isAudioReady.value = false
+  manualReconnectContext.value = testStore.phase === 'postTest' ? 'postTest' : 'plate'
+  showManualReconnect.value = true
+  console.log('[Dev] 模拟连接失败，context:', manualReconnectContext.value)
+}
 </script>
 
 <style lang="less" scoped>
@@ -1095,6 +1181,37 @@ function handleDevClearData() {
   color: #fff;
   font-size: 16px;
   letter-spacing: 1px;
+}
+
+.audio-reconnect-tip {
+  font-size: 15px;
+  color: #fcd34d;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.audio-manual-reconnect-btn {
+  margin-top: 8px;
+  padding: 12px 32px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.audio-manual-reconnect-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.audio-manual-reconnect-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .audio-connecting-spinner {
