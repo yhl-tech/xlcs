@@ -87,21 +87,6 @@ onMounted(() => {
   })
 })
 
-// 等待 WebRTC 连接成功后再播报第一个问题
-let firstQuestionAsked = false
-watch(
-  () => dialog.isConnected.value,
-  async (connected) => {
-    if (connected && !firstQuestionAsked) {
-      firstQuestionAsked = true
-      console.log('[PostTestForm] WebRTC 已连接，开始播报第一个问题')
-      await askCurrentQuestion()
-      startQuestionTimer()
-    }
-  },
-  { immediate: true }
-)
-
 onUnmounted(() => {
   clearQuestionTimer()
 })
@@ -110,6 +95,9 @@ onUnmounted(() => {
 const currentQuestion = computed(() => {
   return displayableQuestions.value[currentQuestionIndex.value] || null
 })
+
+// 用于确保第一个问题只播报一次（mount 时若已连接立即触发，否则等 watch 检测到 isConnected 变 true 时再触发）
+let firstQuestionAsked = false
 
 // 当前问题背景色（每题一个淡色）
 const QUESTION_COLORS = [
@@ -215,6 +203,23 @@ function clearQuestionTimer() {
     timerId = null
   }
 }
+
+// WebRTC 连接就绪后播报第一题
+// 注意：这里 immediate: true 会在 setup 同步阶段触发回调；watch 必须放在
+// askCurrentQuestion / startQuestionTimer / currentQuestion 等被引用的依赖
+// 都声明完之后，否则会触发 TDZ（Cannot access ... before initialization）。
+watch(
+  () => dialog.isConnected.value,
+  async (connected) => {
+    if (connected && !firstQuestionAsked) {
+      firstQuestionAsked = true
+      console.log('[PostTestForm] WebRTC 已连接，开始播报第一个问题')
+      await askCurrentQuestion()
+      startQuestionTimer()
+    }
+  },
+  { immediate: true }
+)
 
 function startQuestionTimer() {
   clearQuestionTimer()

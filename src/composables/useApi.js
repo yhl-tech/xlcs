@@ -17,7 +17,7 @@ const API_CONFIG = {
  * @param {Blob|File} fileData - 文件数据
  * @param {string} fileName - 文件名
  */
-function saveFileToLocal(fileData, fileName) {
+export function saveFileToLocal(fileData, fileName) {
   try {
     const blob = fileData instanceof Blob ? fileData : new Blob([fileData])
     const url = URL.createObjectURL(blob)
@@ -508,7 +508,10 @@ export function useApi() {
     const fileSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2)
     console.log('[API] 上传音频文件:', { fileName, size: `${fileSizeMB}MB`, userId, plateNumber })
 
-    saveFileToLocal(fileToUpload, fileName)
+    // select 段（plateIndex === null）已由 TestView 在转码后立即兜底保存，避免重复下载
+    if (plateIndex !== null) {
+      saveFileToLocal(fileToUpload, fileName)
+    }
 
     const response = await client.post('/rorschach/user/upload_sub_media', formData, {
       headers: { 'user-id': userId },
