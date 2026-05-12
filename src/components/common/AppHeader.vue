@@ -4,10 +4,10 @@
     <div class="header-left">
       <img 
         :src="`${baseUrl}images/logo.png`" 
-        alt="InnerScan" 
+        alt="psyla" 
         class="header-logo"
       >
-      <span class="header-brand">知己心探</span>
+      <span class="header-brand">塞拉</span>
     </div>
 
     <!-- 中间区域（可选标题） -->

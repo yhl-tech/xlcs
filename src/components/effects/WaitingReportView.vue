@@ -292,7 +292,7 @@
           </svg>
           全链路数据加密
           <div class="rf-footer-dot" />
-          知己心探
+          塞拉
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 {
   "name": "xlcs-vue3",
   "version": "1.0.0",
-  "description": "知己心探",
+  "description": "塞拉",
   "type": "module",
   "scripts": {
     "dev": "vite",

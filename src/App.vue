@@ -168,7 +168,7 @@ watch(() => route.path, async (newPath, oldPath) => {
 })
 
 onMounted(async () => {
-  console.log('知己心探 Vue 3 版本已启动')
+  console.log('塞拉 Vue 3 版本已启动')
   console.log('[App] onMounted - 当前路由:', route.path, route.name)
   console.log('[App] onMounted - 用户信息:', authStore.userInfo)
   

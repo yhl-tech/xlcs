@@ -7,20 +7,20 @@ const routes = [
     path: '/',
     name: 'Home',
     component: () => import('@/views/HomeView.vue'),
-    meta: { title: '知己心探 - 首页' }
+    meta: { title: '塞拉 - 首页' }
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { title: '知己心探 - 登录' }
+    meta: { title: '塞拉 - 登录' }
   },
   {
     path: '/prep',
     name: 'Prep',
     component: () => import('@/views/PrepView.vue'),
     meta: { 
-      title: '知己心探 - 测试准备',
+      title: '塞拉 - 测试准备',
       requiresAuth: true 
     }
   },
@@ -29,7 +29,7 @@ const routes = [
     name: 'Intro',
     component: () => import('@/views/IntroView.vue'),
     meta: { 
-      title: '知己心探 - 测试说明',
+      title: '塞拉 - 测试说明',
       requiresAuth: true 
     }
   },
@@ -38,7 +38,7 @@ const routes = [
     name: 'Test',
     component: () => import('@/views/TestView.vue'),
     meta: { 
-      title: '知己心探 - 测试',
+      title: '塞拉 - 测试',
       requiresAuth: true 
     }
   },
@@ -47,7 +47,7 @@ const routes = [
     name: 'Report',
     component: () => import('@/views/ReportView.vue'),
     meta: { 
-      title: '知己心探 - 报告',
+      title: '塞拉 - 报告',
       requiresAuth: true 
     }
   },

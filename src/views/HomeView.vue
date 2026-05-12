@@ -8,15 +8,15 @@
       <div class="logo-group">
         <div class="logo-wrapper">
           <div class="logo-glow"></div>
-          <img :src="`${baseUrl}images/logo.png`" alt="InnerScan Logo" class="logo-img" />
+          <img :src="`${baseUrl}images/logo.png`" alt="psyla Logo" class="logo-img" />
         </div>
         <div class="logo-text">
           <div class="logo-title">
-            INNER<span class="logo-highlight">SCAN</span>
+            psy<span class="logo-highlight">la</span>
           </div>
           <div class="logo-subtitle">
             <span class="line-left"></span>
-            <span class="text">知己心探</span>
+            <span class="text">塞拉</span>
             <span class="line-right"></span>
           </div>
         </div>
@@ -47,7 +47,7 @@
               <p class="hero-subtitle">抵达你不曾了解的 自我</p>
               
               <p class="hero-description">
-                InnerScan 融合多模态 AI 与投射性心理测试，深度解析你的潜意识结构。<br>
+                psyla 融合多模态 AI 与投射性心理测试，深度解析你的潜意识结构。<br>
                 我们将模糊的直觉转化为可视化的<strong class="highlight-text">"心理基因组"</strong>，助你精准洞察核心人格、情绪模式与潜在天赋。
               </p>
 
@@ -79,7 +79,7 @@
               </h2>
               
               <p class="section-description">
-                传统的心理测试依赖主观经验，而 InnerScan 的多模态 AI 引擎能深度解析你语气的起伏、对图像的直觉反应与认知模式。<br><br>
+                传统的心理测试依赖主观经验，而 psyla 的多模态 AI 引擎能深度解析你语气的起伏、对图像的直觉反应与认知模式。<br><br>
                 我们将思维的混沌墨迹，重组为双螺旋般的有序序列。
               </p>
 
@@ -153,7 +153,7 @@
               
               <p class="section-description">
                 你的每一次选择、每一段关系、每一种潜能，都汇聚成这片独一无二的星云。<br>
-                InnerScan 帮你在这个复杂的系统中，找到属于你的引力中心。
+                psyla 帮你在这个复杂的系统中，找到属于你的引力中心。
               </p>
 
               <button class="cta-btn small" @click="openLoginModal">
