@@ -848,7 +848,7 @@ html {
   }
 
   .text {
-    font-size: 10px;
+    font-size: 22px;
     font-weight: bold;
     letter-spacing: 0.4em;
     color: @brand-cyan;
