@@ -242,10 +242,10 @@
           <div class="device-check-actions">
             <button
               type="button"
-              :disabled="isMicTesting"
+              :disabled="isMicTesting || !isWelcomeMp3Finished"
               @click="handleMicTest"
             >
-              🎙️ {{ isMicTesting ? '检测中...' : '检测麦克风（测试时请说话）' }}
+              🎙️ {{ micTestButtonLabel }}
             </button>
           </div>
 
@@ -304,9 +304,18 @@ const educationOptions = ['小学', '初中', '高中', '中专', '大专', '本
 const isSpeakerTestPassed = ref(false)
 const isMicTestPassed = ref(false)
 
+// 欢迎语 MP3 播放结束（含失败结束，避免永久不可点）
+const isWelcomeMp3Finished = ref(false)
+
 // 计算属性：是否设备测试都通过（只需麦克风通过）
 const isDeviceTestPassed = computed(() => {
   return isMicTestPassed.value
+})
+
+const micTestButtonLabel = computed(() => {
+  if (isMicTesting.value) return '检测中...'
+  if (!isWelcomeMp3Finished.value) return '请听完开场语音后再检测麦克风'
+  return '检测麦克风（测试时请说话）'
 })
 
 // 设备检测状态
@@ -390,15 +399,17 @@ async function playWelcomeMessage() {
   try {
     // 等待 1 秒，确保页面加载完成
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
+
     console.log('[PrepView] 开始播放欢迎语音...')
-    
+
     // 使用全局音频管理器播放
     await playAudio('/audio/welcome.MP3')
-    
+
     console.log('[PrepView] 欢迎语播放完成')
   } catch (error) {
     console.error('[PrepView] 播放欢迎语失败:', error)
+  } finally {
+    isWelcomeMp3Finished.value = true
   }
 }
 
@@ -507,6 +518,10 @@ async function handleSpeakerTest() {
 
 // 测试麦克风
 async function handleMicTest() {
+  if (!isWelcomeMp3Finished.value) {
+    return
+  }
+
   isMicTesting.value = true
   deviceCheckStatus.value = 'checking'
   deviceCheckResult.value = '正在请求麦克风权限...'
