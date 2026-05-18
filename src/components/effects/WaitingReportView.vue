@@ -1131,6 +1131,26 @@ onUnmounted(() => {
     padding-top: 80px;
   }
 
+  .rf-download-section {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .rf-download-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rf-download-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
   .rf-steps-detail {
     padding: 1.5rem;
   }

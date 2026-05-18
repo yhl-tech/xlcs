@@ -360,20 +360,46 @@ defineExpose({
 
 @media (max-width: 768px) {
   .energy-pillar-container {
-    right: 12px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 40;
   }
 
   .energy-pillar {
-    width: 20px;
-    height: 180px;
+    width: 16px;
+    height: min(40vh, 220px);
+    height: min(40dvh, 220px);
   }
-  
+
   .energy-scale {
-    height: 180px;
+    height: min(40vh, 220px);
+    height: min(40dvh, 220px);
   }
-  
+
   .scale-label {
-    font-size: 9px;
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .energy-pillar-container {
+    right: 2px;
+  }
+
+  .energy-pillar {
+    width: 14px;
+    height: min(36vh, 180px);
+    height: min(36dvh, 180px);
+  }
+
+  .energy-scale {
+    height: min(36vh, 180px);
+    height: min(36dvh, 180px);
+  }
+
+  .scale-label {
+    font-size: 7px;
   }
 }
 </style>

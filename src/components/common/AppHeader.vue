@@ -236,7 +236,11 @@ function handleLogout() {
 @media (max-width: 768px) {
   .app-header {
     padding: 0 16px;
-    height: 60px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
   }
 
   .header-logo {

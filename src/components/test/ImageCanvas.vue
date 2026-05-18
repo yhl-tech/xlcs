@@ -667,13 +667,21 @@ defineExpose({
 
 @media (max-width: 768px) {
   .image-canvas-container {
-    padding: 16px;
-    min-height: min(60vh, 400px);
+    padding: 4px;
+    min-height: 0;
+    height: 100%;
+    margin-top: 0;
   }
 
   .rorschach-image {
-    max-width: 95%;
-    max-height: 95%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .image-canvas-container {
+    padding: 2px;
   }
 }
 </style>

@@ -6,23 +6,28 @@
         :disabled="currentPlate <= 1" 
         @click="emit('previous')"
       >
-        ◀ 上一张
+        <span class="btn-icon">◀</span>
+        <span class="btn-label">上一张</span>
       </button>
     </div>
 
     <!-- 缩放旋转按钮组 -->
     <div class="control-group">
-      <button @click="emit('zoom-in')">
-        🔍+ 放大
+      <button @click="emit('zoom-in')" aria-label="放大">
+        <span class="btn-icon">🔍+</span>
+        <span class="btn-label">放大</span>
       </button>
-      <button @click="emit('zoom-out')">
-        🔍- 缩小
+      <button @click="emit('zoom-out')" aria-label="缩小">
+        <span class="btn-icon">🔍-</span>
+        <span class="btn-label">缩小</span>
       </button>
-      <button @click="emit('rotate-left')">
-        ↶ 左转
+      <button @click="emit('rotate-left')" aria-label="左转">
+        <span class="btn-icon">↶</span>
+        <span class="btn-label">左转</span>
       </button>
-      <button @click="emit('rotate-right')">
-        ↷ 右转
+      <button @click="emit('rotate-right')" aria-label="右转">
+        <span class="btn-icon">↷</span>
+        <span class="btn-label">右转</span>
       </button>
     </div>
 
@@ -31,8 +36,10 @@
       <button 
         :class="{ selected: currentTool === 'pen' }"
         @click="toggleTool('pen')"
+        aria-label="画笔"
       >
-        ✏️ 画笔
+        <span class="btn-icon">✏️</span>
+        <span class="btn-label">画笔</span>
       </button>
       <div class="color-selector">
         <div 
@@ -67,11 +74,14 @@
       <button 
         :class="{ selected: currentTool === 'eraser' }"
         @click="toggleTool('eraser')"
+        aria-label="擦除"
       >
-        🗑️ 擦除
+        <span class="btn-icon">🗑️</span>
+        <span class="btn-label">擦除</span>
       </button>
-      <button @click="emit('clear-all')">
-        🧹 一键擦除
+      <button @click="emit('clear-all')" aria-label="一键擦除">
+        <span class="btn-icon">🧹</span>
+        <span class="btn-label">一键擦除</span>
       </button>
     </div>
 
@@ -82,7 +92,7 @@
         :class="{ pulse: countdown > 0 }"
         @click="handleNext"
       >
-        {{ nextButtonText }}
+        <span class="btn-label-next">{{ nextButtonText }}</span>
       </button>
     </div>
   </div>
@@ -288,15 +298,28 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .controls-bar {
-    gap: 8px;
-    padding-bottom: 12px;
+    position: relative;
+    z-index: 30;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    padding-left: calc(10px + env(safe-area-inset-left, 0px));
+    padding-right: calc(10px + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(10, 15, 30, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   .control-group {
-    padding: 6px 8px;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 4px 8px;
 
     button {
-      padding: 6px 10px;
+      padding: 5px 10px;
       font-size: 12px;
     }
   }
@@ -307,15 +330,42 @@ onUnmounted(() => {
   }
 }
 
+/* 小屏：极紧凑布局，全部按钮可见、最多两行 */
 @media (max-width: 480px) {
   .controls-bar {
-    flex-direction: column;
-    gap: 6px;
+    gap: 5px;
+    padding: 5px 6px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   }
 
   .control-group {
-    flex-wrap: wrap;
-    justify-content: center;
+    padding: 3px 5px;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.08);
+
+    button {
+      padding: 4px 7px;
+      font-size: 11px;
+      gap: 4px;
+
+      /* 隐藏按钮文字，仅保留 emoji，节省横向空间 */
+      .btn-label {
+        display: none;
+      }
+    }
+  }
+
+  .color-option {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+  }
+
+  /* 前进 / 下一张按钮保留完整文字 */
+  .next-btn {
+    min-width: 0;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 }
 </style>

@@ -761,6 +761,7 @@ async function handleStartTest() {
 .prep-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   display: flex;
   align-items: center;
@@ -769,6 +770,11 @@ async function handleStartTest() {
   background: transparent;
   overflow-y: auto;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  @media (max-width: 768px) {
+    padding: 72px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    align-items: flex-start;
+  }
 }
 
 // 准备页面布局（两栏）
@@ -812,6 +818,13 @@ async function handleStartTest() {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 18px;
+    border-radius: 16px;
+  }
 }
 
 // 左侧信息卡片

@@ -471,7 +471,7 @@ async function finishQuestionnaire() {
     margin-bottom: 16px;
   }
   
-  .header-title {
+  .ptf-title {
     font-size: 24px;
   }
 }
@@ -480,6 +480,69 @@ async function finishQuestionnaire() {
   .ptf-grid {
     grid-template-columns: repeat(3, 1fr);
     overflow-y: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .ptf-container {
+    padding: 14px 16px calc(72px + env(safe-area-inset-bottom, 0px));
+    justify-content: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ptf-title {
+    font-size: 22px;
+    letter-spacing: 1px;
+    padding: 0 12px;
+  }
+
+  .ptf-question-text {
+    font-size: 16px;
+  }
+
+  .ptf-instruction-box {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+
+  .ptf-grid {
+    gap: 10px;
+  }
+
+  .ptf-card {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ptf-title-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .ptf-next-btn {
+    position: static;
+    align-self: center;
+    width: 100%;
+    max-width: 320px;
+    justify-content: center;
+    padding: 10px 16px;
+  }
+
+  .ptf-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .ptf-card-label {
+    font-size: 12px;
+  }
+
+  .ptf-container {
+    padding: 12px 12px calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>

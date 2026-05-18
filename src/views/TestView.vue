@@ -1522,6 +1522,7 @@ function handleDevSimulateConnectFail() {
 .test-view {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   padding-top: 70px; /* 为头部导航栏留出空间 */
   position: relative;
   overflow: hidden;
@@ -1576,6 +1577,7 @@ function handleDevSimulateConnectFail() {
   flex: 1;
   width: 100%;
   max-height: calc(100vh - 140px); // 减去控制栏高度，限制图片区域
+  max-height: calc(100dvh - 140px);
   position: relative;
   overflow: hidden;
   background: transparent;
@@ -1721,13 +1723,19 @@ function handleDevSimulateConnectFail() {
 .waiting-screen {
   width: 100%;
   height: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   position: relative;
   z-index: 1;
   background: transparent;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .summary-card {
@@ -1886,19 +1894,57 @@ function handleDevSimulateConnectFail() {
 }
 
 @media (max-width: 768px) {
-  .image-container {
-    padding: 16px;
-    min-height: min(60vh, 400px);
+  .test-view {
+    height: 100vh;
+    height: 100dvh;
+    padding-top: calc(56px + env(safe-area-inset-top, 0px));
   }
 
+  .test-screen {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* 图版区占满剩余高度，最大化可视范围 */
+  .image-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    padding: 2px 28px 2px 2px; /* 右侧留给能量柱 */
+  }
+
+  /* 字幕悬浮在图版下沿，不占控制栏空间 */
   .subtitle-container {
-    bottom: 70px;
-    max-width: 98%;
-    padding: 10px 20px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 10px;
+    width: auto;
+    max-width: calc(100% - 20px);
+    padding: 6px 14px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 20;
+    pointer-events: none;
   }
 
   .subtitle-text {
-    font-size: 14px;
+    font-size: 12.5px;
+    line-height: 1.35;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .test-screen :deep(.controls-bar) {
+    flex-shrink: 0;
+    z-index: 30;
   }
 
   .confirm-dialog__actions {
@@ -1908,6 +1954,24 @@ function handleDevSimulateConnectFail() {
     :deep(.base-button) {
       width: 100%;
     }
+  }
+}
+
+@media (max-width: 480px) {
+  .image-container {
+    padding-right: 26px;
+  }
+
+  .subtitle-container {
+    bottom: 8px;
+    padding: 5px 10px;
+    max-width: calc(100% - 16px);
+  }
+
+  .subtitle-text {
+    font-size: 11.5px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 }
 </style>
