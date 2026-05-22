@@ -13,13 +13,32 @@
             <span>报告已生成完毕</span>
           </div>
           <div class="rf-download-buttons">
-            <button class="rf-download-btn rf-download-btn-primary" @click="handleDownloadReport" :disabled="!reportNewPdf">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button
+              class="rf-download-btn rf-download-btn-primary"
+              :class="{ 'is-loading': isDownloadingReport }"
+              :disabled="!reportNewPdf || isDownloadingReport"
+              @click="handleDownloadReport"
+            >
+              <span
+                v-if="isDownloadingReport"
+                class="rf-download-spinner"
+                aria-hidden="true"
+              />
+              <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              下载测试报告
+              {{ isDownloadingReport ? '下载中…' : '下载测试报告' }}
             </button>
             <button class="rf-download-btn rf-download-btn-secondary" @click="handleOpenPublicityReport" :disabled="!reportHtml">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -301,9 +320,17 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, h } from 'vue'
+import { useRouter } from 'vue-router'
 import useApi from '@/composables/useApi'
 import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
+import {
+  parsePublicityHtmlResponse,
+  preparePublicityHtmlDocument,
+  shouldOpenPublicityInApp,
+  openPublicityInNewWindow,
+  stashPublicityHtmlForInApp
+} from '@/utils/publicityReport'
 
 const props = defineProps({
   sessionId: {
@@ -312,6 +339,7 @@ const props = defineProps({
   }
 })
 
+const router = useRouter()
 const api = useApi()
 const authStore = useAuthStore()
 const testStore = useTestStore()
@@ -330,6 +358,7 @@ const currentStepIndex = ref(2) // 默认在 AI 模型计算阶段
 const isCompleted = ref(false)
 const reportNewPdf = ref(false)
 const reportHtml = ref(false)
+const isDownloadingReport = ref(false)
 const dots = ref('...')
 
 // 定时器
@@ -471,13 +500,16 @@ async function checkReportStatus() {
 
 // 下载报告
 async function handleDownloadReport() {
+  if (isDownloadingReport.value) return
+
+  const userId = getUserId()
+  if (!userId) {
+    alert('用户信息不存在，请重新登录')
+    return
+  }
+
+  isDownloadingReport.value = true
   try {
-    const userId = getUserId()
-    if (!userId) {
-      alert('用户信息不存在，请重新登录')
-      return
-    }
-    
     console.log('[WaitingReport] 开始下载报告:', userId)
     const response = await api.downloadReport(userId)
     
@@ -514,6 +546,8 @@ async function handleDownloadReport() {
   } catch (error) {
     console.error('[WaitingReport] 下载报告失败:', error)
     alert(error.message || '下载失败，请稍后重试')
+  } finally {
+    isDownloadingReport.value = false
   }
 }
 
@@ -525,30 +559,39 @@ async function handleOpenPublicityReport() {
       alert('用户信息不存在，请重新登录')
       return
     }
-    
+
     console.log('[WaitingReport] 获取报告解读版:', userId)
     const response = await api.getPublicityReport(userId)
-    
-    // 响应拦截器对非 blob 返回 response.data
-    // 但由于设置了 transformResponse，response 可能就是 HTML 字符串
-    const htmlContent = typeof response === 'string' ? response : (response?.data || response)
-    
-    console.log('[WaitingReport] HTML 内容类型:', typeof htmlContent, '长度:', htmlContent?.length)
-    
-    if (!htmlContent || typeof htmlContent !== 'string') {
+    const rawHtml = parsePublicityHtmlResponse(response)
+
+    console.log(
+      '[WaitingReport] 解读版解析结果:',
+      rawHtml ? `HTML 长度 ${rawHtml.length}` : '无有效 HTML'
+    )
+
+    if (!rawHtml) {
       alert('暂无报告解读版')
       return
     }
-    
-    // 使用 Blob URL 在新窗口打开
-    const blob = new Blob([htmlContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    
-    // 延迟清理
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    
-    console.log('[WaitingReport] 报告解读版已打开')
+
+    const html = preparePublicityHtmlDocument(rawHtml)
+
+    // 移动端系统浏览器：blob + 新标签易白屏，改应用内全屏 iframe
+    if (shouldOpenPublicityInApp()) {
+      stashPublicityHtmlForInApp(html)
+      await router.push({ name: 'PublicityReport' })
+      console.log('[WaitingReport] 报告解读版（应用内）已打开')
+      return
+    }
+
+    if (!openPublicityInNewWindow(html)) {
+      stashPublicityHtmlForInApp(html)
+      await router.push({ name: 'PublicityReport' })
+      console.log('[WaitingReport] 弹窗被拦截，改用应用内打开')
+      return
+    }
+
+    console.log('[WaitingReport] 报告解读版（新窗口）已打开')
   } catch (error) {
     console.error('[WaitingReport] 获取报告解读版失败:', error)
     alert(error.message || '获取失败，请稍后重试')
@@ -703,14 +746,33 @@ onUnmounted(() => {
   color: white;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   
-  &:hover {
+  &:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
   }
   
-  &:active {
+  &:active:not(:disabled) {
     transform: translateY(0);
   }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  &.is-loading {
+    cursor: wait;
+  }
+}
+
+.rf-download-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
 .rf-download-btn-secondary {

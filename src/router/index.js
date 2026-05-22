@@ -51,6 +51,15 @@ const routes = [
       requiresAuth: true 
     }
   },
+  {
+    path: '/report/publicity',
+    name: 'PublicityReport',
+    component: () => import('@/views/PublicityReportView.vue'),
+    meta: {
+      title: '塞拉 - 报告解读版',
+      requiresAuth: true
+    }
+  },
   // 404 页面
   {
     path: '/:pathMatch(.*)*',
