@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:prod": "vite build --mode production",
+    "build:dev": "vite build --mode devbuild --outDir ror_test --emptyOutDir",
     "build:test": "vite build --mode test --outDir ror_test --emptyOutDir",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix",

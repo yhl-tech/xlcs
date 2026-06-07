@@ -470,9 +470,6 @@ async function handleDialogError(error) {
   }
 }
 
-// TTS 播报提示词（让 AI 只朗读不添加额外解释）
-const TTS_READ_ONLY_PROMPT = '请仅朗读以下文本内容，逐字逐句播报，不要添加任何前缀或后缀，也不要添加任何额外解释，保持原文的换行与停顿：'
-
 // 记录已刷新过 system prompt 的图版，避免重复刷新
 const lastSystemPromptRefreshedPlate = ref(-1)
 
@@ -588,9 +585,9 @@ async function handleManualReconnect() {
         isAudioReady.value = true
         tracker.startTracking(testStore.currentPlate, recordingStartTime)
         try {
-          await sendTTSBroadcast('这张图你可以看到什么？')
+          await triggerPlateOpening(testStore.currentPlate)
         } catch (err) {
-          console.warn('[TestView] 手动重连后播报提示失败:', err)
+          console.warn('[TestView] 手动重连后触发开场失败:', err)
         }
       }
     }
@@ -601,11 +598,6 @@ async function handleManualReconnect() {
   } finally {
     isManualReconnecting.value = false
   }
-}
-
-// 构建 TTS 播报查询文本
-function buildTTSQuery(text) {
-  return `${TTS_READ_ONLY_PROMPT}\n${text}`
 }
 
 function refreshSystemPromptForPlate(plateIndex) {
@@ -623,28 +615,41 @@ function refreshSystemPromptForPlate(plateIndex) {
   return updated
 }
 
-// 发送 TTS 播报
-async function sendTTSBroadcast(text) {
+// 让 AI 按当前图版系统提示词主动开场，不走 TTS 朗读
+function triggerPlateOpening(plateIndex = testStore.currentPlate) {
   if (!dialog.isConnected.value) {
-    console.warn('[TestView] WebRTC 未连接，无法播报')
+    console.warn('[TestView] WebRTC 未连接，无法触发开场')
     return false
   }
-  
-  try {
-    const ttsQuery = buildTTSQuery(text)
-    console.log('[TestView] 发送 TTS 播报:', text)
-    dialog.sendTextMessage(ttsQuery)
-    
-    // 显示字幕
-    showSubtitles.value = true
-    currentSubtitle.value = text
-    subtitleSpeaker.value = 'assistant'
-    
+
+  refreshSystemPromptForPlate(plateIndex)
+  console.log(`[TestView] 触发 AI 按图版 ${plateIndex + 1} 系统提示词主动开场`)
+  return dialog.requestAssistantResponse()
+}
+
+function waitAndTriggerPlateOpening(plateIndex = testStore.currentPlate) {
+  if (triggerPlateOpening(plateIndex)) return
+
+  const checkConnection = setInterval(() => {
+    if (triggerPlateOpening(plateIndex)) {
+      clearInterval(checkConnection)
+    }
+  }, 500)
+
+  setTimeout(() => clearInterval(checkConnection), 10000)
+}
+
+function applyPlateVoiceDialogResult(recordingStartTime) {
+  if (dialog.isConnected.value && recordingStartTime !== null) {
+    isAudioReady.value = true
+    showManualReconnect.value = false
     return true
-  } catch (error) {
-    console.warn('[TestView] TTS 播报失败:', error)
-    return false
   }
+
+  isAudioReady.value = false
+  manualReconnectContext.value = 'plate'
+  showManualReconnect.value = true
+  return false
 }
 
 // 颜色映射
@@ -750,10 +755,10 @@ onMounted(async () => {
     console.log('[TestView] 测试阶段，启动 WebRTC 语音对话...')
     isAudioReady.value = false
     const recordingStartTime = await startVoiceDialog()
-    isAudioReady.value = true
+    const voiceReady = applyPlateVoiceDialogResult(recordingStartTime)
 
     // 录音启动后再开始追踪，使用录音开始时间作为基准时间
-    if (!tracker.isTracking.value) {
+    if (voiceReady && !tracker.isTracking.value) {
       console.log('[TestView] 录音已启动，开始追踪图版:', testStore.currentPlate)
       console.log('[TestView] - 使用录音开始时间戳:', recordingStartTime)
       tracker.startTracking(testStore.currentPlate, recordingStartTime)
@@ -767,29 +772,11 @@ onMounted(async () => {
       console.warn('[TestView] 刷新系统提示词失败:', err)
     }
     
-    // 播放开场白（仅第一次进入时）
-    if (!hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
+    // 第一张图开场：由 AI 按 SYSTEM_1_PROMPT 主动提问
+    if (voiceReady && !hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
       hasPlayedOpeningSpeech.value = true
-      // 延迟播放，等待 WebRTC 连接完成
-      setTimeout(async () => {
-        if (dialog.isConnected.value) {
-          const openingText = '这是第一张墨迹图片，你可以看到一些什么？'
-          console.log('[TestView] 播放开场白:', openingText)
-          await sendTTSBroadcast(openingText)
-        } else {
-          console.log('[TestView] WebRTC 未连接，等待连接后播放开场白')
-          // 监听连接状态
-          const checkConnection = setInterval(() => {
-            if (dialog.isConnected.value) {
-              clearInterval(checkConnection)
-              const openingText = '这是第一张墨迹图片，你可以看到一些什么？'
-              console.log('[TestView] WebRTC 已连接，播放开场白:', openingText)
-              sendTTSBroadcast(openingText)
-            }
-          }, 500)
-          // 10 秒后停止检查
-          setTimeout(() => clearInterval(checkConnection), 10000)
-        }
+      setTimeout(() => {
+        waitAndTriggerPlateOpening(testStore.currentPlate)
       }, 1500)
     }
   }
@@ -823,17 +810,23 @@ watch(() => testStore.phase, async (newPhase, oldPhase) => {
     if (!dialog.isConnected.value && !dialog.isConnecting.value) {
       console.log('[TestView] WebRTC 未连接，启动语音对话...')
       recordingStartTime = await startVoiceDialog()
-    } else {
+      applyPlateVoiceDialogResult(recordingStartTime)
+    } else if (dialog.isConnected.value) {
       console.log('[TestView] WebRTC 已连接，跳过重新连接')
+      isAudioReady.value = true
+      showManualReconnect.value = false
     }
 
-    // WebRTC/混合录音启动完成后再移除遮罩
-    isAudioReady.value = true
-
-    // 录音启动后再开始追踪，使用录音开始时间作为基准时间
-    if (!tracker.isTracking.value) {
+    if (isAudioReady.value && !tracker.isTracking.value) {
       console.log('[TestView] 录音已启动，开始追踪图版:', testStore.currentPlate)
       tracker.startTracking(testStore.currentPlate, recordingStartTime)
+    }
+
+    if (isAudioReady.value && !hasPlayedOpeningSpeech.value && testStore.currentPlate === 0) {
+      hasPlayedOpeningSpeech.value = true
+      setTimeout(() => {
+        waitAndTriggerPlateOpening(testStore.currentPlate)
+      }, 1500)
     }
   }
 })
@@ -1021,16 +1014,12 @@ async function handleNextPlate() {
       // 立即记录新图版的时间戳
       tracker.startTracking(testStore.currentPlate, recordingStartTime)
 
-      // 刷新去重标记（新连接后重置，确保新图版会刷新）
-      lastSystemPromptRefreshedPlate.value = testStore.currentPlate
-
-      // 播报当前图片的提示语音
+      // 触发 AI 按当前图版系统提示词主动开场
       try {
-        const promptText = '这张图你可以看到什么？'
-        console.log('[TestView] 切换图片，播报提示:', promptText)
-        await sendTTSBroadcast(promptText)
+        console.log('[TestView] 切换图片，触发 AI 主动开场，图版:', testStore.currentPlate + 1)
+        await triggerPlateOpening(testStore.currentPlate)
       } catch (err) {
-        console.warn('[TestView] 播报提示失败:', err)
+        console.warn('[TestView] 触发开场失败:', err)
       }
     }
   }
@@ -1279,7 +1268,17 @@ async function startVoiceDialog() {
     return recordingStartTime
   } catch (error) {
     console.error('语音对话启动失败:', error)
-    uiStore.showError('语音对话启动失败，请检查麦克风���限')
+    if (testStore.phase === 'test') {
+      manualReconnectContext.value = 'plate'
+      showManualReconnect.value = true
+      isAudioReady.value = false
+    } else if (testStore.phase === 'postTest') {
+      manualReconnectContext.value = 'postTest'
+      showManualReconnect.value = true
+      isAudioReady.value = false
+    } else {
+      uiStore.showError('语音对话启动失败，请检查麦克风权限')
+    }
     return null
   }
 }

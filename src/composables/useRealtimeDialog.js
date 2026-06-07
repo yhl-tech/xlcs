@@ -546,6 +546,20 @@ export function useRealtimeDialog () {
   }
 
   /**
+   * 触发 AI 主动回复（不发送用户消息，依赖 session instructions）
+   */
+  function requestAssistantResponse () {
+    if (!isConnected.value) {
+      console.warn('[Dialog] 未连接')
+      return false
+    }
+
+    return sendEvent({
+      type: 'response.create'
+    })
+  }
+
+  /**
    * 发送文本消息
    */
   function sendTextMessage (text, options = {}) {
@@ -1088,6 +1102,7 @@ export function useRealtimeDialog () {
     disconnect,
     sendEvent,
     sendTextMessage,
+    requestAssistantResponse,
     updateSession,
     setCallbacks,
     clearTranscripts,
