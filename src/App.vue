@@ -171,6 +171,10 @@ onMounted(async () => {
   console.log('塞拉 Vue 3 版本已启动')
   console.log('[App] onMounted - 当前路由:', route.path, route.name)
   console.log('[App] onMounted - 用户信息:', authStore.userInfo)
+
+  if (authStore.isLoggedIn) {
+    await authStore.syncBasicInfo()
+  }
   
   // 将 realtimeDialog 挂载到全局，方便其他组件访问
   window.$realtimeDialog = realtimeDialog

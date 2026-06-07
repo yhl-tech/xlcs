@@ -165,7 +165,7 @@
           <button 
             type="submit" 
             class="start-btn"
-         
+            :disabled="!isDeviceTestPassed"
             :class="{ 'btn-disabled': !isDeviceTestPassed }"
           >
             {{ isDeviceTestPassed ? '开始测试' : '请先完成设备检测' }}
@@ -300,6 +300,15 @@ const eduDropdownOpen = ref(false)
 // 学历选项
 const educationOptions = ['小学', '初中', '高中', '中专', '大专', '本科', '硕士', '博士']
 
+function applyBasicInfoToForm(basicInfo) {
+  if (!basicInfo) return
+  if (basicInfo.sex) form.sex = basicInfo.sex
+  if (basicInfo.age) form.age = basicInfo.age
+  if (basicInfo.education) form.education = basicInfo.education
+  if (basicInfo.occupation) form.occupation = basicInfo.occupation
+  if (basicInfo.mood) form.mood = basicInfo.mood
+}
+
 // 设备测试完成状态
 const isSpeakerTestPassed = ref(false)
 const isMicTestPassed = ref(false)
@@ -343,6 +352,11 @@ function handleClickOutside(event) {
 
 onMounted(async () => {
   console.log('[PrepView] 页面已加载')
+
+  if (authStore.isLoggedIn) {
+    await authStore.syncBasicInfo()
+    applyBasicInfoToForm(testStore.basicInfo)
+  }
 
   // 添加点击外部关闭下拉框的监听
   document.addEventListener('click', handleClickOutside)
@@ -680,6 +694,10 @@ async function handleMicTest() {
 
 // 开始测试
 async function handleStartTest() {
+  if (!isDeviceTestPassed.value) {
+    return
+  }
+
   if (!validateForm()) {
     return
   }

@@ -80,6 +80,9 @@ let delayNode = null // 延迟节点
 // 音频延迟配置（秒）
 const AUDIO_DELAY_SECONDS = 1.0
 
+// 数据通道建连超时（自动重连场景下与 TestView 单次重试策略配合）
+const DATA_CHANNEL_OPEN_TIMEOUT_MS = 20000
+
 // 混合录音相关
 const isMixedRecording = ref(false)
 let mixedStreamDestination = null
@@ -149,7 +152,10 @@ export function useRealtimeDialog () {
       // 1. 获取临时令牌
       console.log('[Dialog] 步骤 1/10: 获取临时令牌...')
       const session = await getEphemeralToken(systemPrompt, speaker)
-      const ephemeralKey = session.client_secret.value
+      const ephemeralKey = session.client_secret?.value ?? session.value
+      if (!ephemeralKey) {
+        throw new Error('获取临时令牌失败：响应中缺少 value')
+      }
       proxyConnectionId = session.connection_id || null
       if (proxyConnectionId) {
         console.log('[Dialog] ✓ 步骤 1/10: 已获取临时令牌，proxy connection_id:', proxyConnectionId)
@@ -287,7 +293,7 @@ export function useRealtimeDialog () {
         rejectDataChannel = reject
         const timeout = setTimeout(() => {
           reject(new Error('数据通道打开超时'))
-        }, 30000)
+        }, DATA_CHANNEL_OPEN_TIMEOUT_MS)
 
         dc.onopen = () => {
           clearTimeout(timeout)
@@ -312,7 +318,7 @@ export function useRealtimeDialog () {
 
       // 9. 发送 SDP 到 OpenAI（经后端代理）
       console.log('[Dialog] 步骤 9/10: 发送 SDP 到 OpenAI...')
-      const model = DIALOG_CONFIG.openai.model || 'gpt-4o-realtime-preview-2024-12-17'
+      const model = DIALOG_CONFIG.openai.model || 'gpt-realtime-1.5'
       const sdpHeaders = {
         'X-Ephemeral-Key': ephemeralKey,
         'Content-Type': 'application/sdp'
@@ -403,7 +409,7 @@ export function useRealtimeDialog () {
     }
 
     const session = await response.json()
-    console.log('[Dialog] 成功获取令牌，会话ID:', session.id)
+    console.log('[Dialog] 成功获取令牌，session id:', session.id || session.session?.id)
     return session
   }
 
@@ -452,6 +458,7 @@ export function useRealtimeDialog () {
         break
 
       case 'response.audio_transcript.done':
+      case 'response.output_audio_transcript.done':
         if (event.transcript) {
           const transcript = {
             speaker: 'assistant',
@@ -513,18 +520,23 @@ export function useRealtimeDialog () {
       return false
     }
 
-    const sessionConfig = {}
+    const sessionConfig = {
+      type: 'realtime'
+    }
 
     if (options.systemPrompt !== undefined) {
       sessionConfig.instructions = options.systemPrompt
     }
 
+    const audioConfig = {}
     if (options.speaker !== undefined) {
-      sessionConfig.voice = options.speaker
+      audioConfig.output = { voice: options.speaker }
     }
-
     if (options.turnDetection !== undefined) {
-      sessionConfig.turn_detection = options.turnDetection
+      audioConfig.input = { turn_detection: options.turnDetection }
+    }
+    if (Object.keys(audioConfig).length > 0) {
+      sessionConfig.audio = audioConfig
     }
 
     return sendEvent({

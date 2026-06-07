@@ -4,6 +4,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { normalizeBasicInfoResponse } from '@/utils/basicInfo'
 
 export const useAuthStore = defineStore('auth', () => {
   // ==================== 状态 ====================
@@ -43,6 +44,32 @@ export const useAuthStore = defineStore('auth', () => {
   }
   
   /**
+   * 从后端拉取用户基本信息并写入 testStore
+   */
+  async function syncBasicInfo() {
+    const userId = userInfo.value?.username || userInfo.value?.phone
+    if (!userId) return null
+
+    const { useApi } = await import('@/composables/useApi')
+    const { useTestStore } = await import('@/stores/testStore')
+    const api = useApi()
+    const testStore = useTestStore()
+
+    try {
+      const response = await api.getBasicInfo(userId)
+      const basicInfo = normalizeBasicInfoResponse(response)
+      if (basicInfo) {
+        testStore.setBasicInfo(basicInfo)
+        console.log('[Auth] 用户基本信息已同步:', basicInfo)
+      }
+      return basicInfo
+    } catch (error) {
+      console.warn('[Auth] 获取用户基本信息失败:', error)
+      return null
+    }
+  }
+
+  /**
    * 设置用户信息
    */
   function setUserInfo(info) {
@@ -71,6 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (result.code === 0 && result.data?.access_token) {
         setToken(result.data.access_token)
         setUserInfo({ phone, username: phone })
+        await syncBasicInfo()
         return { success: true, data: result }
       } else {
         throw new Error(result.exception || result.msg || '登录失败')
@@ -99,6 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (result.code === 0 && result.data?.access_token) {
         setToken(result.data.access_token)
         setUserInfo({ username })
+        await syncBasicInfo()
         return { success: true, data: result }
       } else {
         throw new Error(result.exception || result.msg || '登录失败')
@@ -146,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     loginWithUsername,
     logout,
-    checkTokenValidity
+    checkTokenValidity,
+    syncBasicInfo
   }
 })

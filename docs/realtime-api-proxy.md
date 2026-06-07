@@ -144,7 +144,7 @@ iceTransportPolicy: 'relay'   // 强制 TURN 中继，不走直连
 1. 停止当前图版录音并上传
 2. 切换 `testStore.currentPlate`
 3. 显示**连接中遮罩**（`isAudioReady = false`）
-4. `reconnectAndStartRecording()`（最多重试 3 次，退避 3/6/9 秒）
+4. `reconnectAndStartRecording()`（自动重连 1 次，数据通道超时 20s；失败则显示手动重连按钮）
 5. 连接成功 → 移除遮罩（`isAudioReady = true`）
 6. 播报提示语「这张图你可以看到些什么？」
 

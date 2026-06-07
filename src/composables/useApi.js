@@ -226,9 +226,10 @@ export function useApi() {
 
   // ==================== 测试相关 ====================
 
-  const getBasicInfo = async (userId = null) => {
-    const params = userId ? { user_id: userId } : {}
-    const response = await client.get('/rorschach/basic_info', { params })
+  const getBasicInfo = async (userId) => {
+    const response = await client.post('/rorschach/user/get_basic_info', {
+      user_id: userId
+    })
     return response
   }
 
@@ -611,6 +612,20 @@ export function useApi() {
     return response
   }
 
+  const getReportMajorRecommendation = async (userId) => {
+    const response = await client.post('/rorschach/user/get_report_major_recommendation',
+      { user_id: userId },
+      {
+        responseType: 'blob',
+        timeout: 300000,
+        headers: {
+          'Accept': 'text/html'
+        }
+      }
+    )
+    return response
+  }
+
   // ==================== 返回 ====================
 
   return {
@@ -641,7 +656,8 @@ export function useApi() {
     downloadReport,
     getReportData,
     checkUploadFilesStatus,
-    getPublicityReport
+    getPublicityReport,
+    getReportMajorRecommendation
   }
 }
 

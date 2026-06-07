@@ -247,9 +247,12 @@ const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 const isPlateSwitching = ref(false)
 const isAudioReady = ref(false) // 默认显示遮罩，WebRTC 连接就绪后再置 true
 const postTestFormKey = ref(0) // 用于在后测录音失败重试时强制重建 PostTestForm
-const showManualReconnect = ref(false) // 自动重连全部失败后显示手动按钮
+const showManualReconnect = ref(false) // 自动重连失败后显示手动按钮
 const manualReconnectContext = ref('') // 'plate' | 'postTest'
 const isManualReconnecting = ref(false) // 手动重连中
+
+// WebRTC 自动重连：仅尝试 1 次；connect 内数据通道超时 20s（见 useRealtimeDialog）
+const WEBRTC_DISCONNECT_SETTLE_MS = 5000
 
 // 自定义二次确认弹窗（替代 window.confirm，统一视觉与多行文案）
 const confirmDialog = ref({
@@ -522,50 +525,38 @@ async function stopAndUploadCurrentPlateAudio(plateIndex) {
  * @returns {number|null} 新录音开始时间戳
  */
 async function reconnectAndStartRecording(preferredDeviceId = null) {
-  const MAX_RETRIES = 3
   showManualReconnect.value = false
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // 断开旧连接（录音已在 stopAndUploadCurrentPlateAudio 里停了，这里清空数据）
-      if (dialog.isConnected.value) {
-        console.log(`[TestView] 断开旧 WebRTC 连接... (attempt ${attempt}/${MAX_RETRIES})`)
-        await dialog.disconnect(true)
-      }
-
-      // 让上一次连接的资源释放有足够时间，降低”紧跟着重连导致 datachannel 建连慢/失败”的概率（TURN relay 下更常见）
-      await new Promise(resolve => setTimeout(resolve, 5000))
-
-      // 重新连接（使用新图版对应的提示词）
-      console.log('[TestView] 重新建立 WebRTC 连接（新会话）...')
-      await dialog.connect(getSystemPromptForPlate(testStore.currentPlate), 'alloy', {
-        preferredDeviceId
-      })
-
-      dialog.setCallbacks({
-        onTranscript: (transcript) => {
-          subtitle.show(transcript.text, transcript.speaker)
-        }
-      })
-
-      // 开始新录音
-      const recordingStartTime = Date.now()
-      await dialog.startMixedRecording()
-      console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
-      showManualReconnect.value = false
-      return recordingStartTime
-    } catch (err) {
-      console.error(`[TestView] 重新连接 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
-      if (attempt < MAX_RETRIES) {
-        // 简单退避：给 ICE/TURN 一点时间恢复
-        await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
-      }
+  try {
+    if (dialog.isConnected.value) {
+      console.log('[TestView] 断开旧 WebRTC 连接...')
+      await dialog.disconnect(true)
     }
-  }
 
-  // 全部重试失败，显示手动重连按钮
-  manualReconnectContext.value = 'plate'
-  showManualReconnect.value = true
-  return null
+    // 让上一次连接的资源释放有足够时间，降低紧跟着重连导致 datachannel 建连慢/失败的概率
+    await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
+
+    console.log('[TestView] 重新建立 WebRTC 连接（新会话，超时 20s）...')
+    await dialog.connect(getSystemPromptForPlate(testStore.currentPlate), 'alloy', {
+      preferredDeviceId
+    })
+
+    dialog.setCallbacks({
+      onTranscript: (transcript) => {
+        subtitle.show(transcript.text, transcript.speaker)
+      }
+    })
+
+    const recordingStartTime = Date.now()
+    await dialog.startMixedRecording()
+    console.log('[TestView] ✓ 新录音已开始，时间戳:', recordingStartTime)
+    showManualReconnect.value = false
+    return recordingStartTime
+  } catch (err) {
+    console.error('[TestView] 重新连接 WebRTC 失败:', err)
+    manualReconnectContext.value = 'plate'
+    showManualReconnect.value = true
+    return null
+  }
 }
 
 /**
@@ -579,7 +570,7 @@ async function handleManualReconnect() {
   try {
     if (manualReconnectContext.value === 'postTest') {
       if (dialog.isConnected.value) await dialog.disconnect(true)
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
       await dialog.connect(POSTTEST_PROMPT, 'alloy', {
         preferredDeviceId: selectedMicDeviceId.value || null
       })
@@ -976,39 +967,29 @@ async function handleNextPlate() {
     showSubtitles.value = false
     currentSubtitle.value = ''
     showManualReconnect.value = false
-    // 使用与主测试相同的重连策略，提高频繁断开/重连时的成功率
-    const MAX_RETRIES = 3
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        // attempt=1 时上面已经断开过，attempt>1 是连接失败重试时再断开
-        if (dialog.isConnected.value) {
-          console.log(`[TestView] 后测阶段断开旧 WebRTC 连接... (attempt ${attempt}/${MAX_RETRIES})`)
-          await dialog.disconnect(true)
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 5000))
-
-        await dialog.connect(POSTTEST_PROMPT, 'alloy')
-        dialog.setCallbacks({
-          onTranscript: (transcript) => {
-            subtitle.show(transcript.text, transcript.speaker)
-          }
-        })
-        await dialog.startMixedRecording()
-        console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
-        isAudioReady.value = true
-        showManualReconnect.value = false
-        break
-      } catch (err) {
-        console.error(`[TestView] 后测阶段重连 WebRTC 失败 (attempt ${attempt}/${MAX_RETRIES}):`, err)
-        if (attempt < MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
-        } else {
-          // 全部重试失败，显示手动重连按钮（不解除遮罩，让用户主动重连）
-          manualReconnectContext.value = 'postTest'
-          showManualReconnect.value = true
-        }
+    try {
+      if (dialog.isConnected.value) {
+        console.log('[TestView] 后测阶段断开旧 WebRTC 连接...')
+        await dialog.disconnect(true)
       }
+
+      await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
+
+      console.log('[TestView] 后测阶段重新建立 WebRTC 连接（超时 20s）...')
+      await dialog.connect(POSTTEST_PROMPT, 'alloy')
+      dialog.setCallbacks({
+        onTranscript: (transcript) => {
+          subtitle.show(transcript.text, transcript.speaker)
+        }
+      })
+      await dialog.startMixedRecording()
+      console.log('[TestView] 后测阶段 WebRTC 已重新连接并开始录音')
+      isAudioReady.value = true
+      showManualReconnect.value = false
+    } catch (err) {
+      console.error('[TestView] 后测阶段重连 WebRTC 失败:', err)
+      manualReconnectContext.value = 'postTest'
+      showManualReconnect.value = true
     }
   } else {
     const completedPlate = testStore.currentPlate
@@ -1128,39 +1109,32 @@ async function retryPostTestRecording(preferredDeviceId = null) {
   currentSubtitle.value = ''
   uiStore.loadingMessage = '正在重新连接后测语音...'
 
-  const MAX_RETRIES = 5
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      if (dialog.isConnected.value) {
-        console.log(`[TestView] retry: 断开旧 WebRTC 连接 (${attempt}/${MAX_RETRIES})`)
-        await dialog.disconnect(true)
-      }
-      await new Promise(resolve => setTimeout(resolve, 3000))
-
-      await dialog.connect(POSTTEST_PROMPT, 'alloy', {
-        preferredDeviceId
-      })
-      dialog.setCallbacks({
-        onTranscript: (transcript) => {
-          subtitle.show(transcript.text, transcript.speaker)
-        }
-      })
-      await dialog.startMixedRecording()
-      console.log('[TestView] ✓ 后测语音已重新连接并开始录音')
-      isAudioReady.value = true
-      uiStore.loadingMessage = ''
-      return true
-    } catch (err) {
-      console.error(`[TestView] retry 重连后测语音失败 (${attempt}/${MAX_RETRIES}):`, err)
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, 3000 * attempt))
-      }
+  try {
+    if (dialog.isConnected.value) {
+      console.log('[TestView] retry: 断开旧 WebRTC 连接')
+      await dialog.disconnect(true)
     }
-  }
+    await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
 
-  isAudioReady.value = true
-  uiStore.loadingMessage = ''
-  return false
+    await dialog.connect(POSTTEST_PROMPT, 'alloy', {
+      preferredDeviceId
+    })
+    dialog.setCallbacks({
+      onTranscript: (transcript) => {
+        subtitle.show(transcript.text, transcript.speaker)
+      }
+    })
+    await dialog.startMixedRecording()
+    console.log('[TestView] ✓ 后测语音已重新连接并开始录音')
+    isAudioReady.value = true
+    uiStore.loadingMessage = ''
+    return true
+  } catch (err) {
+    console.error('[TestView] retry 重连后测语音失败:', err)
+    isAudioReady.value = true
+    uiStore.loadingMessage = ''
+    return false
+  }
 }
 
 // 后测问卷提交：录音成功才进 uploading；失败时弹窗让用户选择重试或主动跳过

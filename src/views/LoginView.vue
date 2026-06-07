@@ -470,6 +470,7 @@ async function handleRegister() {
       if (response.data?.access_token) {
         authStore.setToken(response.data.access_token)
         authStore.setUserInfo({ username })
+        await authStore.syncBasicInfo()
         
         setTimeout(() => {
           router.push('/test')

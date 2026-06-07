@@ -10,10 +10,15 @@ OpenAI Realtime Token 代理服务
 """
 
 import os
+import json
+import traceback
+
 import httpx
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict
+
+from loguru import logger
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
@@ -24,7 +29,13 @@ load_dotenv()
 
 app = FastAPI(title="Realtime Token Proxy")
 
+# CURRENT_REALTIME_MODEL = "gpt-4o-realtime-preview-2024-12-17"  # deprecated
+CURRENT_REALTIME_MODEL = os.getenv("REALTIME_MODEL", "gpt-realtime-1.5")
+REALTIME_VOICE = os.getenv("REALTIME_VOICE", "alloy")
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+_raw_timeout = os.getenv("LINK_TIMEOUT", "30")
+LINK_TIMEOUT = int(_raw_timeout) if _raw_timeout and _raw_timeout.isdigit() else 30
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 HTTP_PROXY = os.getenv("HTTP_PROXY", "")
 
@@ -78,14 +89,14 @@ def get_client_ip(request: Request) -> str:
 
 # 后台任务：清理超时连接
 async def cleanup_expired_connections():
-    """定期清理超过2小时的连接"""
+    """定期清理超过1小时的连接"""
     while True:
         try:
             current_time = datetime.now()
             expired_connections = []
 
             for conn_id, conn_info in active_connections.items():
-                if current_time - conn_info.created_at > timedelta(hours=2):
+                if current_time - conn_info.created_at > timedelta(hours=1):
                     expired_connections.append(conn_id)
 
             for conn_id in expired_connections:
@@ -110,79 +121,130 @@ async def startup_event():
 
 @app.post("/realtime/token")
 async def get_realtime_token(request: Request):
+
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="未配置 OPENAI_API_KEY")
 
-    async with httpx.AsyncClient(timeout=30, proxy=HTTP_PROXY or None) as client:
-        response = await client.post(
-            "https://api.openai.com/v1/realtime/sessions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "gpt-4o-realtime-preview-2024-12-17",
-            },
-        )
+    try:
+        # pdb.set_trace()
+        async with httpx.AsyncClient(timeout=LINK_TIMEOUT, proxy=HTTP_PROXY or None) as client:
+            response = await client.post(
+                # "https://api.openai.com/v1/realtime/sessions",
+                "https://api.openai.com/v1/realtime/client_secrets",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "expires_after": {
+                      "anchor": "created_at",
+                      "seconds": 600  # 1800
+                    },
+                    "session": {
+                      "type": "realtime",
+                      "model": CURRENT_REALTIME_MODEL,
+                      "instructions": "You are a friendly assistant.",
+                      "audio": {
+                          "output": {"voice": REALTIME_VOICE},
+                          "input": {
+                              "turn_detection": {
+                                  "type": "server_vad",
+                                  "threshold": 0.6,
+                                  "prefix_padding_ms": 500,
+                                  "silence_duration_ms": 1500,
+                              }
+                          },
+                      },
+                    }
+                  },
+            )
+    except:
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
     if response.status_code != 200:
+        logger.error(f"openai response: {response}")
         raise HTTPException(status_code=response.status_code, detail=response.text)
 
-    # 获取响应数据并记录连接
-    token_data = response.json()
+    try:
+        # 获取响应数据并记录连接
+        token_data = response.json()
 
-    # connection_id 仅用于本代理登记/前端 X-Connection-Id，须短且非密钥
-    client_ip = get_client_ip(request)
-    connection_id = f"{client_ip}_{datetime.now().timestamp()}"
+        # connection_id 仅用于本代理登记/前端 X-Connection-Id，须短且非密钥
+        client_ip = get_client_ip(request)
+        connection_id = f"{client_ip}_{datetime.now().timestamp()}"
 
-    # 记录新连接
-    active_connections[connection_id] = ConnectionInfo(connection_id, client_ip)
-    print(f"[TOKEN] 新建连接: {connection_id}, 来自IP: {client_ip}")
+        # 记录新连接
+        active_connections[connection_id] = ConnectionInfo(connection_id, client_ip)
+        logger.info(f"[TOKEN] 新建连接: {connection_id}, 来自IP: {client_ip}")
 
-    # 在返回数据中添加连接ID，方便客户端后续操作
-    token_data["connection_id"] = connection_id
-
-    return token_data
+        # 在返回数据中添加连接ID，方便客户端后续操作
+        token_data["connection_id"] = connection_id
+        if token_data.get("value") and not token_data.get("client_secret"):
+            token_data["client_secret"] = {"value": token_data["value"]}
+        logger.info(f"token_data keys: {list(token_data.keys())}")
+        return token_data
+    except:
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 
 @app.post("/realtime/sdp")
 async def proxy_sdp(request: Request):
-    ephemeral_key = request.headers.get("X-Ephemeral-Key")
-    connection_id = request.headers.get("X-Connection-Id")  # 客户端需要传递连接ID
-    model = request.query_params.get("model", "gpt-4o-realtime-preview-2024-12-17")
+    ephemeral_key = request.headers.get("X-Ephemeral-Key", None)
+    connection_id = request.headers.get("X-Connection-Id", None)  # 客户端需要传递连接ID
+    model = request.query_params.get(
+        "model", CURRENT_REALTIME_MODEL)
     sdp_body = await request.body()
 
-    if not ephemeral_key:
-        raise HTTPException(status_code=400, detail="缺少 X-Ephemeral-Key")
+    if ephemeral_key is None:
+        raise HTTPException(status_code=422, detail="缺少 X-Ephemeral-Key")
 
-    # 更新连接活动时间
+    # connection_id 仅用于本代理统计，OpenAI 不依赖
     if connection_id and connection_id in active_connections:
         active_connections[connection_id].last_activity = datetime.now()
 
-    print(f"[SDP] 转发 SDP 到 OpenAI, model={model}, body_size={len(sdp_body)}")
+    # 以 token 创建时的模型为准，避免 ?model= 与 client_secrets 不一致导致 400
+    effective_model = CURRENT_REALTIME_MODEL
+    if model and model != effective_model:
+        logger.warning(
+            f"[SDP] 忽略 query model={model}，使用 token 模型 {effective_model}"
+        )
+
+    logger.info(
+        f"[SDP] 转发 SDP 到 OpenAI GA /realtime/calls, "
+        f"model={effective_model}, body_size={len(sdp_body)}"
+    )
+
+    sdp_text = sdp_body.decode("utf-8") if isinstance(sdp_body, bytes) else sdp_body
+    session_payload = json.dumps({
+        "type": "realtime",
+        "model": effective_model,
+    })
 
     try:
-        async with httpx.AsyncClient(timeout=30, proxy=HTTP_PROXY or None) as client:
+        async with httpx.AsyncClient(timeout=LINK_TIMEOUT, proxy=HTTP_PROXY or None) as client:
             response = await client.post(
-                f"https://api.openai.com/v1/realtime?model={model}",
+                "https://api.openai.com/v1/realtime/calls",
                 headers={
                     "Authorization": f"Bearer {ephemeral_key}",
-                    "Content-Type": "application/sdp",
                 },
-                content=sdp_body,
+                files={
+                    "sdp": (None, sdp_text, "application/sdp"),
+                    "session": (None, session_payload, "application/json"),
+                },
             )
 
-        print(f"[SDP] OpenAI 响应状态: {response.status_code}")
-        print(f"[SDP] OpenAI 响应内容: {response.text[:200]}")
-
-        if response.status_code not in (200, 201):
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-
-        return PlainTextResponse(content=response.text, status_code=200)
-
+        logger.info(f"[SDP] OpenAI 响应状态: {response.status_code}")
+        logger.info(f"[SDP] OpenAI 响应内容: {response.text[:200]}")
     except httpx.RequestError as e:
-        print(f"[SDP] 请求异常: {e}")
+        logger.info(f"[SDP] 请求异常: {traceback.format_exc()}")
         raise HTTPException(status_code=502, detail=f"请求 OpenAI 失败: {str(e)}")
+
+    if response.status_code not in (200, 201):
+        logger.error(f"proxy: {response}")
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    return PlainTextResponse(content=response.text, status_code=200)
+
 
 
 @app.get("/realtime/status")
@@ -193,7 +255,7 @@ async def get_realtime_status():
     if connection_count == 0:
         return {
             "status": "idle",
-            "message": "当前没有人使用gpt-4o服务",
+            "message": "当前没有人使用 AI 语音服务",
             "active_connections": 0,
             "connections": []
         }
@@ -211,7 +273,7 @@ async def get_realtime_status():
 
         return {
             "status": "active",
-            "message": f"当前正在{connection_count}人使用gpt-4o服务",
+            "message": f"当前 {connection_count} 人正在使用 AI 语音服务",
             "active_connections": connection_count,
             "connections": connections_detail
         }
@@ -229,7 +291,7 @@ async def close_connection(close_request: CloseConnectionRequest):
     conn_info = active_connections.pop(connection_id)
     duration = datetime.now() - conn_info.created_at
 
-    print(f"[CLOSE] 手动关闭连接: {connection_id}, 持续时间: {duration}")
+    logger.info(f"[CLOSE] 手动关闭连接: {connection_id}, 持续时间: {duration}")
 
     return {
         "status": "success",

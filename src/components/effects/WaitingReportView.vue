@@ -4,7 +4,7 @@
       <!-- 左侧：核心进度看板 -->
       <div class="rf-left-panel">
         <!-- 报告下载区域 - 报告就绪时显示在顶部 -->
-        <div v-if="isCompleted" class="rf-download-section">
+        <div  class="rf-download-section">
           <div class="rf-download-header">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -46,6 +46,32 @@
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
               报告解读版
+            </button>
+            <button
+              class="rf-download-btn rf-download-btn-secondary"
+              :class="{ 'is-loading': isDownloadingMajorReport }"
+              :disabled="isDownloadingMajorReport"
+              @click="handleDownloadMajorRecommendation"
+            >
+              <span
+                v-if="isDownloadingMajorReport"
+                class="rf-download-spinner"
+                aria-hidden="true"
+              />
+              <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                <path d="M6 12v5c0 1.7 3.3 3 7 3s7-1.3 7-3v-5"/>
+              </svg>
+              {{ isDownloadingMajorReport ? '下载中…' : '大学专业推荐报告' }}
             </button>
           </div>
         </div>
@@ -331,6 +357,7 @@ import {
   openPublicityInNewWindow,
   stashPublicityHtmlForInApp
 } from '@/utils/publicityReport'
+import { normalizeBasicInfoResponse, parseAgeFromBasicInfo } from '@/utils/basicInfo'
 
 const props = defineProps({
   sessionId: {
@@ -359,6 +386,8 @@ const isCompleted = ref(false)
 const reportNewPdf = ref(false)
 const reportHtml = ref(false)
 const isDownloadingReport = ref(false)
+const showMajorRecommendation = ref(false)
+const isDownloadingMajorReport = ref(false)
 const dots = ref('...')
 
 // 定时器
@@ -452,6 +481,35 @@ function getUserId() {
   return authStore.userInfo?.username || authStore.userInfo?.phone || props.sessionId
 }
 
+function parseAgeFromStoredBasicInfo() {
+  return parseAgeFromBasicInfo(testStore.basicInfo)
+}
+
+async function loadMajorRecommendationEligibility() {
+  const cachedAge = parseAgeFromStoredBasicInfo()
+  if (cachedAge !== null) {
+    showMajorRecommendation.value = cachedAge < 20
+    return
+  }
+
+  const userId = getUserId()
+  if (!userId) return
+
+  try {
+    const response = await api.getBasicInfo(userId)
+    const basicInfo = normalizeBasicInfoResponse(response)
+    if (basicInfo) {
+      testStore.setBasicInfo(basicInfo)
+    }
+    const age = parseAgeFromBasicInfo(basicInfo ?? response?.data ?? response)
+    showMajorRecommendation.value = age !== null && age < 20
+    console.log('[WaitingReport] 专业推荐报告可见性:', showMajorRecommendation.value, 'age:', age)
+  } catch (error) {
+    console.warn('[WaitingReport] 获取基本信息失败:', error)
+    showMajorRecommendation.value = false
+  }
+}
+
 // 检查报告状态
 async function checkReportStatus() {
   try {
@@ -465,6 +523,7 @@ async function checkReportStatus() {
     if (testStore.reportStatus?.isReady) {
       isCompleted.value = true
       currentStepIndex.value = steps.length - 1
+      await loadMajorRecommendationEligibility()
       if (checkTimer) {
         clearInterval(checkTimer)
       }
@@ -489,6 +548,7 @@ async function checkReportStatus() {
         isReady: true,
         message: response.msg || '报告已生成'
       })
+      await loadMajorRecommendationEligibility()
       if (checkTimer) {
         clearInterval(checkTimer)
       }
@@ -551,6 +611,54 @@ async function handleDownloadReport() {
   }
 }
 
+async function handleDownloadMajorRecommendation() {
+  if (isDownloadingMajorReport.value) return
+
+  const userId = getUserId()
+  if (!userId) {
+    alert('用户信息不存在，请重新登录')
+    return
+  }
+
+  isDownloadingMajorReport.value = true
+  try {
+    console.log('[WaitingReport] 开始下载大学专业推荐报告:', userId)
+    const response = await api.getReportMajorRecommendation(userId)
+    const blob = response.data || response
+
+    if (!(blob instanceof Blob)) {
+      console.error('[WaitingReport] 专业推荐报告返回的不是 Blob:', typeof blob)
+      alert('服务器返回的数据格式不正确，请稍后重试')
+      return
+    }
+
+    if (blob.size < 100) {
+      alert('专业推荐报告文件异常，请稍后重试')
+      return
+    }
+
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.style.display = 'none'
+    a.href = url
+    a.download = `major-recommendation-${userId}.html`
+    document.body.appendChild(a)
+    a.click()
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    }, 100)
+
+    console.log('[WaitingReport] 大学专业推荐报告下载完成')
+  } catch (error) {
+    console.error('[WaitingReport] 下载大学专业推荐报告失败:', error)
+    alert(error.message || '下载失败，请稍后重试')
+  } finally {
+    isDownloadingMajorReport.value = false
+  }
+}
+
 // 打开报告解读版
 async function handleOpenPublicityReport() {
   try {
@@ -605,6 +713,7 @@ onMounted(() => {
   if (testStore.reportStatus?.isReady) {
     isCompleted.value = true
     currentStepIndex.value = steps.length - 1
+    loadMajorRecommendationEligibility()
   } else {
     // 定期检查报告状态
     checkReportStatus()
@@ -780,9 +889,23 @@ onUnmounted(() => {
   color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.3);
   
-  &:hover {
+  &:hover:not(:disabled) {
     background: rgba(59, 130, 246, 0.15);
     border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  &.is-loading {
+    cursor: wait;
+  }
+
+  .rf-download-spinner {
+    border-color: rgba(37, 99, 235, 0.25);
+    border-top-color: #2563eb;
   }
 }
 
