@@ -105,7 +105,7 @@
           </button>
         </template>
       </div>
-      <PostTestForm :key="postTestFormKey" @submit="handlePostTestSubmit" />
+      <PostTestForm @submit="handlePostTestSubmit" />
     </div>
 
     <!-- 上传文件阶段 -->
@@ -120,76 +120,6 @@
     <div v-else-if="testStore.phase === 'waiting'" class="waiting-screen">
       <WaitingReportView :session-id="testStore.sessionId" />
     </div>
-
-    <!-- 自定义二次确认弹窗（替代 window.confirm） -->
-    <BaseModal
-      :model-value="confirmDialog.visible"
-      :title="confirmDialog.title"
-      :closable="false"
-      :close-on-overlay="false"
-      :show-footer="false"
-      size="medium"
-    >
-      <div class="confirm-dialog">
-        <div class="confirm-dialog__icon" :class="`confirm-dialog__icon--${confirmDialog.type}`">
-          <svg v-if="confirmDialog.type === 'danger'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <svg v-else-if="confirmDialog.type === 'warning'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-        </div>
-        <p class="confirm-dialog__message">{{ confirmDialog.message }}</p>
-        <div v-if="confirmDialog.showMicTest" class="confirm-dialog__mic-test">
-          <div class="confirm-dialog__device-picker">
-            <label class="confirm-dialog__device-label">当前输入设备</label>
-            <select v-model="selectedMicDeviceId" class="confirm-dialog__device-select">
-              <option v-for="device in availableMicDevices" :key="device.id" :value="device.id">
-                {{ device.label }}{{ device.isVirtual ? ' (疑似虚拟设备)' : '' }}
-              </option>
-            </select>
-            <p class="confirm-dialog__device-hint">
-              如未找到真实麦克风，请点击浏览器右上角地址栏麦克风图标切换输入设备。
-            </p>
-          </div>
-          <BaseButton
-            variant="outline"
-            size="small"
-            :loading="isMicTesting"
-            @click="runMicrophoneTest"
-          >
-            {{ isMicTesting ? '检测中…' : '麦克风测试' }}
-          </BaseButton>
-          <p v-if="micTestResult" class="confirm-dialog__mic-test-result">
-            {{ micTestResult }}
-          </p>
-        </div>
-        <div
-          class="confirm-dialog__actions"
-          :class="{ 'confirm-dialog__actions--single': !confirmDialog.showCancel }"
-        >
-          <BaseButton
-            v-if="confirmDialog.showCancel"
-            variant="secondary"
-            @click="handleConfirmDialogNo"
-          >
-            {{ confirmDialog.cancelText }}
-          </BaseButton>
-          <BaseButton :variant="confirmDialog.confirmVariant" @click="handleConfirmDialogYes">
-            {{ confirmDialog.confirmText }}
-          </BaseButton>
-        </div>
-      </div>
-    </BaseModal>
   </div>
 </template>
 
@@ -201,7 +131,6 @@ import { useSessionStore } from '@/stores/sessionStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import BaseButton from '@/components/common/BaseButton.vue'
-import BaseModal from '@/components/common/BaseModal.vue'
 import ImageCanvas from '@/components/test/ImageCanvas.vue'
 import ControlsBar from '@/components/test/ControlsBar.vue'
 import EnergyPillar from '@/components/test/EnergyPillar.vue'
@@ -246,229 +175,12 @@ const brushColor = ref('#ef4444') // 默认红色
 const hasPlayedOpeningSpeech = ref(false) // 是否已播放开场白
 const isPlateSwitching = ref(false)
 const isAudioReady = ref(false) // 默认显示遮罩，WebRTC 连接就绪后再置 true
-const postTestFormKey = ref(0) // 用于在后测录音失败重试时强制重建 PostTestForm
 const showManualReconnect = ref(false) // 自动重连失败后显示手动按钮
 const manualReconnectContext = ref('') // 'plate' | 'postTest'
 const isManualReconnecting = ref(false) // 手动重连中
 
 // WebRTC 自动重连：仅尝试 1 次；connect 内数据通道超时 20s（见 useRealtimeDialog）
 const WEBRTC_DISCONNECT_SETTLE_MS = 5000
-
-// 自定义二次确认弹窗（替代 window.confirm，统一视觉与多行文案）
-const confirmDialog = ref({
-  visible: false,
-  title: '',
-  message: '',
-  confirmText: '确定',
-  cancelText: '取消',
-  confirmVariant: 'primary', // primary | danger
-  type: 'warning', // info | warning | danger
-  showCancel: true, // 是否显示次按钮（false 时只有主按钮，强制用户点主按钮）
-  showMicTest: false, // 是否展示“麦克风测试”按钮
-  resolve: null
-})
-
-function showConfirm({
-  title = '请确认',
-  message = '',
-  confirmText = '确定',
-  cancelText = '取消',
-  confirmVariant = 'primary',
-  type = 'warning',
-  showCancel = true,
-  showMicTest = false
-} = {}) {
-  return new Promise((resolve) => {
-    confirmDialog.value = {
-      visible: true,
-      title,
-      message,
-      confirmText,
-      cancelText,
-      confirmVariant,
-      type,
-      showCancel,
-      showMicTest,
-      resolve
-    }
-    micTestResult.value = ''
-    isMicTesting.value = false
-    if (showMicTest) {
-      loadAvailableMicDevices().catch((err) => {
-        console.warn('[TestView] 加载麦克风列表失败:', err)
-      })
-    }
-  })
-}
-
-function handleConfirmDialogYes() {
-  const r = confirmDialog.value.resolve
-  confirmDialog.value.visible = false
-  confirmDialog.value.resolve = null
-  if (r) r(true)
-}
-
-function handleConfirmDialogNo() {
-  const r = confirmDialog.value.resolve
-  confirmDialog.value.visible = false
-  confirmDialog.value.resolve = null
-  if (r) r(false)
-}
-
-const isMicTesting = ref(false)
-const micTestResult = ref('')
-const isHandlingVirtualMicError = ref(false)
-const availableMicDevices = ref([])
-const selectedMicDeviceId = ref('')
-
-function isVirtualMicLabel(label = '') {
-  const normalized = String(label || '').toLowerCase()
-  const suspiciousKeywords = [
-    'virtual',
-    'oray',
-    'vb-audio',
-    'voicemeeter',
-    'blackhole',
-    'loopback',
-    'soundflower',
-    'stereo mix',
-    'cable',
-    'obs'
-  ]
-  return suspiciousKeywords.some(keyword => normalized.includes(keyword))
-}
-
-async function loadAvailableMicDevices() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    availableMicDevices.value = []
-    return
-  }
-  const devices = await navigator.mediaDevices.enumerateDevices()
-  const audioInputs = devices.filter(d => d.kind === 'audioinput')
-  availableMicDevices.value = audioInputs.map((d, index) => ({
-    id: d.deviceId,
-    label: d.label || `麦克风 ${index + 1}`,
-    isVirtual: isVirtualMicLabel(d.label)
-  }))
-  // 初始化选择：优先保留用户已有选择，其次选第一个非虚拟设备
-  const hasSelected = availableMicDevices.value.some(d => d.id === selectedMicDeviceId.value)
-  if (!hasSelected) {
-    const firstReal = availableMicDevices.value.find(d => !d.isVirtual)
-    selectedMicDeviceId.value = firstReal?.id || availableMicDevices.value[0]?.id || ''
-  }
-}
-
-async function runMicrophoneTest() {
-  if (isMicTesting.value) return
-  isMicTesting.value = true
-  micTestResult.value = ''
-  let stream = null
-
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      micTestResult.value = '当前浏览器不支持麦克风检测，请更换浏览器后重试。'
-      return
-    }
-
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    const audioInputs = devices.filter(d => d.kind === 'audioinput')
-    if (audioInputs.length === 0) {
-      micTestResult.value = '未检测到任何麦克风设备，请先连接麦克风。'
-      return
-    }
-
-    const audioConstraints = selectedMicDeviceId.value
-      ? { deviceId: { exact: selectedMicDeviceId.value } }
-      : true
-    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
-    const track = stream.getAudioTracks()[0]
-    if (!track) {
-      micTestResult.value = '检测失败：浏览器未返回可用音频轨道。'
-      return
-    }
-
-    const trackName = track.label || '未知麦克风'
-    if (isVirtualMicLabel(trackName)) {
-      micTestResult.value =
-        `检测失败：检测到虚拟麦克风「${trackName}」。\n` +
-        '请点击浏览器左上角地址栏的麦克风图标，切换为真实麦克风后重试。'
-      return
-    }
-    if (track.readyState !== 'live') {
-      micTestResult.value = `检测失败：麦克风轨道状态异常（${track.readyState}）。`
-      return
-    }
-    if (track.muted) {
-      micTestResult.value = `检测失败：${trackName} 当前被静音，请检查系统权限或硬件静音键。`
-      return
-    }
-
-    micTestResult.value = `检测通过：当前可访问麦克风「${trackName}」。`
-
-  } catch (error) {
-    const message = error?.message || ''
-    if (message.includes('Permission denied') || message.includes('NotAllowedError')) {
-      micTestResult.value = '检测失败：麦克风权限被拒绝，请在浏览器地址栏中开启麦克风权限。'
-    } else if (message.includes('NotFoundError')) {
-      micTestResult.value = '检测失败：未找到可用麦克风设备，请重新插入后重试。'
-    } else {
-      micTestResult.value = `检测失败：${message || '未知错误'}`
-    }
-  } finally {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop())
-    }
-    isMicTesting.value = false
-  }
-}
-
-async function handleDialogError(error) {
-  const message = String(error?.message || '')
-  if (!message.includes('虚拟麦克风')) return
-  if (isHandlingVirtualMicError.value) return
-  isHandlingVirtualMicError.value = true
-
-  try {
-    await showConfirm({
-      title: '检测到虚拟麦克风',
-      message:
-        `${message}\n\n` +
-        '当前设备可能无法采集真实人声，\n' +
-        '请切换为真实麦克风后再继续测试。',
-      confirmText: '重新连接',
-      confirmVariant: 'danger',
-      type: 'danger',
-      showCancel: false,
-      showMicTest: true
-    })
-
-    // 用户点击“重新连接”后，按当前阶段执行重连
-    isAudioReady.value = false
-    showManualReconnect.value = false
-
-    if (testStore.phase === 'postTest') {
-      const ok = await retryPostTestRecording(selectedMicDeviceId.value || null)
-      if (!ok) {
-        manualReconnectContext.value = 'postTest'
-        showManualReconnect.value = true
-      }
-    } else if (testStore.phase === 'test') {
-      const recordingStartTime = await reconnectAndStartRecording(selectedMicDeviceId.value || null)
-      if (recordingStartTime !== null) {
-        isAudioReady.value = true
-        tracker.startTracking(testStore.currentPlate, recordingStartTime)
-      } else {
-        manualReconnectContext.value = 'plate'
-        showManualReconnect.value = true
-      }
-    } else {
-      // 其他阶段不需要录音
-      isAudioReady.value = true
-    }
-  } finally {
-    isHandlingVirtualMicError.value = false
-  }
-}
 
 // 记录已刷新过 system prompt 的图版，避免重复刷新
 const lastSystemPromptRefreshedPlate = ref(-1)
@@ -568,9 +280,7 @@ async function handleManualReconnect() {
     if (manualReconnectContext.value === 'postTest') {
       if (dialog.isConnected.value) await dialog.disconnect(true)
       await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
-      await dialog.connect(POSTTEST_PROMPT, 'alloy', {
-        preferredDeviceId: selectedMicDeviceId.value || null
-      })
+      await dialog.connect(POSTTEST_PROMPT, 'alloy')
       dialog.setCallbacks({
         onTranscript: (transcript) => {
           subtitle.show(transcript.text, transcript.speaker)
@@ -580,7 +290,7 @@ async function handleManualReconnect() {
       console.log('[TestView] 手动重连后测阶段成功')
       isAudioReady.value = true
     } else {
-      const recordingStartTime = await reconnectAndStartRecording(selectedMicDeviceId.value || null)
+      const recordingStartTime = await reconnectAndStartRecording()
       if (recordingStartTime !== null) {
         isAudioReady.value = true
         tracker.startTracking(testStore.currentPlate, recordingStartTime)
@@ -684,11 +394,6 @@ watch(() => dialog.transcripts, (transcripts) => {
 
 onMounted(async () => {
   console.log('[TestView] 组件已挂载，当前阶段:', testStore.phase)
-
-  // 订阅 dialog 错误：命中“虚拟麦克风阻断”时弹窗提示用户去检查麦克风
-  dialog.setCallbacks({
-    onError: handleDialogError
-  })
 
   // 停止所有之前的音频播放（来自准备页面或说明页面）
   stopAllAudios()
@@ -1044,7 +749,6 @@ function handlePreviousPlate() {
 
 /**
  * 处理后测阶段录音：停止 → 转码 → 本地兜底保存 → 暂存到 store
- * 返回 true 表示拿到合法 mp3Blob 并已落地；false 表示任何一步失败
  */
 async function processPostTestAudio(userId) {
   try {
@@ -1088,45 +792,7 @@ async function processPostTestAudio(userId) {
   }
 }
 
-/**
- * 重新建立后测阶段的 WebRTC 连接并重新启动录音
- * 在 handlePostTestSubmit 检测到录音失败时调用
- */
-async function retryPostTestRecording(preferredDeviceId = null) {
-  isAudioReady.value = false
-  showSubtitles.value = false
-  currentSubtitle.value = ''
-  uiStore.loadingMessage = '正在重新连接后测语音...'
-
-  try {
-    if (dialog.isConnected.value) {
-      console.log('[TestView] retry: 断开旧 WebRTC 连接')
-      await dialog.disconnect(true)
-    }
-    await new Promise(resolve => setTimeout(resolve, WEBRTC_DISCONNECT_SETTLE_MS))
-
-    await dialog.connect(POSTTEST_PROMPT, 'alloy', {
-      preferredDeviceId
-    })
-    dialog.setCallbacks({
-      onTranscript: (transcript) => {
-        subtitle.show(transcript.text, transcript.speaker)
-      }
-    })
-    await dialog.startMixedRecording()
-    console.log('[TestView] ✓ 后测语音已重新连接并开始录音')
-    isAudioReady.value = true
-    uiStore.loadingMessage = ''
-    return true
-  } catch (err) {
-    console.error('[TestView] retry 重连后测语音失败:', err)
-    isAudioReady.value = true
-    uiStore.loadingMessage = ''
-    return false
-  }
-}
-
-// 后测问卷提交：录音成功才进 uploading；失败时弹窗让用户选择重试或主动跳过
+// 后测问卷提交：尽力保存录音后进入上传阶段
 async function handlePostTestSubmit(answers) {
   // 保存问卷答案
   Object.entries(answers).forEach(([key, value]) => {
@@ -1136,48 +802,13 @@ async function handlePostTestSubmit(answers) {
 
   const userId = authStore.userInfo?.username || authStore.userInfo?.phone || authStore.userId
 
-  const audioOk = await processPostTestAudio(userId)
-
-  // 录音必须成功才放行进 uploading；失败时强制用户重新录制（弹窗只有一个按钮）
-  if (!audioOk) {
-    // 第一次失败：提示重新录制
-    await showConfirm({
-      title: '五个问题录音失败，请检查麦克风连接，并重新测试',
-      message:
-        '检测到本次后测语音未成功录制或转码。\n\n' +
-        '本测试要求必须有完整的语音数据，\n' +
-        '将为您重新连接录音并重新回答 5 个问题。',
-      confirmText: '重新录制',
-      confirmVariant: 'primary',
-      type: 'warning',
-      showCancel: false,
-      showMicTest: true
-    })
-
-    // 重连录音，失败就一直提示「再试一次」直到成功
-    while (true) {
-      const reconnected = await retryPostTestRecording()
-      if (reconnected) {
-        break
-      }
-      await showConfirm({
-        title: '重新连接失败',
-        message:
-          '多次尝试重新连接录音均未成功。\n\n' +
-          '请检查网络后再次尝试，本测试无法在缺少语音的情况下完成。',
-        confirmText: '再试一次',
-        confirmVariant: 'danger',
-        type: 'danger',
-        showCancel: false
-      })
-    }
-
-    // 重连成功，强制重建 PostTestForm 让用户重答 5 个问题；保持 phase='postTest'
-    postTestFormKey.value++
-    return
+  try {
+    await processPostTestAudio(userId)
+  } catch (err) {
+    console.warn('[TestView] 后测录音处理失败，继续进入上传阶段:', err)
   }
 
-  // 关闭 WebRTC 连接（无论音频是否成功）
+  // 关闭 WebRTC 连接
   console.log('[TestView] 后测提交后，关闭 WebRTC 连接')
   try {
     if (dialog.isConnected.value) {
@@ -1732,140 +1363,6 @@ function handleDevSimulateConnectFail() {
   }
 }
 
-// 自定义二次确认弹窗
-.confirm-dialog {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 4px 8px 0;
-  text-align: center;
-
-  &__icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    svg {
-      width: 36px;
-      height: 36px;
-    }
-
-    &--warning {
-      background: rgba(254, 202, 87, 0.15);
-      color: #feca57;
-      box-shadow: 0 0 0 1px rgba(254, 202, 87, 0.3), 0 0 24px rgba(254, 202, 87, 0.25);
-      animation: confirmIconPulse 2s ease-in-out infinite;
-    }
-
-    &--danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-      box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35), 0 0 24px rgba(239, 68, 68, 0.3);
-      animation: confirmIconPulse 2s ease-in-out infinite;
-    }
-
-    &--info {
-      background: rgba(99, 102, 241, 0.15);
-      color: #818cf8;
-      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3), 0 0 24px rgba(99, 102, 241, 0.25);
-    }
-  }
-
-  &__message {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.88);
-    font-size: 15px;
-    line-height: 1.7;
-    white-space: pre-line; // 支持 \n 换行
-    letter-spacing: 0.4px;
-  }
-
-  &__actions {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    margin-top: 8px;
-    width: 100%;
-
-    :deep(.base-button) {
-      min-width: 140px;
-    }
-
-    &--single :deep(.base-button) {
-      min-width: 200px;
-    }
-  }
-
-  &__mic-test {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-top: -4px;
-
-    :deep(.base-button) {
-      min-width: 120px;
-    }
-  }
-
-  &__device-picker {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: flex-start;
-  }
-
-  &__device-label {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  &__device-select {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(139, 92, 246, 0.45);
-    background: rgba(12, 16, 40, 0.85);
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 13px;
-    outline: none;
-  }
-
-  &__device-select:focus {
-    border-color: rgba(167, 139, 250, 0.95);
-    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.25);
-  }
-
-  &__device-hint {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.65);
-    text-align: left;
-  }
-
-  &__mic-test-result {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 13px;
-    line-height: 1.5;
-    text-align: center;
-    white-space: pre-line;
-    max-width: 92%;
-  }
-}
-
-@keyframes confirmIconPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-
 @media (max-width: 768px) {
   .test-view {
     height: 100vh;
@@ -1918,15 +1415,6 @@ function handleDevSimulateConnectFail() {
   .test-screen :deep(.controls-bar) {
     flex-shrink: 0;
     z-index: 30;
-  }
-
-  .confirm-dialog__actions {
-    flex-direction: column-reverse;
-    width: 100%;
-
-    :deep(.base-button) {
-      width: 100%;
-    }
   }
 }
 

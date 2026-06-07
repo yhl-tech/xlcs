@@ -17,26 +17,6 @@ function getLamejs () {
   throw new Error('lamejs 库未正确加载，请确保 script 已加载')
 }
 
-/**
- * 检测是否为疑似虚拟麦克风设备名（关键词规则，属于高概率识别）
- */
-function isVirtualMicrophoneLabel (label = '') {
-  const normalized = String(label || '').toLowerCase()
-  const suspiciousKeywords = [
-    'virtual',
-    'oray',
-    'vb-audio',
-    'voicemeeter',
-    'blackhole',
-    'loopback',
-    'soundflower',
-    'stereo mix',
-    'cable',
-    'obs'
-  ]
-  return suspiciousKeywords.some(keyword => normalized.includes(keyword))
-}
-
 // 对话配置
 const DIALOG_CONFIG = {
   openai: OPENAI_CONFIG,
@@ -175,12 +155,6 @@ export function useRealtimeDialog () {
       mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints
       })
-      // 默认阻断策略：命中疑似虚拟麦克风则中断连接，交给 UI 弹窗引导用户检查设备
-      const micTrack = mediaStream.getAudioTracks?.()[0]
-      const micLabel = micTrack?.label || ''
-      if (isVirtualMicrophoneLabel(micLabel)) {
-        throw new Error(`检测到虚拟麦克风（${micLabel || 'unknown'}），请切换真实麦克风后重试`)
-      }
       console.log('[Dialog] ✓ 步骤 2/10: 麦克风已启用')
 
       // 3. 初始化音频上下文
