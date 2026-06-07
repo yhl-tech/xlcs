@@ -4,7 +4,7 @@
       <!-- 左侧：核心进度看板 -->
       <div class="rf-left-panel">
         <!-- 报告下载区域 - 报告就绪时显示在顶部 -->
-        <div  class="rf-download-section">
+        <div v-if="isCompleted" class="rf-download-section">
           <div class="rf-download-header">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -48,9 +48,10 @@
               报告解读版
             </button>
             <button
+              v-if="showMajorRecommendationButton"
               class="rf-download-btn rf-download-btn-secondary"
               :class="{ 'is-loading': isDownloadingMajorReport }"
-              :disabled="isDownloadingMajorReport"
+              :disabled="!reportMajorRecommendation || isDownloadingMajorReport"
               @click="handleDownloadMajorRecommendation"
             >
               <span
@@ -345,7 +346,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, h } from 'vue'
+import { ref, onMounted, onUnmounted, h, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import useApi from '@/composables/useApi'
 import { useAuthStore } from '@/stores/authStore'
@@ -358,6 +359,7 @@ import {
   stashPublicityHtmlForInApp
 } from '@/utils/publicityReport'
 import { normalizeBasicInfoResponse, parseAgeFromBasicInfo } from '@/utils/basicInfo'
+import { parseReportStatusFlags } from '@/utils/reportStatus'
 
 const props = defineProps({
   sessionId: {
@@ -385,10 +387,13 @@ const currentStepIndex = ref(2) // 默认在 AI 模型计算阶段
 const isCompleted = ref(false)
 const reportNewPdf = ref(false)
 const reportHtml = ref(false)
+const reportMajorRecommendation = ref(false)
+const isUnder20 = ref(false)
 const isDownloadingReport = ref(false)
-const showMajorRecommendation = ref(false)
 const isDownloadingMajorReport = ref(false)
 const dots = ref('...')
+
+const showMajorRecommendationButton = computed(() => isUnder20.value)
 
 // 定时器
 let dotTimer = null
@@ -485,28 +490,47 @@ function parseAgeFromStoredBasicInfo() {
   return parseAgeFromBasicInfo(testStore.basicInfo)
 }
 
-async function loadMajorRecommendationEligibility() {
-  const cachedAge = parseAgeFromStoredBasicInfo()
-  if (cachedAge !== null) {
-    showMajorRecommendation.value = cachedAge < 20
-    return
-  }
+async function syncUserAge() {
+  let age = parseAgeFromStoredBasicInfo()
 
   const userId = getUserId()
-  if (!userId) return
-
-  try {
-    const response = await api.getBasicInfo(userId)
-    const basicInfo = normalizeBasicInfoResponse(response)
-    if (basicInfo) {
-      testStore.setBasicInfo(basicInfo)
+  if (userId) {
+    try {
+      const response = await api.getBasicInfo(userId)
+      const basicInfo = normalizeBasicInfoResponse(response)
+      if (basicInfo) {
+        testStore.setBasicInfo(basicInfo)
+        age = parseAgeFromBasicInfo(basicInfo)
+      } else {
+        age = parseAgeFromBasicInfo(response?.data ?? response) ?? age
+      }
+    } catch (error) {
+      console.warn('[WaitingReport] 获取基本信息失败:', error)
     }
-    const age = parseAgeFromBasicInfo(basicInfo ?? response?.data ?? response)
-    showMajorRecommendation.value = age !== null && age < 20
-    console.log('[WaitingReport] 专业推荐报告可见性:', showMajorRecommendation.value, 'age:', age)
-  } catch (error) {
-    console.warn('[WaitingReport] 获取基本信息失败:', error)
-    showMajorRecommendation.value = false
+  }
+
+  isUnder20.value = age !== null && age < 20
+  console.log('[WaitingReport] 年龄判断:', { age, isUnder20: isUnder20.value })
+}
+
+function applyReportStatusResponse(response) {
+  const flags = parseReportStatusFlags(response)
+  reportNewPdf.value = flags.newPdf
+  reportHtml.value = flags.html
+  reportMajorRecommendation.value = flags.majorRecommendation
+
+  if (flags.isAnyReady) {
+    isCompleted.value = true
+    currentStepIndex.value = steps.length - 1
+    testStore.setReportStatus({
+      status: 'ready',
+      isReady: true,
+      message: response.msg || '报告已生成'
+    })
+    if (checkTimer) {
+      clearInterval(checkTimer)
+      checkTimer = null
+    }
   }
 }
 
@@ -518,41 +542,12 @@ async function checkReportStatus() {
       console.warn('[WaitingReport] 无用户ID')
       return
     }
-    
-    // 先检查 testStore 中的报告状态
-    if (testStore.reportStatus?.isReady) {
-      isCompleted.value = true
-      currentStepIndex.value = steps.length - 1
-      await loadMajorRecommendationEligibility()
-      if (checkTimer) {
-        clearInterval(checkTimer)
-      }
-      return
-    }
-    
+
+    await syncUserAge()
+
     const response = await api.checkReportStatus(userId)
     console.log('[WaitingReport] 报告状态:', response)
-
-    // 解析报告状态: new_pdf 对应下载测试报告，html 对应报告解读版
-    const newPdf = response.code === 0 && response.data?.new_pdf === true
-    const html = response.code === 0 && response.data?.html === true
-
-    reportNewPdf.value = newPdf
-    reportHtml.value = html
-
-    if (newPdf || html) {
-      isCompleted.value = true
-      currentStepIndex.value = steps.length - 1
-      testStore.setReportStatus({
-        status: 'ready',
-        isReady: true,
-        message: response.msg || '报告已生成'
-      })
-      await loadMajorRecommendationEligibility()
-      if (checkTimer) {
-        clearInterval(checkTimer)
-      }
-    }
+    applyReportStatusResponse(response)
   } catch (error) {
     console.warn('检查报告状态失败:', error)
   }
@@ -706,17 +701,16 @@ async function handleOpenPublicityReport() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   startDotAnimation()
-  
-  // 检查是否已有报告就绪状态
+
   if (testStore.reportStatus?.isReady) {
     isCompleted.value = true
     currentStepIndex.value = steps.length - 1
-    loadMajorRecommendationEligibility()
-  } else {
-    // 定期检查报告状态
-    checkReportStatus()
+  }
+
+  await checkReportStatus()
+  if (!isCompleted.value) {
     checkTimer = setInterval(checkReportStatus, 30000)
   }
 })

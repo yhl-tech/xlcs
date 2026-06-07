@@ -34,6 +34,7 @@ import { useTestStore } from '@/stores/testStore'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
 import useApi from '@/composables/useApi'
 import { stopAllAudios } from '@/utils/audioManager'
+import { isReportStatusReady } from '@/utils/reportStatus'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -129,7 +130,7 @@ async function checkUserTestStatus() {
 
     // 判断报告是否就绪
     // code === 0 表示请求成功，data === true 表示报告已生成
-    const isReportReady = reportStatus.code === 0 && reportStatus.data === true
+    const isReportReady = isReportStatusReady(reportStatus)
 
     console.log('[App] 报告是否就绪:', isReportReady, '(code:', reportStatus.code, ', data:', reportStatus.data, ')')
 

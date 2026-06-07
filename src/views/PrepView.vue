@@ -266,6 +266,7 @@ import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import useApi from '@/composables/useApi'
 import { playAudio, stopAllAudios, getActiveAudioCount } from '@/utils/audioManager'
+import { isReportStatusReady } from '@/utils/reportStatus'
 import { useImagePreloader } from '@/composables/useImagePreloader'
 
 const router = useRouter()
@@ -369,7 +370,7 @@ onMounted(async () => {
       if (uploadStatus.code === 0 && uploadStatus.data === true) {
         console.log('[PrepView] 用户已提交过测试，跳转到等待报告页面')
         const reportStatus = await api.checkReportStatus(userId)
-        const isReportReady = reportStatus.code === 0 && reportStatus.data === true
+        const isReportReady = isReportStatusReady(reportStatus)
         testStore.setPhase('waiting')
         testStore.setReportStatus({
           status: isReportReady ? 'ready' : 'pending',

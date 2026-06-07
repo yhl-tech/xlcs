@@ -31,6 +31,9 @@ export function parseAgeFromBasicInfo(source) {
   if (!payload || typeof payload !== 'object') return null
 
   const raw = payload.age ?? payload.年龄
-  const age = parseInt(raw, 10)
+  if (raw === null || raw === undefined || raw === '') return null
+
+  const match = String(raw).match(/\d+/)
+  const age = match ? parseInt(match[0], 10) : parseInt(raw, 10)
   return Number.isFinite(age) ? age : null
 }
