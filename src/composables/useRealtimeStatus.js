@@ -41,6 +41,11 @@ function release() {
   }
 }
 
+/** 立即拉取在线人数（WebRTC 断开后可主动刷新） */
+export function refreshRealtimeStatus() {
+  return fetchStatus()
+}
+
 export function useRealtimeStatus() {
   onMounted(() => {
     acquire()

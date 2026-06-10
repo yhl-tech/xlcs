@@ -175,6 +175,7 @@
 import { ref, computed, onMounted, onUnmounted, shallowRef, markRaw, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { stopAllAudios } from '@/utils/audioManager'
 import LoginModal from '@/components/common/LoginModal.vue'
 import RealtimeStatusBadge from '@/components/common/RealtimeStatusBadge.vue'
 
@@ -210,13 +211,13 @@ watch(() => route.query.showLogin, (val) => {
   }
 }, { immediate: true })
 
-// 监听登录状态，已登录时关闭弹窗
+// 监听登录状态，已登录时关闭弹窗；退出时停止音频
 watch(() => authStore.token, (token) => {
   if (token) {
     showLoginModal.value = false
   } else {
-    // 退出登录时，如果在首页则不自动打开弹窗
     showLoginModal.value = false
+    stopAllAudios()
   }
 })
 

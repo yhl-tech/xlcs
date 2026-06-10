@@ -264,16 +264,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
-import useApi from '@/composables/useApi'
 import { playAudio, stopAllAudios, getActiveAudioCount } from '@/utils/audioManager'
-import { isReportStatusReady } from '@/utils/reportStatus'
 import { useImagePreloader } from '@/composables/useImagePreloader'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const testStore = useTestStore()
 const sessionStore = useSessionStore()
-const api = useApi()
 const { preloadAll } = useImagePreloader()
 
 // 表单数据
@@ -354,6 +351,12 @@ function handleClickOutside(event) {
 onMounted(async () => {
   console.log('[PrepView] 页面已加载')
 
+  // 路由守卫已做过检测；若状态已是 waiting，直接跳转
+  if (testStore.phase === 'waiting') {
+    router.replace('/test')
+    return
+  }
+
   if (authStore.isLoggedIn) {
     await authStore.syncBasicInfo()
     applyBasicInfoToForm(testStore.basicInfo)
@@ -361,29 +364,6 @@ onMounted(async () => {
 
   // 添加点击外部关闭下拉框的监听
   document.addEventListener('click', handleClickOutside)
-
-  // 检查用户是否已提交过测试，若已提交则直接跳转到等待报告页面
-  try {
-    const userId = authStore.userInfo?.username || authStore.userInfo?.phone
-    if (userId) {
-      const uploadStatus = await api.checkUploadFilesStatus(userId)
-      if (uploadStatus.code === 0 && uploadStatus.data === true) {
-        console.log('[PrepView] 用户已提交过测试，跳转到等待报告页面')
-        const reportStatus = await api.checkReportStatus(userId)
-        const isReportReady = isReportStatusReady(reportStatus)
-        testStore.setPhase('waiting')
-        testStore.setReportStatus({
-          status: isReportReady ? 'ready' : 'pending',
-          isReady: isReportReady,
-          message: isReportReady ? '报告已生成' : '报告处理中...'
-        })
-        router.replace('/test')
-        return
-      }
-    }
-  } catch (err) {
-    console.warn('[PrepView] 检查测试状态失败:', err)
-  }
 
   // 播放欢迎语音（使用 MP3 文件，不需要 WebRTC）
   if (!welcomeMessagePlayed) {

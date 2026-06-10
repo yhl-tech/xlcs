@@ -5,6 +5,7 @@
  */
 import { ref, reactive } from 'vue'
 import { OPENAI_CONFIG } from '@/utils/constants'
+import { refreshRealtimeStatus } from '@/composables/useRealtimeStatus'
 
 // lamejs 通过 script 标签加载到 window.lamejs
 // lamejs ES Module 有兼容性问题（MPEGMode is not defined），必须使用 script 方式
@@ -83,26 +84,60 @@ const callbacks = {
   onTranscript: null
 }
 
+const CLOSE_RETRY_DELAYS_MS = [0, 500, 1500]
+
+async function requestCloseProxyConnection (connectionId) {
+  const body = JSON.stringify({ connection_id: connectionId })
+  const headers = { 'Content-Type': 'application/json' }
+
+  const deleteRes = await fetch('/realtime/connection', { method: 'DELETE', headers, body })
+  if (deleteRes.ok || deleteRes.status === 404) {
+    return true
+  }
+
+  const deleteDetail = await deleteRes.text().catch(() => '')
+  console.warn('[Dialog] DELETE /realtime/connection 失败:', deleteRes.status, deleteDetail)
+
+  const postRes = await fetch('/realtime/connection/close', { method: 'POST', headers, body })
+  if (postRes.ok || postRes.status === 404) {
+    return true
+  }
+
+  const postDetail = await postRes.text().catch(() => '')
+  console.warn('[Dialog] POST /realtime/connection/close 失败:', postRes.status, postDetail)
+  return false
+}
+
 /**
- * 告知代理服务释放连接登记（DELETE /realtime/connection），失败不影响本地 WebRTC 清理
+ * 告知代理服务释放连接登记，成功后在线人数才会减少
+ * 仅在服务端确认（含 404 已不存在）后才清空 proxyConnectionId
  */
 async function notifyProxyConnectionClosed () {
   const id = proxyConnectionId
-  if (!id) return
-  proxyConnectionId = null
-  try {
-    const res = await fetch('/realtime/connection', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ connection_id: id })
-    })
-    if (!res.ok) {
-      const text = await res.text()
-      console.warn('[Dialog] 通知代理关闭连接失败:', res.status, text)
+  if (!id) return true
+
+  console.log('[Dialog] 通知代理关闭连接（在线人数）:', id)
+
+  for (let attempt = 0; attempt < CLOSE_RETRY_DELAYS_MS.length; attempt++) {
+    if (CLOSE_RETRY_DELAYS_MS[attempt] > 0) {
+      await new Promise(resolve => setTimeout(resolve, CLOSE_RETRY_DELAYS_MS[attempt]))
     }
-  } catch (e) {
-    console.warn('[Dialog] 通知代理关闭连接异常:', e)
+    try {
+      const closed = await requestCloseProxyConnection(id)
+      if (closed) {
+        proxyConnectionId = null
+        console.log('[Dialog] ✓ 代理连接已关闭:', id)
+        refreshRealtimeStatus().catch(() => {})
+        return true
+      }
+      console.warn(`[Dialog] 关闭代理连接失败，第 ${attempt + 1}/${CLOSE_RETRY_DELAYS_MS.length} 次`)
+    } catch (e) {
+      console.warn(`[Dialog] 关闭代理连接异常，第 ${attempt + 1}/${CLOSE_RETRY_DELAYS_MS.length} 次:`, e)
+    }
   }
+
+  console.error('[Dialog] ✗ 无法通知代理关闭连接，在线人数可能未更新:', id)
+  return false
 }
 
 export function useRealtimeDialog () {
@@ -640,6 +675,11 @@ export function useRealtimeDialog () {
       mixedAudioChunks = []
     } else {
       console.log('[Dialog] 保留录音数据，数据块数:', mixedAudioChunks.length)
+    }
+
+    // WebRTC 资源清理后再试一次，避免请求失败时在线人数残留
+    if (proxyConnectionId) {
+      await notifyProxyConnectionClosed()
     }
 
     console.log('[Dialog] 已断开连接')

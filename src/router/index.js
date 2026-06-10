@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useUiStore } from '@/stores/uiStore'
+import { stopAllAudios } from '@/utils/audioManager'
+import { resolveCompletedTestRedirect } from '@/utils/resolveCompletedTest'
 
 // 路由配置
 const routes = [
@@ -75,8 +78,10 @@ const router = createRouter({
   routes
 })
 
+const ROUTES_CHECK_COMPLETED_TEST = new Set(['Prep', 'Intro'])
+
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // 设置页面标题
   if (to.meta.title) {
     document.title = to.meta.title
@@ -100,6 +105,23 @@ router.beforeEach((to, from, next) => {
     next({ path: '/', query: { showLogin: 'true' } })
     return
   }
+
+  // 进入准备页/说明页前先查是否已测过，避免已测用户看到表单并听完引导语音
+  if (ROUTES_CHECK_COMPLETED_TEST.has(to.name)) {
+    const uiStore = useUiStore()
+    uiStore.showLoading('正在检查测试状态...')
+    try {
+      const { completed } = await resolveCompletedTestRedirect()
+      if (completed) {
+        next({ name: 'Test', replace: true })
+        return
+      }
+    } catch (error) {
+      console.warn('[Router] 检查测试状态失败:', error)
+    } finally {
+      uiStore.hideLoading()
+    }
+  }
   
   next()
 })
@@ -109,6 +131,14 @@ router.afterEach((to, from) => {
   // 只在路由真正改变时滚动到顶部（排除首页内部滚动）
   if (to.path !== from.path) {
     window.scrollTo(0, 0)
+  }
+
+  // 回到首页且未登录时，确保媒体已停止（防止退出后音频/状态残留）
+  if (to.name === 'Home') {
+    const authStore = useAuthStore()
+    if (!authStore.isLoggedIn) {
+      stopAllAudios()
+    }
   }
 })
 

@@ -48,6 +48,7 @@ import { useTestStore } from '@/stores/testStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { stopAllAudios } from '@/utils/audioManager'
 import { isDevelopment } from '@/utils/constants'
+import { useLogout } from '@/composables/useLogout'
 import RealtimeStatusBadge from '@/components/common/RealtimeStatusBadge.vue'
 
 // 获取 BASE_URL 用于资源路径
@@ -64,6 +65,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const testStore = useTestStore()
 const sessionStore = useSessionStore()
+const { logout } = useLogout()
 
 const displayName = computed(() => {
   return authStore.userInfo?.username || authStore.userInfo?.phone || '用户'
@@ -97,28 +99,7 @@ function handleEnterTest() {
 
 function handleLogout() {
   if (confirm('确定要退出登录吗？')) {
-    console.log('[AppHeader] 开始退出登录流程')
-
-    // 1. 停止所有音频播放
-    stopAllAudios()
-
-    // 2. 断开 WebRTC 连接
-    if (window.$realtimeDialog && window.$realtimeDialog.isConnected.value) {
-      console.log('[AppHeader] 断开 WebRTC 连接')
-      window.$realtimeDialog.disconnect()
-    }
-
-    // 3. 清空用户状态
-    authStore.logout()
-
-    // 4. 清空测试数据
-    testStore.resetTest()
-    sessionStore.clearSnapshot()
-
-    // 5. 跳转到首页（不带 showLogin 参数）
-    router.push('/')
-
-    console.log('[AppHeader] 退出登录完成')
+    logout()
   }
 }
 </script>

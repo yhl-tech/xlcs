@@ -32,9 +32,8 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useTestStore } from '@/stores/testStore'
 import { useRealtimeDialog } from '@/composables/useRealtimeDialog'
-import useApi from '@/composables/useApi'
 import { stopAllAudios } from '@/utils/audioManager'
-import { isReportStatusReady } from '@/utils/reportStatus'
+import { resolveCompletedTestRedirect } from '@/utils/resolveCompletedTest'
 import BlackHoleBackground from '@/components/effects/BlackHoleBackground.vue'
 import LoadingOverlay from '@/components/common/LoadingOverlay.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -44,8 +43,6 @@ const router = useRouter()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 const testStore = useTestStore()
-const api = useApi()
-
 // 全局 WebRTC 实时对话服务
 const realtimeDialog = useRealtimeDialog()
 
@@ -74,99 +71,37 @@ watch(() => route.name, (routeName, oldRouteName) => {
   }
 }, { immediate: false })
 
-// 监听登录状态，登出时断开 WebRTC
+// 监听登录状态，登出时停止音频并断开 WebRTC
 watch(() => authStore.isLoggedIn, (isLoggedIn) => {
-  if (!isLoggedIn && realtimeDialog.isConnected.value) {
-    console.log('[App] 用户已登出，断开 WebRTC 连接')
-    realtimeDialog.disconnect()
+  if (!isLoggedIn) {
+    stopAllAudios()
+    console.log('[App] 用户已登出，断开 WebRTC 并关闭在线人数登记')
+    realtimeDialog.disconnect().catch((error) => {
+      console.warn('[App] 登出后断开 WebRTC 失败:', error)
+    })
   }
 })
 
 // 检查用户是否已提交测试（用于页面刷新时的状态恢复）
 async function checkUserTestStatus() {
+  const currentPath = route.path
+  if (currentPath === '/' || currentPath === '/login') {
+    testStore.setInitialCheckComplete(true)
+    return false
+  }
+
   try {
-    const userId = authStore.userInfo?.username || authStore.userInfo?.phone
-    if (!userId) {
-      console.log('[App] 无用户ID，跳过检查')
-      return false
-    }
-
-    // 不在登录页和首页检查
-    const currentPath = route.path
-    if (currentPath === '/' || currentPath === '/login') {
-      console.log('[App] 在首页或登录页，跳过检查')
-      return false
-    }
-
-    console.log('[App] 检查用户测试状态:', userId)
-
-    // 1. 检查用户是否已提交测试数据
-    let uploadStatus
-    try {
-      uploadStatus = await api.checkUploadFilesStatus(userId)
-      console.log('[App] 上传状态:', JSON.stringify(uploadStatus))
-    } catch (err) {
-      console.error('[App] checkUploadFilesStatus 调用失败:', err)
-      return false
-    }
-
-    // 如果用户未提交数据，不跳转
-    // code !== 0 表示请求失败，data !== true 表示未提交过测试
-    if (uploadStatus.code !== 0 || uploadStatus.data !== true) {
-      console.log('[App] 用户未提交过测试, code:', uploadStatus.code, 'data:', uploadStatus.data)
-      return false
-    }
-
-    // 2. 用户已提交数据，获取报告状态
-    console.log('[App] ✓ 用户已提交测试，开始调用 checkReportStatus...')
-    let reportStatus
-    try {
-      reportStatus = await api.checkReportStatus(userId)
-      console.log('[App] 报告状态:', JSON.stringify(reportStatus))
-    } catch (err) {
-      console.error('[App] checkReportStatus 调用失败:', err)
-      return false
-    }
-
-    // 判断报告是否就绪
-    // code === 0 表示请求成功，data === true 表示报告已生成
-    const isReportReady = isReportStatusReady(reportStatus)
-
-    console.log('[App] 报告是否就绪:', isReportReady, '(code:', reportStatus.code, ', data:', reportStatus.data, ')')
-
-    // 3. 设置状态并跳转到等待报告页面
-    console.log('[App] 设置 phase 为 waiting，跳转到报告等待页面')
-    testStore.setPhase('waiting')
-    testStore.setReportStatus({
-      status: isReportReady ? 'ready' : 'pending',
-      isReady: isReportReady,
-      message: reportStatus.msg || (isReportReady ? '报告已生成' : '报告处理中...')
-    })
-    
-    // 跳转到 /test 页面（用 replace 避免历史记录堆积）
-    // 即使当前在 /test，也强制跳转以确保组件重新渲染
-    if (currentPath !== '/test') {
-      console.log('[App] 跳转到 /test')
+    const { completed } = await resolveCompletedTestRedirect()
+    if (completed && currentPath !== '/test') {
       router.replace('/test')
-    } else {
-      console.log('[App] 已在 /test 页面，phase 已设置为 waiting')
     }
-    return true
+    return completed
   } catch (error) {
     console.error('[App] 检查测试状态失败:', error)
+    testStore.setInitialCheckComplete(true)
     return false
   }
 }
-
-// 监听路由变化，登录后检查测试状态
-watch(() => route.path, async (newPath, oldPath) => {
-  // 从登录页跳转到其他页面时，检查用户测试状态
-  if (oldPath === '/login' && newPath !== '/login' && newPath !== '/') {
-    console.log('[App] 从登录页跳转，检查用户测试状态')
-    await checkUserTestStatus()
-    testStore.setInitialCheckComplete(true)
-  }
-})
 
 onMounted(async () => {
   console.log('塞拉 Vue 3 版本已启动')
@@ -189,9 +124,6 @@ onMounted(async () => {
   console.log('[App] 开始检查用户测试状态...')
   await checkUserTestStatus()
   console.log('[App] 检查用户测试状态完成')
-  
-  // 标记初始检查已完成
-  testStore.setInitialCheckComplete(true)
 })
 </script>
 
